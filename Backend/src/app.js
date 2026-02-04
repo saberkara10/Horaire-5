@@ -5,7 +5,7 @@ const app = express();
 app.use(express.json());
 
 // Route de vérification du serveur
-app.get("/api/health", (req, res) => {
+app.get("/api/health", (request, response) => {
   res.status(200).json({
     status: "OK",
     message: "Le serveur fonctionne correctement"
@@ -13,7 +13,7 @@ app.get("/api/health", (req, res) => {
 });
 
 // Route de test API
-app.get("/api/test", (req, res) => {
+app.get("/api/test", (request, response) => {
   res.status(200).json({
     message: "La route de test fonctionne correctement"
   });
