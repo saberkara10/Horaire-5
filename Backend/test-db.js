@@ -1,8 +1,18 @@
+/**
+ * Test de connexion à la base de données MySQL.
+ *
+ * Exécute une requête simple pour vérifier que
+ * la connexion avec la base fonctionne correctement.
+ */
+
 import db from "./db.js";
 
+/**
+ * Fonction auto-exécutée pour tester la connexion MySQL.
+ */
 (async () => {
   try {
-    const [rows] = await db.query("SELECT 1 AS test");
+    await db.query("SELECT 1");
     console.log("Connexion MySQL OK");
     process.exit(0);
   } catch (err) {
