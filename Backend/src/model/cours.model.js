@@ -15,7 +15,7 @@
  * - type_salle
  */
 
-import pool from "../db/pool.js";
+import pool from "../../db.js";
 
 /**
  * Récupérer tous les cours.
@@ -40,7 +40,7 @@ export async function recupererTousLesCours() {
  */
 export async function recupererCoursParId(idCours) {
   const [coursTrouve] = await pool.query(
-    `SELECT id_cours, code, nom, duree, programme, etape_etude, tywpe_salle
+    `SELECT id_cours, code, nom, duree, programme, etape_etude, type_salle
      FROM cours
      WHERE id_cours = ?
      LIMIT 1`,
