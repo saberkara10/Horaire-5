@@ -1,7 +1,15 @@
-const app = require("./app");
 
 /**
- * Port d’écoute du serveur.
+ * Démarrage du serveur backend.
+ *
+ * Lance l'application Express sur le port défini
+ * dans les variables d'environnement.
+ */
+
+import app from "./app.js";
+
+/**
+ * Port d'écoute du serveur.
  */
 const PORT = process.env.PORT || 3000;
 
