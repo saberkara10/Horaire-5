@@ -1,21 +1,34 @@
-const express = require("express");
-require("dotenv").config();
+/**
+ * Configuration principale de l'application Express.
+ */
+
+import express from "express";
+import dotenv from "dotenv";
+
+import coursRoutes from "../routes/cours.routes.js";
+
+dotenv.config();
 
 const app = express();
+
 app.use(express.json());
 
-// Route de vérification du serveur
+// Route santé serveur
 app.get("/api/health", (request, response) => {
   response.status(200).json({
     status: "OK",
-    message: "Le serveur fonctionne correctement"
+    message: "Le serveur fonctionne correctement",
   });
 });
 
-// Route de test API
+// Route test
 app.get("/api/test", (request, response) => {
   response.status(200).json({
-    message: "La route de test fonctionne correctement"
+    message: "La route de test fonctionne correctement",
   });
 });
-module.exports =app;
+
+// Initialiser routes cours
+coursRoutes(app);
+
+export default app;

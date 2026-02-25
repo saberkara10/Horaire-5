@@ -69,4 +69,4 @@ app.get("/responsable-only", authRequired, authorize(["RESPONSABLE"]), (req, res
 
 // Démarrage du serveur
 
-app.listen(PORT, () => console.log(`Serveur démarré sur http://localhost:${PORT}`));
+export default app;
