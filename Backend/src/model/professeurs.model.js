@@ -1,118 +1,177 @@
 /**
- * ROUTES — Module Professeurs
+ * MODEL - Gestion des professeurs
  *
- * Ce module définit toutes les routes HTTP liées aux professeurs.
- * Les validations sont appliquées avant l'appel au modèle.
+ * Ce module contient uniquement les requetes SQL liees a la table `professeurs`.
+ * Aucune validation metier ici.
+ *
+ * Table `professeurs` :
+ * - id_professeur (PK)
+ * - matricule (UNIQUE)
+ * - nom
+ * - prenom
+ * - specialite
  */
 
-import {
-  recupererTousLesProfesseurs,
-  recupererProfesseurParId,
-  ajouterProfesseur,
-  modifierProfesseur,
-  supprimerProfesseur,
-} from "../src/model/professeurs.model.js";
-
-import {
-  validerIdProfesseur,
-  verifierProfesseurExiste,
-  validerCreateProfesseur,
-  validerUpdateProfesseur,
-  validerDeleteProfesseur,
-} from "../src/validations/professeurs.validations.js";
+import pool from "../../db.js";
 
 /**
- * Initialiser les routes des professeurs.
+ * Recuperer tous les professeurs.
  *
- * @param {import("express").Express} app Application Express.
+ * @returns {Promise<Array<Object>>} Liste des professeurs.
  */
-export default function professeursRoutes(app) {
-  /**
-   * GET /api/professeurs
-   * Récupérer tous les professeurs.
-   */
-  app.get("/api/professeurs", async (request, response) => {
-    try {
-      const professeurs = await recupererTousLesProfesseurs();
-      response.status(200).json(professeurs);
-    } catch (error) {
-      response.status(500).json({ message: "Erreur serveur." });
-    }
-  });
-
-  /**
-   * GET /api/professeurs/:id
-   * Récupérer un professeur par son identifiant.
-   */
-  app.get(
-    "/api/professeurs/:id",
-    validerIdProfesseur,
-    verifierProfesseurExiste,
-    async (request, response) => {
-      try {
-        response.status(200).json(request.professeur);
-      } catch (error) {
-        response.status(500).json({ message: "Erreur serveur." });
-      }
-    }
+export async function recupererTousLesProfesseurs() {
+  const [listeProfesseurs] = await pool.query(
+    `SELECT id_professeur, matricule, nom, prenom, specialite
+     FROM professeurs
+     ORDER BY matricule ASC`
   );
 
-  /**
-   * POST /api/professeurs
-   * Ajouter un nouveau professeur.
-   */
-  app.post(
-    "/api/professeurs",
-    validerCreateProfesseur,
-    async (request, response) => {
-      try {
-        const professeurAjoute = await ajouterProfesseur(request.body);
-        response.status(201).json(professeurAjoute);
-      } catch (error) {
-        response.status(500).json({ message: "Erreur serveur." });
-      }
-    }
+  return listeProfesseurs;
+}
+
+/**
+ * Recuperer un professeur par son identifiant.
+ *
+ * @param {number} idProfesseur - Identifiant du professeur.
+ * @returns {Promise<Object|null>} Le professeur trouve ou null.
+ */
+export async function recupererProfesseurParId(idProfesseur) {
+  const [professeurTrouve] = await pool.query(
+    `SELECT id_professeur, matricule, nom, prenom, specialite
+     FROM professeurs
+     WHERE id_professeur = ?
+     LIMIT 1`,
+    [idProfesseur]
   );
 
-  /**
-   * PUT /api/professeurs/:id
-   * Modifier un professeur existant.
-   */
-  app.put(
-    "/api/professeurs/:id",
-    validerIdProfesseur,
-    verifierProfesseurExiste,
-    validerUpdateProfesseur,
-    async (request, response) => {
-      try {
-        const professeurModifie = await modifierProfesseur(
-          Number(request.params.id),
-          request.body
-        );
+  return professeurTrouve.length ? professeurTrouve[0] : null;
+}
 
-        response.status(200).json(professeurModifie);
-      } catch (error) {
-        response.status(500).json({ message: "Erreur serveur." });
-      }
-    }
+/**
+ * Verifier si un professeur existe par son matricule.
+ *
+ * @param {string} matriculeProfesseur - Matricule du professeur.
+ * @returns {Promise<Object|null>} Le professeur trouve ou null.
+ */
+export async function recupererProfesseurParMatricule(matriculeProfesseur) {
+  const [professeurTrouve] = await pool.query(
+    `SELECT id_professeur, matricule, nom, prenom, specialite
+     FROM professeurs
+     WHERE matricule = ?
+     LIMIT 1`,
+    [matriculeProfesseur]
   );
 
-  /**
-   * DELETE /api/professeurs/:id
-   * Supprimer un professeur (DELETE réel).
-   */
-  app.delete(
-    "/api/professeurs/:id",
-    validerIdProfesseur,
-    verifierProfesseurExiste,
-    validerDeleteProfesseur,
-    async (request, response) => {
-      try {
-        await supprimerProfesseur(Number(request.params.id));
-        response.status(200).json({ message: "Professeur supprimé." });
-      } catch (error) {
-        response.status(500).json({ message: "Erreur serveur." });
-      }
-    }
+  return professeurTrouve.length ? professeurTrouve[0] : null;
+}
+
+/**
+ * Ajouter un nouveau professeur.
+ *
+ * @param {Object} nouveauProfesseur
+ * @param {string} nouveauProfesseur.matricule
+ * @param {string} nouveauProfesseur.nom
+ * @param {string} nouveauProfesseur.prenom
+ * @param {string|null} nouveauProfesseur.specialite
+ *
+ * @returns {Promise<Object>} Le professeur ajoute.
+ */
+export async function ajouterProfesseur(nouveauProfesseur) {
+  const { matricule, nom, prenom, specialite } = nouveauProfesseur;
+
+  const [resultatInsertion] = await pool.query(
+    `INSERT INTO professeurs (matricule, nom, prenom, specialite)
+     VALUES (?, ?, ?, ?)`,
+    [matricule, nom, prenom, specialite ?? null]
   );
+
+  return recupererProfesseurParId(resultatInsertion.insertId);
+}
+
+/**
+ * Modifier un professeur existant.
+ *
+ * @param {number} idProfesseur - Identifiant du professeur.
+ * @param {Object} donneesModification - Champs a modifier.
+ *
+ * @returns {Promise<Object|null>} Le professeur modifie ou null si inexistant.
+ */
+export async function modifierProfesseur(idProfesseur, donneesModification) {
+  const champsAModifier = [];
+  const valeurs = [];
+
+  if (donneesModification.matricule !== undefined) {
+    champsAModifier.push("matricule = ?");
+    valeurs.push(donneesModification.matricule);
+  }
+
+  if (donneesModification.nom !== undefined) {
+    champsAModifier.push("nom = ?");
+    valeurs.push(donneesModification.nom);
+  }
+
+  if (donneesModification.prenom !== undefined) {
+    champsAModifier.push("prenom = ?");
+    valeurs.push(donneesModification.prenom);
+  }
+
+  if (donneesModification.specialite !== undefined) {
+    champsAModifier.push("specialite = ?");
+    valeurs.push(donneesModification.specialite);
+  }
+
+  if (champsAModifier.length === 0) {
+    return recupererProfesseurParId(idProfesseur);
+  }
+
+  valeurs.push(idProfesseur);
+
+  const [resultatModification] = await pool.query(
+    `UPDATE professeurs
+     SET ${champsAModifier.join(", ")}
+     WHERE id_professeur = ?
+     LIMIT 1`,
+    valeurs
+  );
+
+  if (resultatModification.affectedRows === 0) {
+    return null;
+  }
+
+  return recupererProfesseurParId(idProfesseur);
+}
+
+/**
+ * Verifier si un professeur est deja affecte dans un horaire.
+ *
+ * @param {number} idProfesseur - Identifiant du professeur.
+ * @returns {Promise<boolean>} true si affecte, sinon false.
+ */
+export async function professeurEstDejaAffecte(idProfesseur) {
+  const [affectations] = await pool.query(
+    `SELECT 1
+     FROM affectation_cours
+     WHERE id_professeur = ?
+     LIMIT 1`,
+    [idProfesseur]
+  );
+
+  return affectations.length > 0;
+}
+
+/**
+ * Supprimer un professeur.
+ *
+ * @param {number} idProfesseur - Identifiant du professeur.
+ * @returns {Promise<boolean>} true si supprime.
+ */
+export async function supprimerProfesseur(idProfesseur) {
+  const [resultatSuppression] = await pool.query(
+    `DELETE FROM professeurs
+     WHERE id_professeur = ?
+     LIMIT 1`,
+    [idProfesseur]
+  );
+
+  return resultatSuppression.affectedRows > 0;
 }

@@ -1,179 +1,107 @@
 /**
- * Routes — Gestion des professeurs
+ * ROUTES - Module Professeurs
  *
- * Ce module gère :
- * - CRUD des professeurs
- * - Validation des données
- * - Vérification d'unicité du matricule
+ * Ce module definit toutes les routes HTTP liees aux professeurs.
+ * Les validations sont appliquees avant l'appel au modele.
  */
-
-import { Router } from "express";
 
 import {
-  recupererTousLesProfesseurs,
-  recupererProfesseurParId,
-  recupererProfesseurParMatricule,
-  ajouterProfesseur,
-  modifierProfesseur,
-  supprimerProfesseur,
-} from "../src/model/professeurs.model.js";
+  recupererTousLesProfesseurs,ajouterProfesseur,modifierProfesseur,supprimerProfesseur,} from "../src/model/professeurs.model.js";
 
-import {
-  validerIdProfesseur,
-  validerCreationProfesseur,
-  validerModificationProfesseur,
-} from "../src/validations/professeurs.validation.js";
-
-const router = Router();
+import {validerIdProfesseur,verifierProfesseurExiste, validerCreateProfesseur, validerUpdateProfesseur, validerDeleteProfesseur,} from "../src/validations/professeurs.validation.js";
 
 /**
- * GET /api/professeurs
- * Retourne la liste des professeurs.
+ * Initialiser les routes des professeurs.
+ *
+ * @param {import("express").Express} app Application Express.
  */
-router.get("/", async (request, response) => {
-  try {
-    const professeurs = await recupererTousLesProfesseurs();
-    return response.json(professeurs);
-  } catch (error) {
-    console.error("Erreur recupererTousLesProfesseurs :", error);
-    return response.status(500).json({ message: "Erreur serveur" });
-  }
-});
-
-/**
- * GET /api/professeurs/:id
- * Retourne un professeur par identifiant.
- */
-router.get("/:id", async (request, response) => {
-  try {
-    const validationId = validerIdProfesseur(request.params.id);
-
-    if (!validationId.ok) {
-      return response.status(400).json({ message: validationId.message });
+export default function professeursRoutes(app) {
+  /**
+   * GET /api/professeurs
+   * Recuperer tous les professeurs.
+   */
+  app.get("/api/professeurs", async (request, response) => {
+    try {
+      const professeurs = await recupererTousLesProfesseurs();
+      response.status(200).json(professeurs);
+    } catch (error) {
+      response.status(500).json({ message: "Erreur serveur." });
     }
+  });
 
-    const professeur = await recupererProfesseurParId(validationId.value);
-
-    if (!professeur) {
-      return response.status(404).json({ message: "Professeur introuvable" });
-    }
-
-    return response.json(professeur);
-  } catch (error) {
-    console.error("Erreur recupererProfesseurParId :", error);
-    return response.status(500).json({ message: "Erreur serveur" });
-  }
-});
-
-/**
- * POST /api/professeurs
- * Ajoute un nouveau professeur.
- */
-router.post("/", async (request, response) => {
-  try {
-    const validation = validerCreationProfesseur(request.body);
-
-    if (!validation.ok) {
-      return response.status(400).json({ message: validation.message });
-    }
-
-    // Vérifier l’unicité du matricule
-    const existe = await recupererProfesseurParMatricule(validation.value.matricule);
-
-    if (existe) {
-      return response.status(409).json({ message: "Matricule déjà existant" });
-    }
-
-    const professeurAjoute = await ajouterProfesseur(validation.value);
-
-    return response.status(201).json({
-      message: "Professeur ajouté avec succès",
-      professeur: professeurAjoute,
-    });
-  } catch (error) {
-    console.error("Erreur ajouterProfesseur :", error);
-    return response.status(500).json({ message: "Erreur serveur" });
-  }
-});
-
-/**
- * PUT /api/professeurs/:id
- * Modifie un professeur existant.
- */
-router.put("/:id", async (request, response) => {
-  try {
-    const validationId = validerIdProfesseur(request.params.id);
-
-    if (!validationId.ok) {
-      return response.status(400).json({ message: validationId.message });
-    }
-
-    const validationBody = validerModificationProfesseur(request.body);
-
-    if (!validationBody.ok) {
-      return response.status(400).json({ message: validationBody.message });
-    }
-
-    // Si modification du matricule → vérifier unicité
-    if (validationBody.value.matricule !== undefined) {
-      const profAvecMemeMatricule =
-        await recupererProfesseurParMatricule(validationBody.value.matricule);
-
-      if (
-        profAvecMemeMatricule &&
-        profAvecMemeMatricule.id_professeur !== validationId.value
-      ) {
-        return response.status(409).json({ message: "Matricule déjà existant" });
+  /**
+   * GET /api/professeurs/:id
+   * Recuperer un professeur par son identifiant.
+   */
+  app.get(
+    "/api/professeurs/:id",
+    validerIdProfesseur,
+    verifierProfesseurExiste,
+    async (request, response) => {
+      try {
+        response.status(200).json(request.professeur);
+      } catch (error) {
+        response.status(500).json({ message: "Erreur serveur." });
       }
     }
+  );
 
-    const professeurModifie = await modifierProfesseur(
-      validationId.value,
-      validationBody.value
-    );
-
-    if (!professeurModifie) {
-      return response.status(404).json({ message: "Professeur introuvable" });
+  /**
+   * POST /api/professeurs
+   * Ajouter un nouveau professeur.
+   */
+  app.post(
+    "/api/professeurs",
+    validerCreateProfesseur,
+    async (request, response) => {
+      try {
+        const professeurAjoute = await ajouterProfesseur(request.body);
+        response.status(201).json(professeurAjoute);
+      } catch (error) {
+        response.status(500).json({ message: "Erreur serveur." });
+      }
     }
+  );
 
-    return response.json({
-      message: "Professeur modifié avec succès",
-      professeur: professeurModifie,
-    });
-  } catch (error) {
-    console.error("Erreur modifierProfesseur :", error);
-    return response.status(500).json({ message: "Erreur serveur" });
-  }
-});
+  /**
+   * PUT /api/professeurs/:id
+   * Modifier un professeur existant.
+   */
+  app.put(
+    "/api/professeurs/:id",
+    validerIdProfesseur,
+    verifierProfesseurExiste,
+    validerUpdateProfesseur,
+    async (request, response) => {
+      try {
+        const professeurModifie = await modifierProfesseur(
+          Number(request.params.id),
+          request.body
+        );
 
-/**
- * DELETE /api/professeurs/:id
- * Supprime un professeur.
- */
-router.delete("/:id", async (request, response) => {
-  try {
-    const validationId = validerIdProfesseur(request.params.id);
-
-    if (!validationId.ok) {
-      return response.status(400).json({ message: validationId.message });
+        response.status(200).json(professeurModifie);
+      } catch (error) {
+        response.status(500).json({ message: "Erreur serveur." });
+      }
     }
+  );
 
-    const supprime = await supprimerProfesseur(validationId.value);
-
-    if (!supprime) {
-      return response.status(404).json({ message: "Professeur introuvable" });
+  /**
+   * DELETE /api/professeurs/:id
+   * Supprimer un professeur (DELETE reel).
+   */
+  app.delete(
+    "/api/professeurs/:id",
+    validerIdProfesseur,
+    verifierProfesseurExiste,
+    validerDeleteProfesseur,
+    async (request, response) => {
+      try {
+        await supprimerProfesseur(Number(request.params.id));
+        response.status(200).json({ message: "Professeur supprime." });
+      } catch (error) {
+        response.status(500).json({ message: "Erreur serveur." });
+      }
     }
-
-    return response.json({
-      message: "Professeur supprimé avec succès",
-    });
-  } catch (error) {
-    console.error("Erreur supprimerProfesseur :", error);
-
-    return response.status(409).json({
-      message: "Suppression impossible (professeur lié à d'autres données)",
-    });
-  }
-});
-
-export default router;
+  );
+}
