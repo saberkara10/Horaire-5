@@ -104,4 +104,5 @@ export default function coursRoutes(app) {
       }
     }
   );
+  
 }
