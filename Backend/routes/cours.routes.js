@@ -24,6 +24,7 @@ export default function coursRoutes(app) {
       const cours = await recupererTousLesCours();
       response.status(200).json(cours);
     } catch (error) {
+      console.error("ERREUR GET /api/cours :", error);  
       response.status(500).json({ message: "Erreur serveur." });
     }
   });
