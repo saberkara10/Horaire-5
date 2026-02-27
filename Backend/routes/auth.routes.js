@@ -1,11 +1,12 @@
 /**
- * Routes d'authentification de l'application.
+ * Routes d'authentification.
  *
- * Ce module gère :
- * la connexion des utilisateurs (login)
- * la récupération de l'utilisateur connecté via la session
- * la déconnexion (logout)
+ * Gère :
+ * - La connexion utilisateur
+ * - La déconnexion
+ * - La récupération de l'utilisateur connecté
  *
+ * Table utilisée : utilisateurs
  */
 
 import { Router } from "express";
@@ -15,108 +16,120 @@ import pool from "../db.js";
 const router = Router();
 
 /**
- * Récupère un utilisateur par email
+ * Recherche un utilisateur par email.
+ *
+ * @param {string} email - Email de l'utilisateur
+ * @returns {Promise<Object|null>} Utilisateur trouvé ou null
  */
 const findUserByEmail = async (email) => {
+
   const [rows] = await pool.query(
-    `SELECT id, email, mot_de_passe_hash, nom, prenom, actif
+    `SELECT id_utilisateur, email, motdepasse, nom, prenom, role
      FROM utilisateurs
      WHERE email = ?`,
     [email]
   );
+
   return rows[0] ?? null;
 };
 
-/**
- * Récupère les rôles d’un utilisateur
- */
-const fetchRoles = async (userId) => {
-  const [rows] = await pool.query(
-    `SELECT r.code
-     FROM utilisateur_roles ur
-     JOIN roles r ON r.id = ur.role_id
-     WHERE ur.utilisateur_id = ?`,
-    [userId]
-  );
-  return rows.map(r => r.code);
-};
 
 /**
- * POST /auth/login
- * Authentifie un utilisateur et initialise la session
+ * Route POST /auth/login
+ *
+ * @param {Request} request - Contient email et password dans request.body
+ * @param {Response} response - Retourne le résultat JSON
+ * @returns {void}
  */
-router.post("/login", async (req, res) => {
+router.post("/login", async (request, response) => {
+
   try {
-    const { email, password } = req.body ?? {};
+
+    const { email, password } = request.body ?? {};
 
     if (!email || !password) {
-      return res.status(400).json({ message: "Email et mot de passe requis" });
+      return response.status(400).json({
+        message: "Email et mot de passe requis"
+      });
     }
 
-    const cleanEmail = String(email).toLowerCase().trim();
+    const cleanEmail = email.toLowerCase().trim();
+
     const user = await findUserByEmail(cleanEmail);
 
-    
     if (!user) {
-      return res.status(401).json({ message: "Identifiants invalides" });
+      return response.status(401).json({
+        message: "Identifiants invalides"
+      });
     }
 
-    if (!user.actif) {
-      return res.status(401).json({ message: "Compte désactivé" });
+    const passwordValid = await bcrypt.compare(
+      password,
+      user.motdepasse
+    );
+
+    if (!passwordValid) {
+      return response.status(401).json({
+        message: "Identifiants invalides"
+      });
     }
 
-    const passwordOk = await bcrypt.compare(password, user.mot_de_passe_hash);
-
-    if (!passwordOk) {
-      return res.status(401).json({ message: "Identifiants invalides" });
-    }
-
-    const roles = await fetchRoles(user.id);
-
-    req.session.user = {
-      id: user.id,
+    request.session.user = {
+      id: user.id_utilisateur,
       email: user.email,
       nom: user.nom,
       prenom: user.prenom,
-      roles,
+      role: user.role,
     };
 
-    return res.json({
+    return response.status(200).json({
       message: "Connexion réussie",
-      user: req.session.user,
+      user: request.session.user
     });
 
-  } catch (err) {
-    console.error("Erreur login :", err);
-    return res.status(500).json({ message: "Erreur serveur" });
+  } catch (error) {
+
+    return response.status(500).json({
+      message: "Erreur interne du serveur"
+    });
   }
 });
 
-/**
- * POST /auth/logout
- * Détruit la session utilisateur
- */
-router.post("/logout", (req, res) => {
-  if (!req.session) {
-    return res.json({ message: "Aucune session active" });
-  }
 
-  req.session.destroy(() => {
-    res.clearCookie("sid");
-    res.json({ message: "Déconnexion réussie" });
+/**
+ * Route POST /auth/logout
+ *
+ * @param {Request} request
+ * @param {Response} response
+ * @returns {void}
+ */
+router.post("/logout", (request, response) => {
+
+  request.session.destroy(() => {
+    response.clearCookie("sid");
+    response.json({
+      message: "Déconnexion réussie"
+    });
   });
 });
 
+
 /**
- * GET /auth/me
- * Retourne l’utilisateur connecté
+ * Route GET /auth/me
+ *
+ * @param {Request} request
+ * @param {Response} response
+ * @returns {void}
  */
-router.get("/me", (req, res) => {
-  if (!req.session?.user) {
-    return res.status(401).json({ message: "Authentification requise" });
+router.get("/me", (request, response) => {
+
+  if (!request.session?.user) {
+    return response.status(401).json({
+      message: "Authentification requise"
+    });
   }
-  res.json({ user: req.session.user });
+
+  response.json({ user: request.session.user });
 });
 
 export default router;
-

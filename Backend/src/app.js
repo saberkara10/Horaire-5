@@ -6,6 +6,7 @@ import express from "express";
 import dotenv from "dotenv";
 
 import coursRoutes from "../routes/cours.routes.js";
+import professeursRoutes from "../routes/professeurs.routes.js";
 
 dotenv.config();
 
@@ -30,5 +31,8 @@ app.get("/api/test", (request, response) => {
 
 // Initialiser routes cours
 coursRoutes(app);
+
+// initialiser routes professeurs
+professeursRoutes(app);
 
 export default app;
