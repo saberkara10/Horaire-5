@@ -1,78 +1,98 @@
 /**
- * Point d'entrée du serveur backend (API).
+ * Configuration principale de l'application Express.
  *
- * Initialise Express, sessions, parsing JSON, CORS, sécurité.
- * Monte les routes (auth, salles, modules métier).
- * Protège les routes sensibles via les middlewares d'authentification
- * et d'autorisation.
+ * Initialise Express, sécurité, sessions, Passport et les routes métier.
  */
 
-import express, { json } from "express";
+import express from "express";
 import session from "express-session";
 import cors from "cors";
 import helmet from "helmet";
 import compression from "compression";
 import passport from "passport";
-import "dotenv/config";
+import dotenv from "dotenv";
+
 import "./auth.js";
 import { userAuth, userAdmin, userResponsable } from "./middlewares/auth.js";
 import authRoutes from "./routes/auth.routes.js";
 import sallesRoutes from "./routes/salles.routes.js";
-import coursRoutes from "./routes/cours.routes.js";
-import professeursRoutes from "./routes/professeurs.routes.js";
+// import coursRoutes from "./routes/cours.routes.js";
+// import professeursRoutes from "./routes/professeurs.routes.js";
 
-
+dotenv.config();
 
 // Validation des variables d'environnement
 const SESSION_SECRET = process.env.SESSION_SECRET;
 if (!SESSION_SECRET) {
-    throw new Error("SESSION_SECRET manquant dans .env");
+  throw new Error("SESSION_SECRET manquant dans .env");
 }
 
-const PORT = process.env.PORT || 3000;
-
-// Création du serveur
+// Création de l'application
 const app = express();
 
-// Ajout des middlewares
+// Middlewares globaux
 app.use(helmet());
 app.use(compression());
-app.use(json());
-app.use(cors({
+app.use(express.json());
+
+app.use(
+  cors({
     origin: process.env.CORS_ORIGIN || "http://localhost:5173",
-    credentials: true
-}));
-app.use(session({
+    credentials: true,
+  })
+);
+
+app.use(
+  session({
     name: "sid",
     secret: SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
     cookie: {
-        httpOnly: true,
-        maxAge: 1000 * 60 * 60,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax"
-    }
-}));
+      httpOnly: true,
+      maxAge: 1000 * 60 * 60,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+    },
+  })
+);
+
 app.use(passport.initialize());
 app.use(passport.session());
 
+// Routes utilitaires
+app.get("/api/health", (request, response) => {
+  response.status(200).json({
+    status: "OK",
+    message: "Le serveur fonctionne correctement",
+  });
+});
 
-// Programmation des routes
+app.get("/api/test", (request, response) => {
+  response.status(200).json({
+    message: "La route de test fonctionne correctement",
+  });
+});
+
+// Routes métier
 authRoutes(app);
 sallesRoutes(app);
 coursRoutes(app);
 professeursRoutes(app);
 
-
-// Route réservée aux administrateurs
+// Routes protégées
 app.get("/admin-only", userAuth, userAdmin, (request, response) => {
-    response.status(200).json({ message: "OK ADMIN", user: request.user });
+  response.status(200).json({
+    message: "OK ADMIN",
+    user: request.user,
+  });
 });
 
-// Route réservée aux responsables
 app.get("/responsable-only", userAuth, userResponsable, (request, response) => {
-    response.status(200).json({ message: "OK RESPONSABLE", user: request.user });
+  response.status(200).json({
+    message: "OK RESPONSABLE",
+    user: request.user,
+  });
 });
 
 export default app;
