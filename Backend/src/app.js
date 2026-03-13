@@ -4,8 +4,11 @@
 
 import express from "express";
 import dotenv from "dotenv";
-
+import sallesRoutes from "../routes/salles.routes.js";
 import coursRoutes from "../routes/cours.routes.js";
+import "../auth.js"
+import {userAuth, userAdmin, userResponsable} from "../middlewares/auth.js"
+import authRoutes from "../routes/auth.routes.js";
 import professeursRoutes from "../routes/professeurs.routes.js";
 
 dotenv.config();
@@ -31,8 +34,12 @@ app.get("/api/test", (request, response) => {
 
 // Initialiser routes cours
 coursRoutes(app);
+authRoutes(app);
 
 // initialiser routes professeurs
 professeursRoutes(app);
+
+//initialiser routes salles
+sallesRoutes(app);
 
 export default app;
