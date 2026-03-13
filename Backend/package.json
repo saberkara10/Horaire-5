@@ -14,11 +14,15 @@
   "license": "ISC",
   "dependencies": {
     "bcrypt": "^6.0.0",
+    "compression": "^1.8.1",
     "cors": "^2.8.6",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
     "express-session": "^1.19.0",
-    "mysql2": "^3.18.1"
+    "helmet": "^8.1.0",
+    "mysql2": "^3.18.1",
+    "passport": "^0.7.0",
+    "passport-local": "^1.0.0"
   },
   "devDependencies": {
     "jest": "^30.2.0",
