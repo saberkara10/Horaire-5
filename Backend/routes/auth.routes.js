@@ -1,135 +1,78 @@
 /**
- * Routes d'authentification.
+ * ROUTES - Module Authentification
  *
- * Gère :
- * - La connexion utilisateur
- * - La déconnexion
- * - La récupération de l'utilisateur connecté
- *
- * Table utilisée : utilisateurs
+ * Ce module definit toutes les routes HTTP liees a l'authentification.
+ * 
  */
 
-import { Router } from "express";
-import bcrypt from "bcrypt";
-import pool from "../db.js";
-
-const router = Router();
+import passport from "passport";
+import { userAuth, userNotAuth } from "../middlewares/auth.js";
+import { emailIsValid, passwordIsValid } from "../src/validations/auth.validation.js";
 
 /**
- * Recherche un utilisateur par email.
+ * Initialiser les routes d'authentification.
  *
- * @param {string} email - Email de l'utilisateur
- * @returns {Promise<Object|null>} Utilisateur trouvé ou null
+ * @param {import("express").Express} app Application Express.
  */
-const findUserByEmail = async (email) => {
+export default function authRoutes(app) {
+  /**
+   * POST /auth/login
+   * Authentifier un utilisateur.
+   */
+  app.post(
+    "/auth/login",
+    userNotAuth,
+    emailIsValid,
+    passwordIsValid,
+    (request, response, next) => {
+      passport.authenticate("local", (error, user, info) => {
+        if (error) {
+          next(error);
+        }
+        else if (!user) {
+          response.status(401).json(info);
+        }
+        else {
+          request.logIn(user, (erreur) => {
+            if (erreur) {
+              next(erreur);
+            }
 
-  const [rows] = await pool.query(
-    `SELECT id_utilisateur, email, motdepasse, nom, prenom, role
-     FROM utilisateurs
-     WHERE email = ?`,
-    [email]
+            response.sendStatus(200);
+          });
+        }
+      })(request, response, next);
+    }
   );
 
-  return rows[0] ?? null;
-};
-
-
-/**
- * Route POST /auth/login
- *
- * @param {Request} request - Contient email et password dans request.body
- * @param {Response} response - Retourne le résultat JSON
- * @returns {void}
- */
-router.post("/login", async (request, response) => {
-
-  try {
-
-    const { email, password } = request.body ?? {};
-
-    if (!email || !password) {
-      return response.status(400).json({
-        message: "Email et mot de passe requis"
+  /**
+   * POST /auth/logout
+   * Deconnecter l'utilisateur.
+   */
+  app.post(
+    "/auth/logout",
+    userAuth,
+    (request, response, next) => {
+      request.logOut((erreur) => {
+        if (erreur) {
+          next(erreur);
+        }
+        else {
+          response.status(200).end();
+        }
       });
     }
+  );
 
-    const cleanEmail = email.toLowerCase().trim();
-
-    const user = await findUserByEmail(cleanEmail);
-
-    if (!user) {
-      return response.status(401).json({
-        message: "Identifiants invalides"
-      });
+  /**
+   * GET /auth/me
+   * Recuperer l'utilisateur connecte.
+   */
+  app.get(
+    "/auth/me",
+    userAuth,
+    (request, response) => {
+      response.status(200).json(request.user);
     }
-
-    const passwordValid = await bcrypt.compare(
-      password,
-      user.motdepasse
-    );
-
-    if (!passwordValid) {
-      return response.status(401).json({
-        message: "Identifiants invalides"
-      });
-    }
-
-    request.session.user = {
-      id: user.id_utilisateur,
-      email: user.email,
-      nom: user.nom,
-      prenom: user.prenom,
-      role: user.role,
-    };
-
-    return response.status(200).json({
-      message: "Connexion réussie",
-      user: request.session.user
-    });
-
-  } catch (error) {
-
-    return response.status(500).json({
-      message: "Erreur interne du serveur"
-    });
-  }
-});
-
-
-/**
- * Route POST /auth/logout
- *
- * @param {Request} request
- * @param {Response} response
- * @returns {void}
- */
-router.post("/logout", (request, response) => {
-
-  request.session.destroy(() => {
-    response.clearCookie("sid");
-    response.json({
-      message: "Déconnexion réussie"
-    });
-  });
-});
-
-
-/**
- * Route GET /auth/me
- *
- * @param {Request} request
- * @param {Response} response
- * @returns {void}
- */
-router.get("/me", (request, response) => {
-
-  if (!request.session?.user) {
-    return response.status(401).json({
-      message: "Authentification requise"
-    });
-  }
-
-  response.json({ user: request.session.user });
-});
-
-export default router;
+  );
+}
