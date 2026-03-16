@@ -16,7 +16,7 @@ describe("Tests routes Cours", () => {
   // ===============================
   test("GET /api/cours/1 doit retourner 200 ou 404", async () => {
     const response = await request(app).get("/api/cours/1");
-    expect([200, 404, 500]).toContain(response.statusCode);
+    expect([200, 404]).toContain(response.statusCode);
   });
 
   // ===============================
@@ -37,7 +37,7 @@ describe("Tests routes Cours", () => {
       .post("/api/cours")
       .send(nouveauCours);
 
-    expect([201, 400 ,500]).toContain(response.statusCode);
+    expect([201, 400]).toContain(response.statusCode);
   });
 
   // ===============================
@@ -53,7 +53,7 @@ describe("Tests routes Cours", () => {
       .put("/api/cours/1")
       .send(modification);
 
-    expect([200, 400, 404 ,500]).toContain(response.statusCode);
+    expect([200, 400, 404]).toContain(response.statusCode);
   });
 
   // ===============================
@@ -64,7 +64,7 @@ describe("Tests routes Cours", () => {
     const response = await request(app)
       .delete("/api/cours/1");
 
-    expect([200, 400, 404 , 500]).toContain(response.statusCode);
+    expect([200, 400, 404]).toContain(response.statusCode);
   });
 
 });

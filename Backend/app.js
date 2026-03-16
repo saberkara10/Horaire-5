@@ -16,8 +16,8 @@ import "./auth.js";
 import { userAuth, userAdmin, userResponsable } from "./middlewares/auth.js";
 import authRoutes from "./routes/auth.routes.js";
 import sallesRoutes from "./routes/salles.routes.js";
-// import coursRoutes from "./routes/cours.routes.js";
-// import professeursRoutes from "./routes/professeurs.routes.js";
+import coursRoutes from "./routes/cours.routes.js";
+import professeursRoutes from "./routes/professeurs.routes.js";
 
 dotenv.config();
 
