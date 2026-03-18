@@ -2,7 +2,7 @@ function normaliserBaseUrl(url) {
   return url.replace(/\/+$/, "");
 }
 
-const baseParDefaut = import.meta.env.DEV ? "http://localhost:3000/api" : "/api";
+const baseParDefaut = "/api";
 
 export const API_BASE_URL = normaliserBaseUrl(
   import.meta.env.VITE_API_BASE_URL || baseParDefaut
