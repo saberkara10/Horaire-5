@@ -6,9 +6,10 @@
  */
 
 import {
-  recupererTousLesProfesseurs,ajouterProfesseur,modifierProfesseur,supprimerProfesseur,} from "../src/model/professeurs.model.js";
+  recupererTousLesProfesseurs,ajouterProfesseur,modifierProfesseur,supprimerProfesseur,recupererProfesseurParId,recupererHoraireProfesseur} from "../src/model/professeurs.model.js";
 
 import {validerIdProfesseur,verifierProfesseurExiste, validerCreateProfesseur, validerUpdateProfesseur, validerDeleteProfesseur,} from "../src/validations/professeurs.validation.js";
+import { userAuth } from "../middlewares/auth.js";
 
 /**
  * Initialiser les routes des professeurs.
@@ -104,4 +105,34 @@ export default function professeursRoutes(app) {
       }
     }
   );
+
+  /**
+   * GET /api/professeurs/:id/horaire
+   * REcuperer l'horaire d'un professeur.
+   */
+
+  app.get("/api/professeurs/:id/horaire", userAuth, async (request, response) => {
+  try {
+    const idProfesseur = Number(request.params.id);
+
+    if (Number.isNaN(idProfesseur)) {
+      return response.status(400).json({ message: "Identifiant invalide." });
+    }
+
+    const professeur = await recupererProfesseurParId(idProfesseur);
+
+    if (!professeur) {
+      return response.status(404).json({ message: "Professeur introuvable." });
+    }
+
+    const horaire = await recupererHoraireProfesseur(idProfesseur);
+
+    return response.status(200).json(horaire);
+  }
+  catch (error) {
+    console.error("ERREUR GET /api/professeurs/:id/horaire :", error);
+    return response.status(500).json({ message: "Erreur serveur." });
+  }
+
+});
 }

@@ -175,3 +175,42 @@ export async function supprimerProfesseur(idProfesseur) {
 
   return resultatSuppression.affectedRows > 0;
 }
+
+/**
+ * recuperer l'horaire complet d'un professeur.
+ * 
+ * @param {number} idProfesseur -Identifiant du professeur .
+ * @returns {Promise<Array<Object>>}  Liste des cours planifies.
+ */
+
+export async function recupererHoraireProfesseur(idProfesseur) {
+  const [horaireProfesseur] = await pool.query(
+    `SELECT
+        ac.id_affectation_cours,
+        c.id_cours,
+        c.code AS code_cours,
+        c.nom AS nom_cours,
+        c.programme,
+        c.etape_etude,
+        c.duree,
+        s.id_salle,
+        s.code AS code_salle,
+        s.type AS type_salle,
+        ph.id_plage_horaires,
+        ph.date,
+        ph.heure_debut,
+        ph.heure_fin
+     FROM affectation_cours ac
+     JOIN cours c
+       ON c.id_cours = ac.id_cours
+     JOIN salles s
+       ON s.id_salle = ac.id_salle
+     JOIN plages_horaires ph
+       ON ph.id_plage_horaires = ac.id_plage_horaires
+     WHERE ac.id_professeur = ?
+     ORDER BY ph.date ASC, ph.heure_debut ASC`,
+    [idProfesseur]
+  );
+
+  return horaireProfesseur;
+}

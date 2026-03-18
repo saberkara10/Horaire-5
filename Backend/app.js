@@ -17,6 +17,7 @@ import { userAuth, userAdmin, userResponsable } from "./middlewares/auth.js";
 import authRoutes from "./routes/auth.routes.js";
 import sallesRoutes from "./routes/salles.routes.js";
 import coursRoutes from "./routes/cours.routes.js";
+import horaireRoutes from "./routes/horaire.routes.js";
 import professeursRoutes from "./routes/professeurs.routes.js";
 
 dotenv.config();
@@ -79,6 +80,7 @@ authRoutes(app);
 sallesRoutes(app);
 coursRoutes(app);
 professeursRoutes(app);
+horaireRoutes(app);
 
 // Routes protégées
 app.get("/admin-only", userAuth, userAdmin, (request, response) => {
