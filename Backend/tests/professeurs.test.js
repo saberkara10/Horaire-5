@@ -1,74 +1,110 @@
 import request from "supertest";
-import app from "../src/app.js";
+import { jest } from "@jest/globals";
+
+const professeursModelMock = {
+  recupererTousLesProfesseurs: jest.fn(),
+  recupererProfesseurParId: jest.fn(),
+  recupererProfesseurParMatricule: jest.fn(),
+  ajouterProfesseur: jest.fn(),
+  modifierProfesseur: jest.fn(),
+  supprimerProfesseur: jest.fn(),
+  professeurEstDejaAffecte: jest.fn(),
+};
+
+await jest.unstable_mockModule("../src/model/professeurs.model.js", () => professeursModelMock);
+
+const { default: app } = await import("../src/app.js");
 
 describe("Tests routes Professeurs", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
 
-  // ===============================
-  // GET TOUS LES PROFESSEURS
-  // ===============================
   test("GET /api/professeurs doit retourner 200", async () => {
+    professeursModelMock.recupererTousLesProfesseurs.mockResolvedValue([
+      {
+        id_professeur: 1,
+        matricule: "MAT001",
+        nom: "Dupont",
+        prenom: "Ali",
+        specialite: "Informatique",
+      },
+    ]);
+
     const response = await request(app).get("/api/professeurs");
     expect(response.statusCode).toBe(200);
   });
 
-  // ===============================
-  // GET PROFESSEUR PAR ID
-  // ===============================
   test("GET /api/professeurs/1 doit retourner 200 ou 404", async () => {
+    professeursModelMock.recupererProfesseurParId.mockResolvedValue({
+      id_professeur: 1,
+      matricule: "MAT001",
+      nom: "Dupont",
+      prenom: "Ali",
+      specialite: "Informatique",
+    });
+
     const response = await request(app).get("/api/professeurs/1");
     expect([200, 404]).toContain(response.statusCode);
   });
 
-  // ===============================
-  // POST CREER PROFESSEUR
-  // ===============================
-  test("POST /api/professeurs doit retourner 201 ou 400", async () => {
-
-    const nouveauProf = {
+  test("POST /api/professeurs doit retourner 201 ou 400 ou 409", async () => {
+    professeursModelMock.recupererProfesseurParMatricule.mockResolvedValue(null);
+    professeursModelMock.ajouterProfesseur.mockResolvedValue({
+      id_professeur: 2,
       matricule: "MAT999",
       nom: "Prof Test",
       prenom: "Test",
-      specialite: "Informatique"
-    };
+      specialite: "Informatique",
+    });
 
     const response = await request(app)
       .post("/api/professeurs")
-      .send(nouveauProf);
+      .send({
+        matricule: "MAT999",
+        nom: "Prof Test",
+        prenom: "Test",
+        specialite: "Informatique",
+      });
 
-    expect([201, 400 , 409]).toContain(response.statusCode);
+    expect([201, 400, 409]).toContain(response.statusCode);
   });
 
-  // ===============================
-  // PUT MODIFIER PROFESSEUR
-  // ===============================
   test("PUT /api/professeurs/1 doit retourner 200, 400 ou 404", async () => {
-
-    const modification = {
-      specialite: "Réseau"
-    };
+    professeursModelMock.recupererProfesseurParId.mockResolvedValue({
+      id_professeur: 1,
+      matricule: "MAT001",
+      nom: "Dupont",
+      prenom: "Ali",
+      specialite: "Informatique",
+    });
+    professeursModelMock.modifierProfesseur.mockResolvedValue({
+      id_professeur: 1,
+      matricule: "MAT001",
+      nom: "Dupont",
+      prenom: "Ali",
+      specialite: "Réseau",
+    });
 
     const response = await request(app)
       .put("/api/professeurs/1")
-      .send(modification);
+      .send({ specialite: "Réseau" });
 
     expect([200, 400, 404]).toContain(response.statusCode);
   });
 
-  // ===============================
-  // DELETE SUPPRIMER PROFESSEUR
-  // ===============================
   test("DELETE /api/professeurs/1 doit retourner 200, 400 ou 404", async () => {
+    professeursModelMock.recupererProfesseurParId.mockResolvedValue({
+      id_professeur: 1,
+      matricule: "MAT001",
+      nom: "Dupont",
+      prenom: "Ali",
+      specialite: "Informatique",
+    });
+    professeursModelMock.professeurEstDejaAffecte.mockResolvedValue(false);
+    professeursModelMock.supprimerProfesseur.mockResolvedValue(true);
 
-    const response = await request(app)
-      .delete("/api/professeurs/1");
-
+    const response = await request(app).delete("/api/professeurs/1");
     expect([200, 400, 404]).toContain(response.statusCode);
   });
-
-});
-
-import pool from "../db.js";
-
-afterAll(async () => {
-  await pool.end();
 });

@@ -1,5 +1,5 @@
 import request from "supertest";
-import app from "../app.js"; // ✅ car ton auth app.js est à la racine Backend/
+import app from "../app.js";
 
 describe("Tests routes Auth", () => {
   test("POST /auth/login retourne 200 ou 401 ou 400 ou 500", async () => {
@@ -7,7 +7,7 @@ describe("Tests routes Auth", () => {
       .post("/auth/login")
       .send({ email: "admin@ecole.ca", password: "Admin123!" });
 
-    expect([200, 401, 400 , 500]).toContain(response.statusCode);
+    expect([200, 401, 400, 500]).toContain(response.statusCode);
   });
 
   test("GET /auth/me sans session retourne 401", async () => {
