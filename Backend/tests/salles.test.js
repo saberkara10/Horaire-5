@@ -70,5 +70,5 @@ describe("Tests routes Salles", () => {
 import pool from "../db.js";
 
 afterAll(async () => {
-  await pool.end();
+  await pool.end().catch(() => {});
 });

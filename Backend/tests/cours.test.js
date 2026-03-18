@@ -1,5 +1,6 @@
 import request from "supertest";
 import app from "../src/app.js";
+import pool from "../db.js";
 
 describe("Tests routes Cours", () => {
 
@@ -67,4 +68,8 @@ describe("Tests routes Cours", () => {
     expect([200, 400, 404]).toContain(response.statusCode);
   });
 
+});
+
+afterAll(async () => {
+  await pool.end().catch(() => {});
 });

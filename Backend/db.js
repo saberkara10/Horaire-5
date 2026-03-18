@@ -1,23 +1,26 @@
 /**
- * Configuration de la base de données MySQL.
+ * Configuration de la base de donnees MySQL.
  *
- * Gère la connexion à la base `gestion_horaires`
- * via un pool de connexions sécurisé.
+ * Gere la connexion a la base `gestion_horaires`
+ * via un pool de connexions securise.
  *
- * Les paramètres de connexion sont définis
- * dans le fichier .env.
+ * Les parametres de connexion sont definis
+ * dans le fichier Backend/.env.
  */
 
 import dotenv from "dotenv";
 import mysql from "mysql2/promise";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-dotenv.config();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-/**
- * Pool de connexions MySQL.
- * Utilisé par le serveur Node.js pour accéder
- * aux données du projet.
- */
+dotenv.config({
+  path: path.join(__dirname, ".env"),
+  quiet: true,
+});
+
 const pool = mysql.createPool({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,

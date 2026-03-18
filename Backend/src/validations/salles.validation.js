@@ -16,7 +16,7 @@ export function codeSalleIsValide(request, response, next) {
   if (request.body.code && typeof request.body.code === "string" && request.body.code.trim().length > 0) {
     return next();
   }
-  response.status(400).end();
+  response.status(400).json({ message: "Code de salle invalide." });
 }
 
 /**
@@ -29,7 +29,7 @@ export function typeSalleIsValide(request, response, next) {
   if (request.body.type && typeof request.body.type === "string" && request.body.type.trim().length > 0) {
     return next();
   }
-  response.status(400).end();
+  response.status(400).json({ message: "Type de salle invalide." });
 }
 
 /**
@@ -42,5 +42,5 @@ export function capaciteSalleIsValide(request, response, next) {
   if (request.body.capacite && typeof request.body.capacite === "number" && request.body.capacite > 0) {
     return next();
   }
-  response.status(400).end();
+  response.status(400).json({ message: "Capacite de salle invalide." });
 }

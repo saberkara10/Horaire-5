@@ -50,6 +50,18 @@ export async function recupererCoursParId(idCours) {
   return coursTrouve.length ? coursTrouve[0] : null;
 }
 
+export async function recupererTypesSalleDisponibles() {
+  const [typesSalle] = await pool.query(
+    `SELECT DISTINCT type
+     FROM salles
+     WHERE type IS NOT NULL
+       AND TRIM(type) <> ''
+     ORDER BY type ASC`
+  );
+
+  return typesSalle.map(({ type }) => type);
+}
+
 /**
  * Vérifier si un cours existe par son code.
  *
