@@ -1,7 +1,7 @@
 const MODULES = [
   { id: "professeurs", label: "Professeurs", disabled: false },
   { id: "cours", label: "Cours", disabled: false },
-  { id: "salles", label: "Salles", disabled: true },
+  { id: "salles", label: "Salles", disabled: false },
   { id: "horaire", label: "Horaire", disabled: true },
 ];
 
