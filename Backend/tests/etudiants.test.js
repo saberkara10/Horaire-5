@@ -2,6 +2,7 @@ import request from "supertest";
 import { jest } from "@jest/globals";
 
 const etudiantsModelMock = {
+  recupererTousLesEtudiants: jest.fn(),
   recupererEtudiantParId: jest.fn(),
   recupererHoraireCompletEtudiant: jest.fn(),
 };
@@ -10,9 +11,45 @@ await jest.unstable_mockModule("../src/model/etudiants.model.js", () => etudiant
 
 const { default: app } = await import("../src/app.js");
 
-describe("Tests routes Étudiants", () => {
+describe("Tests routes Etudiants", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+  });
+
+  test("GET /api/etudiants retourne 200", async () => {
+    etudiantsModelMock.recupererTousLesEtudiants.mockResolvedValue([
+      {
+        id_etudiant: 1,
+        matricule: "2024001",
+        nom: "Benali",
+        prenom: "Sara",
+        groupe: "G01",
+        programme: "Informatique",
+        etape: 2,
+      },
+    ]);
+
+    const response = await request(app).get("/api/etudiants");
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toHaveLength(1);
+  });
+
+  test("GET /api/etudiants/1 retourne 200", async () => {
+    etudiantsModelMock.recupererEtudiantParId.mockResolvedValue({
+      id_etudiant: 1,
+      matricule: "2024001",
+      nom: "Benali",
+      prenom: "Sara",
+      groupe: "G01",
+      programme: "Informatique",
+      etape: 2,
+    });
+
+    const response = await request(app).get("/api/etudiants/1");
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toHaveProperty("id_etudiant", 1);
   });
 
   test("GET /api/etudiants/1/horaire retourne 200", async () => {
@@ -64,7 +101,7 @@ describe("Tests routes Étudiants", () => {
 
     expect(response.statusCode).toBe(400);
     expect(response.body).toEqual({
-      message: "Identifiant étudiant invalide.",
+      message: "Identifiant etudiant invalide.",
     });
   });
 
@@ -75,7 +112,7 @@ describe("Tests routes Étudiants", () => {
 
     expect(response.statusCode).toBe(404);
     expect(response.body).toEqual({
-      message: "Étudiant introuvable.",
+      message: "Etudiant introuvable.",
     });
   });
 

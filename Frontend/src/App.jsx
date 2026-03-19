@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { CoursPage } from "./pages/CoursPage.jsx";
+import { EtudiantsPage } from "./pages/EtudiantsPage.jsx";
 import { ProfesseursPage } from "./pages/ProfesseursPage.jsx";
 import { SallesPage } from "./pages/SallesPage.jsx";
 
@@ -18,6 +19,15 @@ export default function App() {
   if (moduleActif === "cours") {
     return (
       <CoursPage
+        moduleActif={moduleActif}
+        onChangerModule={setModuleActif}
+      />
+    );
+  }
+
+  if (moduleActif === "etudiants") {
+    return (
+      <EtudiantsPage
         moduleActif={moduleActif}
         onChangerModule={setModuleActif}
       />

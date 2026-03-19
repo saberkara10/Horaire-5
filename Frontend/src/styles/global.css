@@ -335,6 +335,26 @@ button {
   font-weight: 600;
 }
 
+.feedback-banner__message {
+  margin: 0;
+}
+
+.feedback-banner__details {
+  margin: 0.85rem 0 0;
+  padding-left: 1.25rem;
+  font-weight: 500;
+}
+
+.feedback-banner__details li + li {
+  margin-top: 0.35rem;
+}
+
+.feedback-banner__more {
+  margin: 0.85rem 0 0;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
 .feedback-banner--success {
   background: rgba(9, 115, 58, 0.12);
   color: #085c2f;
@@ -473,6 +493,11 @@ button {
   gap: 1.5rem;
 }
 
+.detail-card__section {
+  display: grid;
+  gap: 1rem;
+}
+
 .detail-card__header {
   display: flex;
   align-items: center;
@@ -510,6 +535,37 @@ button {
 .detail-card__actions {
   display: flex;
   gap: 0.85rem;
+}
+
+.schedule-preview {
+  display: grid;
+  gap: 0.85rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.schedule-preview--pending {
+  place-items: center;
+  min-height: 96px;
+}
+
+.schedule-preview__item {
+  display: grid;
+  gap: 0.25rem;
+  padding: 1rem;
+  border: 1px solid rgba(17, 20, 20, 0.08);
+  border-radius: 14px;
+  background: #f5f7f4;
+}
+
+.schedule-preview__item strong {
+  font-size: 0.98rem;
+}
+
+.schedule-preview__item span {
+  color: var(--text-secondary);
+  font-size: 0.92rem;
 }
 
 .loader {

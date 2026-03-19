@@ -3,6 +3,7 @@ import { jest } from "@jest/globals";
 
 const coursModelMock = {
   recupererTousLesCours: jest.fn(),
+  recupererTypesSalleDisponibles: jest.fn(),
   recupererCoursParId: jest.fn(),
   recupererCoursParCode: jest.fn(),
   ajouterCours: jest.fn(),

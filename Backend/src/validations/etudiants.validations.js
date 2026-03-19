@@ -1,16 +1,17 @@
 /**
- * VALIDATIONS — Module Étudiants
+ * VALIDATIONS - Module Etudiants
  *
- * Ce module contient les validations liées aux étudiants.
+ * Ce module regroupe les validations communes du module etudiants.
+ * Il se concentre sur les routes de consultation, pas sur l'import de fichier.
  */
 
 import { recupererEtudiantParId } from "../model/etudiants.model.js";
 
 /**
- * Valider l'identifiant de l'étudiant reçu dans l'URL.
+ * Valider l'identifiant de l'etudiant recu dans l'URL.
  *
- * @param {import("express").Request} request Requête Express.
- * @param {import("express").Response} response Réponse Express.
+ * @param {import("express").Request} request Requete Express.
+ * @param {import("express").Response} response Reponse Express.
  * @param {import("express").NextFunction} next Fonction suivante.
  * @returns {void}
  */
@@ -19,18 +20,18 @@ export function validerIdEtudiant(request, response, next) {
 
   if (!Number.isInteger(idEtudiant) || idEtudiant <= 0) {
     return response.status(400).json({
-      message: "Identifiant étudiant invalide.",
+      message: "Identifiant etudiant invalide.",
     });
   }
 
-  next();
+  return next();
 }
 
 /**
- * Vérifier que l'étudiant existe.
+ * Verifier que l'etudiant existe.
  *
- * @param {import("express").Request} request Requête Express.
- * @param {import("express").Response} response Réponse Express.
+ * @param {import("express").Request} request Requete Express.
+ * @param {import("express").Response} response Reponse Express.
  * @param {import("express").NextFunction} next Fonction suivante.
  * @returns {Promise<void>}
  */
@@ -41,11 +42,11 @@ export async function verifierEtudiantExiste(request, response, next) {
 
     if (!etudiant) {
       return response.status(404).json({
-        message: "Étudiant introuvable.",
+        message: "Etudiant introuvable.",
       });
     }
 
-    next();
+    return next();
   } catch (error) {
     return response.status(500).json({
       message: "Erreur serveur.",

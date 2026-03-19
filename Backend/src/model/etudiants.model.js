@@ -1,30 +1,63 @@
 /**
- * MODEL — Gestion des étudiants
+ * MODEL - Gestion des etudiants
  *
- * Ce module contient uniquement les requêtes SQL liées
- * à la consultation d'un étudiant et de son horaire.
+ * Ce module centralise les requetes SQL de consultation des etudiants.
+ * Il couvre :
+ * - la liste des etudiants importes ;
+ * - la fiche detaillee d'un etudiant ;
+ * - la consultation de l'horaire via le groupe de l'etudiant.
+ *
+ * Le lien metier important est le suivant :
+ * l'etudiant est rattache a un groupe, puis le groupe est relie aux
+ * affectations de cours qui permettent de reconstruire l'horaire.
  */
 
 import pool from "../../db.js";
 
 /**
- * Récupérer un étudiant par son identifiant.
+ * Recuperer tous les etudiants avec leur groupe.
  *
- * @param {number} idEtudiant - Identifiant de l'étudiant.
- * @returns {Promise<Object|null>} L'étudiant trouvé ou null.
+ * @returns {Promise<Array<Object>>} Liste ordonnee des etudiants.
+ */
+export async function recupererTousLesEtudiants() {
+  const [etudiants] = await pool.query(
+    `SELECT
+       e.id_etudiant,
+       e.matricule,
+       e.nom,
+       e.prenom,
+       ge.nom_groupe AS groupe,
+       e.programme,
+       e.etape_etude AS etape
+     FROM etudiants e
+     INNER JOIN groupes_etudiants ge
+       ON e.id_groupes_etudiants = ge.id_groupes_etudiants
+     ORDER BY e.matricule ASC, e.nom ASC, e.prenom ASC`
+  );
+
+  return etudiants;
+}
+
+/**
+ * Recuperer un etudiant par son identifiant.
+ *
+ * @param {number} idEtudiant - Identifiant de l'etudiant.
+ * @returns {Promise<Object|null>} L'etudiant trouve ou null.
  */
 export async function recupererEtudiantParId(idEtudiant) {
   const [etudiantTrouve] = await pool.query(
     `SELECT
-       id_etudiant,
-       matricule,
-       nom,
-       prenom,
-       groupe,
-       programme,
-       etape
-     FROM etudiants
-     WHERE id_etudiant = ?
+       e.id_etudiant,
+       e.matricule,
+       e.nom,
+       e.prenom,
+       ge.nom_groupe AS groupe,
+       e.programme,
+       e.etape_etude AS etape
+     FROM etudiants e
+     INNER JOIN groupes_etudiants ge
+       ON e.id_groupes_etudiants = ge.id_groupes_etudiants
+     WHERE e.id_etudiant = ?
      LIMIT 1`,
     [idEtudiant]
   );
@@ -33,10 +66,10 @@ export async function recupererEtudiantParId(idEtudiant) {
 }
 
 /**
- * Récupérer l'horaire d'un étudiant à partir de son groupe.
+ * Recuperer l'horaire d'un etudiant a partir de son groupe.
  *
- * @param {string} groupeEtudiant - Groupe de l'étudiant.
- * @returns {Promise<Array<Object>>} Liste des séances.
+ * @param {string} groupeEtudiant - Groupe de l'etudiant.
+ * @returns {Promise<Array<Object>>} Liste des seances.
  */
 export async function recupererHoraireParGroupe(groupeEtudiant) {
   const [horaireTrouve] = await pool.query(
@@ -77,10 +110,10 @@ export async function recupererHoraireParGroupe(groupeEtudiant) {
 }
 
 /**
- * Récupérer les informations complètes d'un étudiant avec son horaire.
+ * Recuperer les informations completes d'un etudiant avec son horaire.
  *
- * @param {number} idEtudiant - Identifiant de l'étudiant.
- * @returns {Promise<Object|null>} Données complètes ou null.
+ * @param {number} idEtudiant - Identifiant de l'etudiant.
+ * @returns {Promise<Object|null>} Donnees completes ou null.
  */
 export async function recupererHoraireCompletEtudiant(idEtudiant) {
   const etudiant = await recupererEtudiantParId(idEtudiant);
@@ -89,6 +122,8 @@ export async function recupererHoraireCompletEtudiant(idEtudiant) {
     return null;
   }
 
+  // L'horaire n'est pas stocke directement sur l'etudiant.
+  // On le reconstruit dynamiquement a partir de son groupe courant.
   const horaire = await recupererHoraireParGroupe(etudiant.groupe);
 
   return {
