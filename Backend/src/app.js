@@ -13,6 +13,8 @@ import "../auth.js";
 import authRoutes from "../routes/auth.routes.js";
 import professeursRoutes from "../routes/professeurs.routes.js";
 import etudiantsRoutes from "../routes/etudiants.routes.js";
+import affectationsRoutes from "../routes/affectations.routes.js";
+import pool from "../db.js";
 
 dotenv.config();
 
@@ -36,7 +38,7 @@ app.use(
 app.use(passport.initialize());
 app.use(passport.session());
 
-// Route santé serveur
+// Route sante serveur
 app.get("/api/health", (request, response) => {
   response.status(200).json({
     status: "OK",
@@ -51,11 +53,24 @@ app.get("/api/test", (request, response) => {
   });
 });
 
+// Route groupes
+app.get("/api/groupes", async (request, response) => {
+  try {
+    const [groupes] = await pool.query(
+      "SELECT id_groupes_etudiants, nom_groupe FROM groupes_etudiants ORDER BY nom_groupe ASC"
+    );
+    response.status(200).json(groupes);
+  } catch (error) {
+    response.status(500).json({ message: "Erreur lors de la recuperation des groupes." });
+  }
+});
+
 // Initialiser routes
 coursRoutes(app);
 authRoutes(app);
 professeursRoutes(app);
 sallesRoutes(app);
 etudiantsRoutes(app);
+affectationsRoutes(app);
 
 export default app;

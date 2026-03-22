@@ -162,6 +162,18 @@ export function AppShell({
           </NavLink>
         </nav>
 
+        <NavLink
+  to="/affectations"
+  className={({ isActive }) =>
+    `app-shell__nav-item ${isActive ? "app-shell__nav-item--active" : ""}`
+  }
+>
+  <span className="app-shell__nav-icon">
+    <IconCours />
+  </span>
+  <span>Affectations</span>
+</NavLink>
+
         <button className="app-shell__logout" type="button" onClick={onLogout}>
           <span className="app-shell__nav-icon">
             <IconLogout />

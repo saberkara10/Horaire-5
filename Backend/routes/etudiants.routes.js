@@ -1,10 +1,5 @@
 /**
  * ROUTES - Module Étudiants
- *
- * Ce module définit les routes HTTP liées aux étudiants :
- * - consultation de la liste
- * - consultation d'un étudiant
- * - import par fichier
  */
 
 import multer from "multer";
@@ -13,123 +8,54 @@ import {
   recupererTousLesEtudiants,
   recupererEtudiantParId,
   importerEtudiants,
+  recupererHoraireCompletEtudiant,
 } from "../src/model/etudiants.model.js";
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 10 * 1024 * 1024,
-  },
+  limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (request, file, callback) => {
     const extensionsAutorisees = [".xlsx", ".xls", ".csv"];
     const nomFichier = file.originalname.toLowerCase();
-
     const extensionValide = extensionsAutorisees.some((extension) =>
       nomFichier.endsWith(extension)
     );
-
     if (!extensionValide) {
-      return callback(
-        new Error("Format invalide. Utilisez un fichier Excel ou CSV.")
-      );
+      return callback(new Error("Format invalide. Utilisez un fichier Excel ou CSV."));
     }
-
     callback(null, true);
   },
 });
 
-/**
- * Convertir un buffer CSV en objets JS.
- *
- * @param {Buffer} buffer
- * @returns {Array<Object>}
- */
 function parserCsv(buffer) {
   const contenu = buffer.toString("utf-8").trim();
-
-  if (!contenu) {
-    return [];
-  }
-
-  const lignes = contenu
-    .split(/\r?\n/)
-    .map((ligne) => ligne.trim())
-    .filter(Boolean);
-
-  if (lignes.length === 0) {
-    return [];
-  }
-
-  const enTetes = lignes[0].split(",").map((colonne) => colonne.trim());
-
+  if (!contenu) return [];
+  const lignes = contenu.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  if (lignes.length === 0) return [];
+  const enTetes = lignes[0].split(",").map((c) => c.trim());
   return lignes.slice(1).map((ligne) => {
-    const valeurs = ligne.split(",").map((valeur) => valeur.trim());
+    const valeurs = ligne.split(",").map((v) => v.trim());
     const objet = {};
-
-    enTetes.forEach((entete, index) => {
-      objet[entete] = valeurs[index] ?? "";
-    });
-
+    enTetes.forEach((entete, index) => { objet[entete] = valeurs[index] ?? ""; });
     return objet;
   });
 }
 
-/**
- * Convertir un buffer Excel en objets JS.
- *
- * @param {Buffer} buffer
- * @returns {Array<Object>}
- */
 function parserExcel(buffer) {
   const workbook = xlsx.read(buffer, { type: "buffer" });
   const nomPremiereFeuille = workbook.SheetNames[0];
   const feuille = workbook.Sheets[nomPremiereFeuille];
-
-  if (!feuille) {
-    return [];
-  }
-
-  return xlsx.utils.sheet_to_json(feuille, {
-    defval: "",
-    raw: false,
-  });
+  if (!feuille) return [];
+  return xlsx.utils.sheet_to_json(feuille, { defval: "", raw: false });
 }
 
-/**
- * Vérifier que les colonnes obligatoires existent.
- *
- * @param {Array<Object>} lignes
- * @returns {Array<string>}
- */
 function verifierColonnesObligatoires(lignes) {
-  const colonnesObligatoires = [
-    "matricule",
-    "nom",
-    "prenom",
-    "groupe",
-    "programme",
-    "etape",
-  ];
-
-  if (!lignes.length) {
-    return colonnesObligatoires;
-  }
-
-  const colonnesDisponibles = Object.keys(lignes[0]).map((colonne) =>
-    colonne.trim().toLowerCase()
-  );
-
-  return colonnesObligatoires.filter(
-    (colonne) => !colonnesDisponibles.includes(colonne)
-  );
+  const colonnesObligatoires = ["matricule", "nom", "prenom", "groupe", "programme", "etape"];
+  if (!lignes.length) return colonnesObligatoires;
+  const colonnesDisponibles = Object.keys(lignes[0]).map((c) => c.trim().toLowerCase());
+  return colonnesObligatoires.filter((c) => !colonnesDisponibles.includes(c));
 }
 
-/**
- * Normaliser les lignes importées.
- *
- * @param {Array<Object>} lignes
- * @returns {Array<Object>}
- */
 function normaliserEtudiants(lignes) {
   return lignes.map((ligne) => ({
     matricule: String(ligne.matricule ?? "").trim(),
@@ -141,101 +67,78 @@ function normaliserEtudiants(lignes) {
   }));
 }
 
-/**
- * Initialiser les routes des étudiants.
- *
- * @param {import("express").Express} app
- */
 export default function etudiantsRoutes(app) {
-  /**
-   * GET /api/etudiants
-   * Récupérer tous les étudiants.
-   */
+
+  // GET /api/etudiants
   app.get("/api/etudiants", async (request, response) => {
     try {
       const etudiants = await recupererTousLesEtudiants();
       response.status(200).json(etudiants);
     } catch (error) {
-      response.status(500).json({
-        message: "Erreur lors de la récupération des étudiants.",
-      });
+      response.status(500).json({ message: "Erreur lors de la recuperation des etudiants." });
     }
   });
 
-  /**
-   * GET /api/etudiants/:id
-   * Récupérer un étudiant par son identifiant.
-   */
+  // GET /api/etudiants/:id/planning  <- DOIT ETRE AVANT /:id
+  app.get("/api/etudiants/:id/planning", async (request, response) => {
+    try {
+      const id = parseInt(request.params.id);
+      if (isNaN(id)) {
+        return response.status(400).json({ message: "ID invalide." });
+      }
+      const resultat = await recupererHoraireCompletEtudiant(id);
+      if (!resultat) {
+        return response.status(404).json({ message: "Etudiant introuvable." });
+      }
+      response.status(200).json(resultat);
+    } catch (error) {
+      response.status(500).json({ message: "Erreur lors de la recuperation du planning." });
+    }
+  });
+
+  // GET /api/etudiants/:id
   app.get("/api/etudiants/:id", async (request, response) => {
     try {
       const etudiant = await recupererEtudiantParId(Number(request.params.id));
-
       if (!etudiant) {
-        return response.status(404).json({
-          message: "Étudiant introuvable.",
-        });
+        return response.status(404).json({ message: "Etudiant introuvable." });
       }
-
       response.status(200).json(etudiant);
     } catch (error) {
-      response.status(500).json({
-        message: "Erreur lors de la récupération de l'étudiant.",
-      });
+      response.status(500).json({ message: "Erreur lors de la recuperation de l'etudiant." });
     }
   });
 
-  /**
-   * POST /api/etudiants/import
-   * Importer une liste d'étudiants depuis un fichier Excel/CSV.
-   */
-  app.post(
-    "/api/etudiants/import",
-    upload.single("fichier"),
-    async (request, response) => {
-      try {
-        if (!request.file) {
-          return response.status(400).json({
-            message: "Aucun fichier reçu.",
-          });
-        }
-
-        const nomFichier = request.file.originalname.toLowerCase();
-
-        let lignes = [];
-
-        if (nomFichier.endsWith(".csv")) {
-          lignes = parserCsv(request.file.buffer);
-        } else {
-          lignes = parserExcel(request.file.buffer);
-        }
-
-        if (!lignes.length) {
-          return response.status(400).json({
-            message: "Le fichier est vide ou invalide.",
-          });
-        }
-
-        const colonnesManquantes = verifierColonnesObligatoires(lignes);
-
-        if (colonnesManquantes.length > 0) {
-          return response.status(400).json({
-            message: `Colonnes obligatoires manquantes: ${colonnesManquantes.join(", ")}`,
-          });
-        }
-
-        const etudiantsAImporter = normaliserEtudiants(lignes);
-        const resultat = await importerEtudiants(etudiantsAImporter);
-
-        if (!resultat.succes) {
-          return response.status(400).json(resultat);
-        }
-
-        response.status(200).json(resultat);
-      } catch (error) {
-        response.status(500).json({
-          message: error.message || "Erreur lors de l'import des étudiants.",
+  // POST /api/etudiants/import
+  app.post("/api/etudiants/import", upload.single("fichier"), async (request, response) => {
+    try {
+      if (!request.file) {
+        return response.status(400).json({ message: "Aucun fichier recu." });
+      }
+      const nomFichier = request.file.originalname.toLowerCase();
+      let lignes = [];
+      if (nomFichier.endsWith(".csv")) {
+        lignes = parserCsv(request.file.buffer);
+      } else {
+        lignes = parserExcel(request.file.buffer);
+      }
+      if (!lignes.length) {
+        return response.status(400).json({ message: "Le fichier est vide ou invalide." });
+      }
+      const colonnesManquantes = verifierColonnesObligatoires(lignes);
+      if (colonnesManquantes.length > 0) {
+        return response.status(400).json({
+          message: "Colonnes obligatoires manquantes: " + colonnesManquantes.join(", "),
         });
       }
+      const etudiantsAImporter = normaliserEtudiants(lignes);
+      const resultat = await importerEtudiants(etudiantsAImporter);
+      if (!resultat.succes) {
+        return response.status(400).json(resultat);
+      }
+      response.status(200).json(resultat);
+    } catch (error) {
+      response.status(500).json({ message: error.message || "Erreur lors de l'import des etudiants." });
     }
-  );
+  });
 }
