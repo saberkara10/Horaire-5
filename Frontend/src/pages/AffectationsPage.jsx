@@ -10,6 +10,7 @@ export function AffectationsPage({ utilisateur, onLogout }) {
   const [professeurs, setProfesseurs] = useState([]);
   const [salles, setSalles] = useState([]);
   const [groupes, setGroupes] = useState([]);
+  const [affectations, setAffectations] = useState([]);
 
   const [form, setForm] = useState({
     id_cours: "",
@@ -25,29 +26,30 @@ export function AffectationsPage({ utilisateur, onLogout }) {
   const [message, setMessage] = useState("");
   const [erreur, setErreur] = useState("");
 
-  useEffect(() => {
-    async function chargerDonnees() {
-      setLoading(true);
-      setErreur("");
-      try {
-        const [coursData, profsData, sallesData, groupesData] = await Promise.all([
-          recupererCours(),
-          recupererProfesseurs(),
-          recupererSalles(),
-          apiRequest("/api/groupes"),
-        ]);
-        setCours(Array.isArray(coursData) ? coursData : []);
-        setProfesseurs(Array.isArray(profsData) ? profsData : []);
-        setSalles(Array.isArray(sallesData) ? sallesData : []);
-        setGroupes(Array.isArray(groupesData) ? groupesData : []);
-      } catch (error) {
-        setErreur(error.message || "Impossible de charger les donnees.");
-      } finally {
-        setLoading(false);
-      }
+  async function chargerDonnees() {
+    setLoading(true);
+    setErreur("");
+    try {
+      const [coursData, profsData, sallesData, groupesData, affectationsData] = await Promise.all([
+        recupererCours(),
+        recupererProfesseurs(),
+        recupererSalles(),
+        apiRequest("/api/groupes"),
+        apiRequest("/api/affectations"),
+      ]);
+      setCours(Array.isArray(coursData) ? coursData : []);
+      setProfesseurs(Array.isArray(profsData) ? profsData : []);
+      setSalles(Array.isArray(sallesData) ? sallesData : []);
+      setGroupes(Array.isArray(groupesData) ? groupesData : []);
+      setAffectations(Array.isArray(affectationsData) ? affectationsData : []);
+    } catch (error) {
+      setErreur("Impossible de charger les donnees.");
+    } finally {
+      setLoading(false);
     }
-    chargerDonnees();
-  }, []);
+  }
+
+  useEffect(() => { chargerDonnees(); }, []);
 
   function handleChange(event) {
     const { name, value } = event.target;
@@ -55,8 +57,7 @@ export function AffectationsPage({ utilisateur, onLogout }) {
   }
 
   function handleGroupeChange(event) {
-    const options = Array.from(event.target.selectedOptions);
-    const valeurs = options.map((o) => Number(o.value));
+    const valeurs = Array.from(event.target.selectedOptions).map((o) => Number(o.value));
     setForm((prev) => ({ ...prev, id_groupes: valeurs }));
   }
 
@@ -64,7 +65,6 @@ export function AffectationsPage({ utilisateur, onLogout }) {
     event.preventDefault();
     setMessage("");
     setErreur("");
-
     try {
       await apiRequest("/api/affectations", {
         method: "POST",
@@ -79,20 +79,29 @@ export function AffectationsPage({ utilisateur, onLogout }) {
           heure_fin: form.heure_fin,
         }),
       });
-
       setMessage("Affectation creee avec succes !");
-      setForm({
-        id_cours: "",
-        id_professeur: "",
-        id_salle: "",
-        id_groupes: [],
-        date: "",
-        heure_debut: "",
-        heure_fin: "",
-      });
+      setForm({ id_cours: "", id_professeur: "", id_salle: "", id_groupes: [], date: "", heure_debut: "", heure_fin: "" });
+      chargerDonnees();
     } catch (error) {
       setErreur(error.message || "Erreur lors de l'affectation.");
     }
+  }
+
+  async function handleSupprimer(id) {
+    if (!confirm("Supprimer cette affectation ?")) return;
+    try {
+      await apiRequest(`/api/affectations/${id}`, { method: "DELETE" });
+      setMessage("Affectation supprimee.");
+      chargerDonnees();
+    } catch (error) {
+      setErreur(error.message || "Erreur lors de la suppression.");
+    }
+  }
+
+  function formaterHeure(h) { return h ? h.slice(0, 5) : ""; }
+  function formaterDate(d) {
+    if (!d) return "";
+    return new Date(d).toLocaleDateString("fr-CA", { year: "numeric", month: "long", day: "numeric" });
   }
 
   return (
@@ -107,10 +116,9 @@ export function AffectationsPage({ utilisateur, onLogout }) {
           <h2>Creer une affectation</h2>
 
           {loading ? (
-            <p className="import-page__text">Chargement des donnees...</p>
+            <p>Chargement...</p>
           ) : (
             <form className="import-page__form" onSubmit={handleSubmit}>
-
               <select name="id_cours" value={form.id_cours} onChange={handleChange}>
                 <option value="">Choisir un cours</option>
                 {cours.map((item) => (
@@ -145,28 +153,11 @@ export function AffectationsPage({ utilisateur, onLogout }) {
                   </option>
                 ))}
               </select>
-              <small style={{ color: "#94a3b8" }}>Maintenez Ctrl pour selectionner plusieurs groupes</small>
+              <small style={{ color: "#94a3b8" }}>Ctrl + clic pour selectionner plusieurs groupes</small>
 
-              <input
-                type="date"
-                name="date"
-                value={form.date}
-                onChange={handleChange}
-              />
-
-              <input
-                type="time"
-                name="heure_debut"
-                value={form.heure_debut}
-                onChange={handleChange}
-              />
-
-              <input
-                type="time"
-                name="heure_fin"
-                value={form.heure_fin}
-                onChange={handleChange}
-              />
+              <input type="date" name="date" value={form.date} onChange={handleChange} />
+              <input type="time" name="heure_debut" value={form.heure_debut} onChange={handleChange} />
+              <input type="time" name="heure_fin" value={form.heure_fin} onChange={handleChange} />
 
               <button className="import-page__primary-button" type="submit">
                 Affecter
@@ -174,15 +165,50 @@ export function AffectationsPage({ utilisateur, onLogout }) {
             </form>
           )}
 
-          {message && (
-            <div className="import-page__alert import-page__alert--success">
-              <p>{message}</p>
-            </div>
-          )}
+          {message && <div className="import-page__alert import-page__alert--success"><p>{message}</p></div>}
+          {erreur && <div className="import-page__alert import-page__alert--error"><p>{erreur}</p></div>}
+        </section>
 
-          {erreur && (
-            <div className="import-page__alert import-page__alert--error">
-              <p>{erreur}</p>
+        {/* Liste des affectations */}
+        <section style={{ marginTop: "2rem" }}>
+          <h2 style={{ color: "white", marginBottom: "1rem" }}>Liste des affectations</h2>
+          {affectations.length === 0 ? (
+            <p style={{ color: "#94a3b8" }}>Aucune affectation.</p>
+          ) : (
+            <div className="table">
+              <table style={{ width: "100%", borderCollapse: "collapse", color: "white" }}>
+                <thead>
+                  <tr>
+                    <th className="table th">Cours</th>
+                    <th className="table th">Professeur</th>
+                    <th className="table th">Salle</th>
+                    <th className="table th">Date</th>
+                    <th className="table th">Horaire</th>
+                    <th className="table th">Groupes</th>
+                    <th className="table th">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {affectations.map((a) => (
+                    <tr key={a.id_affectation_cours} className="table tr">
+                      <td className="table td"><strong>{a.code_cours}</strong><br /><small>{a.nom_cours}</small></td>
+                      <td className="table td">{a.prenom_professeur} {a.nom_professeur}</td>
+                      <td className="table td">{a.code_salle}</td>
+                      <td className="table td">{formaterDate(a.date)}</td>
+                      <td className="table td">{formaterHeure(a.heure_debut)} - {formaterHeure(a.heure_fin)}</td>
+                      <td className="table td">{a.groupes}</td>
+                      <td className="table td">
+                        <button
+                          onClick={() => handleSupprimer(a.id_affectation_cours)}
+                          style={{ background: "#ef4444", border: "none", color: "white", padding: "0.4rem 0.8rem", borderRadius: "6px", cursor: "pointer" }}
+                        >
+                          Supprimer
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </section>
