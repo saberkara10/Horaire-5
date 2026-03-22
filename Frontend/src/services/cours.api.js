@@ -1,35 +1,29 @@
-import { requeteApi } from "./api.js";
+import { apiRequest } from "./api.js";
+
+const BASE_URL = "/api/cours";
 
 export async function recupererCours() {
-  return requeteApi("/cours");
+  return apiRequest(BASE_URL);
 }
 
-export async function recupererOptionsCours() {
-  return requeteApi("/cours/options");
-}
-
-export async function creerCours(donneesCours) {
-  return requeteApi("/cours", {
+export async function creerCours(cours) {
+  return apiRequest(BASE_URL, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(donneesCours),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(cours),
   });
 }
 
-export async function modifierCours(idCours, donneesCours) {
-  return requeteApi(`/cours/${idCours}`, {
+export async function modifierCours(id, cours) {
+  return apiRequest(`${BASE_URL}/${id}`, {
     method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(donneesCours),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(cours),
   });
 }
 
-export async function supprimerCours(idCours) {
-  return requeteApi(`/cours/${idCours}`, {
+export async function supprimerCours(id) {
+  return apiRequest(`${BASE_URL}/${id}`, {
     method: "DELETE",
   });
 }

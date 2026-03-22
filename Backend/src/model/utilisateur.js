@@ -3,13 +3,21 @@ import pool from "../../db.js";
 /**
  * Recherche un utilisateur par son courriel.
  * @param {string} email Le courriel de l'utilisateur à rechercher.
- * @returns Un utilisateur ou null si aucun utilisateur n'est trouvé.
+ * @returns {Promise<object|null>} Un utilisateur ou null.
  */
 export async function findByEmail(email) {
   const [rows] = await pool.query(
-    `SELECT id, email, mot_de_passe_hash, nom, prenom, actif
+    `SELECT 
+        id_utilisateur AS id,
+        email,
+        motdepasse AS mot_de_passe_hash,
+        nom,
+        prenom,
+        1 AS actif,
+        role
      FROM utilisateurs
-     WHERE email = ?`,
+     WHERE email = ?
+     LIMIT 1`,
     [email]
   );
 
@@ -19,13 +27,20 @@ export async function findByEmail(email) {
 /**
  * Recherche un utilisateur par son identifiant.
  * @param {number} id L'identifiant de l'utilisateur.
- * @returns Un utilisateur ou null si aucun utilisateur n'est trouvé.
+ * @returns {Promise<object|null>} Un utilisateur ou null.
  */
 export async function findById(id) {
   const [rows] = await pool.query(
-    `SELECT id, email, nom, prenom, actif
+    `SELECT
+        id_utilisateur AS id,
+        email,
+        nom,
+        prenom,
+        1 AS actif,
+        role
      FROM utilisateurs
-     WHERE id = ?`,
+     WHERE id_utilisateur = ?
+     LIMIT 1`,
     [id]
   );
 
@@ -35,16 +50,20 @@ export async function findById(id) {
 /**
  * Récupère les rôles d'un utilisateur par son identifiant.
  * @param {number} userId L'identifiant de l'utilisateur.
- * @returns Une liste de codes de rôles (ex: ["ADMIN"]).
+ * @returns {Promise<string[]>} Une liste de rôles.
  */
 export async function findRolesByUserId(userId) {
   const [rows] = await pool.query(
-    `SELECT r.code
-     FROM utilisateur_roles ur
-     JOIN roles r ON r.id = ur.role_id
-     WHERE ur.utilisateur_id = ?`,
+    `SELECT role
+     FROM utilisateurs
+     WHERE id_utilisateur = ?
+     LIMIT 1`,
     [userId]
   );
 
-  return rows.map((r) => r.code);
+  if (!rows.length || !rows[0].role) {
+    return [];
+  }
+
+  return [rows[0].role];
 }

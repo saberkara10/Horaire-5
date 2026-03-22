@@ -1,15 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "../components/layout/AppShell.jsx";
 import {
-  recupererProfesseurs,
-  creerProfesseur,
-  modifierProfesseur,
-  supprimerProfesseur,
-} from "../services/professeurs.api.js";
-import "../styles/ProfesseursPage.css";
+  recupererSalles,
+  creerSalle,
+  modifierSalle,
+  supprimerSalle,
+} from "../services/salles.api.js";
+import "../styles/CrudPages.css";
 
-export function ProfesseursPage({ utilisateur, onLogout }) {
-  const [professeurs, setProfesseurs] = useState([]);
+export function SallesPage({ utilisateur, onLogout }) {
+  const [salles, setSalles] = useState([]);
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState("");
   const [message, setMessage] = useState("");
@@ -18,63 +18,59 @@ export function ProfesseursPage({ utilisateur, onLogout }) {
   const [edition, setEdition] = useState(null);
 
   const [formulaire, setFormulaire] = useState({
-    matricule: "",
-    prenom: "",
-    nom: "",
-    specialite: "",
+    code: "",
+    type: "",
+    capacite: "",
   });
 
-  async function chargerProfesseurs() {
+  async function chargerSalles() {
     setChargement(true);
     setErreur("");
 
     try {
-      const data = await recupererProfesseurs();
-      setProfesseurs(data || []);
+      const data = await recupererSalles();
+      setSalles(data || []);
     } catch (error) {
-      setErreur(error.message || "Impossible de charger les professeurs.");
+      setErreur(error.message || "Impossible de charger les salles.");
     } finally {
       setChargement(false);
     }
   }
 
   useEffect(() => {
-    chargerProfesseurs();
+    chargerSalles();
   }, []);
 
-  const professeursFiltres = useMemo(() => {
+  const sallesFiltrees = useMemo(() => {
     const terme = recherche.trim().toLowerCase();
 
     if (!terme) {
-      return professeurs;
+      return salles;
     }
 
-    return professeurs.filter((professeur) => {
+    return salles.filter((salle) => {
       return (
-        String(professeur.matricule || "").toLowerCase().includes(terme) ||
-        String(professeur.prenom || "").toLowerCase().includes(terme) ||
-        String(professeur.nom || "").toLowerCase().includes(terme) ||
-        String(professeur.specialite || "").toLowerCase().includes(terme)
+        String(salle.code || "").toLowerCase().includes(terme) ||
+        String(salle.type || "").toLowerCase().includes(terme) ||
+        String(salle.capacite || "").toLowerCase().includes(terme)
       );
     });
-  }, [professeurs, recherche]);
+  }, [salles, recherche]);
 
-  function ouvrirModal(professeur = null) {
-    setEdition(professeur);
+  function ouvrirModal(salle = null) {
+    setEdition(salle);
 
-    if (professeur) {
+    if (salle) {
       setFormulaire({
-        matricule: professeur.matricule || "",
-        prenom: professeur.prenom || "",
-        nom: professeur.nom || "",
-        specialite: professeur.specialite || "",
+        code: salle.code || "",
+        type: salle.type || "",
+        capacite: String(salle.capacite || ""),
       });
     } else {
       setFormulaire({
-        matricule: "",
-        prenom: "",
-        nom: "",
-        specialite: "",
+        code: "",
+        type: "",
+        capacite: "",
       });
     }
 
@@ -87,10 +83,9 @@ export function ProfesseursPage({ utilisateur, onLogout }) {
     setModalOuvert(false);
     setEdition(null);
     setFormulaire({
-      matricule: "",
-      prenom: "",
-      nom: "",
-      specialite: "",
+      code: "",
+      type: "",
+      capacite: "",
     });
   }
 
@@ -101,23 +96,30 @@ export function ProfesseursPage({ utilisateur, onLogout }) {
 
     try {
       if (edition) {
-        await modifierProfesseur(edition.id_professeur, formulaire);
-        setMessage("Professeur modifié avec succès.");
+        await modifierSalle(edition.id_salle, {
+          type: formulaire.type,
+          capacite: Number(formulaire.capacite),
+        });
+        setMessage("Salle modifiée avec succès.");
       } else {
-        await creerProfesseur(formulaire);
-        setMessage("Professeur ajouté avec succès.");
+        await creerSalle({
+          code: formulaire.code,
+          type: formulaire.type,
+          capacite: Number(formulaire.capacite),
+        });
+        setMessage("Salle ajoutée avec succès.");
       }
 
       fermerModal();
-      await chargerProfesseurs();
+      await chargerSalles();
     } catch (error) {
-      setErreur(error.message || "Erreur lors de la sauvegarde.");
+      setErreur(error.message || "Erreur lors de l'enregistrement.");
     }
   }
 
-  async function handleSupprimer(idProfesseur) {
+  async function handleSupprimer(idSalle) {
     const confirmation = window.confirm(
-      "Voulez-vous vraiment supprimer ce professeur ?"
+      "Voulez-vous vraiment supprimer cette salle ?"
     );
 
     if (!confirmation) {
@@ -128,9 +130,9 @@ export function ProfesseursPage({ utilisateur, onLogout }) {
     setMessage("");
 
     try {
-      await supprimerProfesseur(idProfesseur);
-      setMessage("Professeur supprimé avec succès.");
-      await chargerProfesseurs();
+      await supprimerSalle(idSalle);
+      setMessage("Salle supprimée avec succès.");
+      await chargerSalles();
     } catch (error) {
       setErreur(error.message || "Erreur lors de la suppression.");
     }
@@ -140,8 +142,8 @@ export function ProfesseursPage({ utilisateur, onLogout }) {
     <AppShell
       utilisateur={utilisateur}
       onLogout={onLogout}
-      title="Professeurs"
-      subtitle="Gérez les enseignants, leurs informations et leurs spécialités."
+      title="Salles"
+      subtitle="Gérez les salles disponibles dans l’établissement."
     >
       <div className="crud-page">
         <div className="crud-page__header">
@@ -150,7 +152,7 @@ export function ProfesseursPage({ utilisateur, onLogout }) {
             className="crud-page__add-button"
             onClick={() => ouvrirModal()}
           >
-            + Ajouter un professeur
+            + Ajouter une salle
           </button>
         </div>
 
@@ -158,7 +160,7 @@ export function ProfesseursPage({ utilisateur, onLogout }) {
           <input
             type="text"
             className="crud-page__search"
-            placeholder="Rechercher un professeur..."
+            placeholder="Rechercher une salle..."
             value={recherche}
             onChange={(event) => setRecherche(event.target.value)}
           />
@@ -174,34 +176,32 @@ export function ProfesseursPage({ utilisateur, onLogout }) {
             <table className="crud-page__table">
               <thead>
                 <tr>
-                  <th>Matricule</th>
-                  <th>Prénom</th>
-                  <th>Nom</th>
-                  <th>Spécialité</th>
+                  <th>Code</th>
+                  <th>Type</th>
+                  <th>Capacité</th>
                   <th>Actions</th>
                 </tr>
               </thead>
 
               <tbody>
-                {professeursFiltres.length === 0 ? (
+                {sallesFiltrees.length === 0 ? (
                   <tr>
-                    <td colSpan="5" className="crud-page__empty">
-                      Aucun professeur trouvé.
+                    <td colSpan="4" className="crud-page__empty">
+                      Aucune salle trouvée.
                     </td>
                   </tr>
                 ) : (
-                  professeursFiltres.map((professeur) => (
-                    <tr key={professeur.id_professeur}>
-                      <td>{professeur.matricule}</td>
-                      <td>{professeur.prenom}</td>
-                      <td>{professeur.nom}</td>
-                      <td>{professeur.specialite}</td>
+                  sallesFiltrees.map((salle) => (
+                    <tr key={salle.id_salle}>
+                      <td>{salle.code}</td>
+                      <td>{salle.type}</td>
+                      <td>{salle.capacite}</td>
                       <td>
                         <div className="crud-page__actions">
                           <button
                             type="button"
                             className="crud-page__action crud-page__action--edit"
-                            onClick={() => ouvrirModal(professeur)}
+                            onClick={() => ouvrirModal(salle)}
                           >
                             Modifier
                           </button>
@@ -209,9 +209,7 @@ export function ProfesseursPage({ utilisateur, onLogout }) {
                           <button
                             type="button"
                             className="crud-page__action crud-page__action--delete"
-                            onClick={() =>
-                              handleSupprimer(professeur.id_professeur)
-                            }
+                            onClick={() => handleSupprimer(salle.id_salle)}
                           >
                             Supprimer
                           </button>
@@ -232,7 +230,7 @@ export function ProfesseursPage({ utilisateur, onLogout }) {
               onClick={(event) => event.stopPropagation()}
             >
               <div className="crud-page__modal-header">
-                <h2>{edition ? "Modifier un professeur" : "Ajouter un professeur"}</h2>
+                <h2>{edition ? "Modifier une salle" : "Ajouter une salle"}</h2>
                 <button
                   type="button"
                   className="crud-page__close"
@@ -243,16 +241,34 @@ export function ProfesseursPage({ utilisateur, onLogout }) {
               </div>
 
               <form className="crud-page__form" onSubmit={handleSoumettre}>
+                {!edition ? (
+                  <label className="crud-page__field">
+                    <span>Code</span>
+                    <input
+                      type="text"
+                      placeholder="ex: B204"
+                      value={formulaire.code}
+                      onChange={(event) =>
+                        setFormulaire({
+                          ...formulaire,
+                          code: event.target.value,
+                        })
+                      }
+                      required
+                    />
+                  </label>
+                ) : null}
+
                 <label className="crud-page__field">
-                  <span>Matricule</span>
+                  <span>Type</span>
                   <input
                     type="text"
-                    placeholder="ex: INF01"
-                    value={formulaire.matricule}
+                    placeholder="ex: Laboratoire"
+                    value={formulaire.type}
                     onChange={(event) =>
                       setFormulaire({
                         ...formulaire,
-                        matricule: event.target.value,
+                        type: event.target.value,
                       })
                     }
                     required
@@ -260,49 +276,19 @@ export function ProfesseursPage({ utilisateur, onLogout }) {
                 </label>
 
                 <label className="crud-page__field">
-                  <span>Prénom</span>
+                  <span>Capacité</span>
                   <input
-                    type="text"
-                    placeholder="ex: Jean"
-                    value={formulaire.prenom}
+                    type="number"
+                    min="1"
+                    placeholder="ex: 30"
+                    value={formulaire.capacite}
                     onChange={(event) =>
                       setFormulaire({
                         ...formulaire,
-                        prenom: event.target.value,
+                        capacite: event.target.value,
                       })
                     }
                     required
-                  />
-                </label>
-
-                <label className="crud-page__field">
-                  <span>Nom</span>
-                  <input
-                    type="text"
-                    placeholder="ex: Martin"
-                    value={formulaire.nom}
-                    onChange={(event) =>
-                      setFormulaire({
-                        ...formulaire,
-                        nom: event.target.value,
-                      })
-                    }
-                    required
-                  />
-                </label>
-
-                <label className="crud-page__field">
-                  <span>Spécialité</span>
-                  <input
-                    type="text"
-                    placeholder="ex: Informatique"
-                    value={formulaire.specialite}
-                    onChange={(event) =>
-                      setFormulaire({
-                        ...formulaire,
-                        specialite: event.target.value,
-                      })
-                    }
                   />
                 </label>
 

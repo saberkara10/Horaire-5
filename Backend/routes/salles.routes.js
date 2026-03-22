@@ -5,7 +5,7 @@
  * Les validations sont appliquees avant l'appel au modele.
  */
 
-import { userAuth } from "../middlewares/auth.js";
+// pas d'authentification sur ces routes pour usage local simple
 import { codeSalleIsValide, typeSalleIsValide, capaciteSalleIsValide } from "../src/validations/salles.validation.js";
 import { getAllSalles, getSalleById, addSalle, modifySalle, deleteSalle } from "../src/model/salle.js";
 
@@ -19,7 +19,7 @@ export default function sallesRoutes(app) {
      * GET /api/salles
      * Recuperer toutes les salles.
      */
-    app.get("/api/salles", userAuth, async (request, response) => {
+    app.get("/api/salles", async (request, response) => {
         const salles = await getAllSalles();
         response.status(200).json(salles);
     });
@@ -28,7 +28,7 @@ export default function sallesRoutes(app) {
      * GET /api/salles/:id
      * Recuperer une salle par son identifiant.
      */
-    app.get("/api/salles/:id", userAuth, async (request, response) => {
+    app.get("/api/salles/:id", async (request, response) => {
         const salle = await getSalleById(request.params.id);
 
         if (salle) {
@@ -45,7 +45,6 @@ export default function sallesRoutes(app) {
      */
     app.post(
         "/api/salles",
-        userAuth,
         codeSalleIsValide,
         typeSalleIsValide,
         capaciteSalleIsValide,
@@ -72,7 +71,6 @@ export default function sallesRoutes(app) {
      */
     app.put(
         "/api/salles/:id",
-        userAuth,
         typeSalleIsValide,
         capaciteSalleIsValide,
         async (request, response) => {
@@ -96,7 +94,7 @@ export default function sallesRoutes(app) {
      * DELETE /api/salles/:id
      * Supprimer une salle.
      */
-    app.delete("/api/salles/:id", userAuth, async (request, response) => {
+    app.delete("/api/salles/:id", async (request, response) => {
         const salle = await getSalleById(request.params.id);
 
         if (!salle) {

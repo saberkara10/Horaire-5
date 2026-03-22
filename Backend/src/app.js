@@ -4,18 +4,37 @@
 
 import express from "express";
 import dotenv from "dotenv";
+import session from "express-session";
+import passport from "passport";
+
 import sallesRoutes from "../routes/salles.routes.js";
 import coursRoutes from "../routes/cours.routes.js";
-import "../auth.js"
-import {userAuth, userAdmin, userResponsable} from "../middlewares/auth.js"
+import "../auth.js";
 import authRoutes from "../routes/auth.routes.js";
 import professeursRoutes from "../routes/professeurs.routes.js";
+import etudiantsRoutes from "../routes/etudiants.routes.js";
 
 dotenv.config();
 
 const app = express();
 
 app.use(express.json());
+
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET || "gdh_secret_dev",
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: false,
+      httpOnly: true,
+      sameSite: "lax",
+    },
+  })
+);
+
+app.use(passport.initialize());
+app.use(passport.session());
 
 // Route santé serveur
 app.get("/api/health", (request, response) => {
@@ -32,14 +51,11 @@ app.get("/api/test", (request, response) => {
   });
 });
 
-// Initialiser routes cours
+// Initialiser routes
 coursRoutes(app);
 authRoutes(app);
-
-// initialiser routes professeurs
 professeursRoutes(app);
-
-//initialiser routes salles
 sallesRoutes(app);
+etudiantsRoutes(app);
 
 export default app;

@@ -1,4 +1,12 @@
 {
+  "name": "horaires-5",
+  "version": "1.0.0",
+  "description": "Gestion des horaires project",
+  "scripts": {
+    "backend": "cd Backend && npm run dev",
+    "frontend": "cd Frontend && npm run dev",
+    "dev": "concurrently \"npm run backend\" \"npm run frontend\""
+  },
   "dependencies": {
     "cors": "^2.8.6",
     "dotenv": "^17.2.3",
@@ -7,6 +15,7 @@
     "mysql2": "^3.18.1"
   },
   "devDependencies": {
+    "concurrently": "^8.2.2",
     "jest": "^30.2.0",
     "supertest": "^7.2.2"
   }

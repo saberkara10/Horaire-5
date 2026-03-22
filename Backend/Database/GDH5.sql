@@ -96,7 +96,29 @@ CREATE TABLE `groupes_etudiants` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Table structure for table `plages_horaires`
+-- Table structure pour table `etudiants`
+--
+
+DROP TABLE IF EXISTS `etudiants`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `etudiants` (
+  `id_etudiant` int NOT NULL AUTO_INCREMENT,
+  `matricule` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `nom` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `prenom` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `id_groupes_etudiants` int NOT NULL,
+  `programme` varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `etape` int NOT NULL,
+  PRIMARY KEY (`id_etudiant`),
+  UNIQUE KEY `matricule` (`matricule`),
+  KEY `fk_etudiant_groupe` (`id_groupes_etudiants`),
+  CONSTRAINT `fk_etudiant_groupe` FOREIGN KEY (`id_groupes_etudiants`) REFERENCES `groupes_etudiants` (`id_groupes_etudiants`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure pour table `plages_horaires`
 --
 
 DROP TABLE IF EXISTS `plages_horaires`;

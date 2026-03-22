@@ -1,28 +1,28 @@
 import { apiRequest } from "./api.js";
 
-const BASE_URL = "/api/professeurs";
+const BASE_URL = "/api/salles";
 
-export async function recupererProfesseurs() {
+export async function recupererSalles() {
   return apiRequest(BASE_URL);
 }
 
-export async function creerProfesseur(professeur) {
+export async function creerSalle(salle) {
   return apiRequest(BASE_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(professeur),
+    body: JSON.stringify(salle),
   });
 }
 
-export async function modifierProfesseur(id, professeur) {
+export async function modifierSalle(id, salle) {
   return apiRequest(`${BASE_URL}/${id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(professeur),
+    body: JSON.stringify(salle),
   });
 }
 
-export async function supprimerProfesseur(id) {
+export async function supprimerSalle(id) {
   return apiRequest(`${BASE_URL}/${id}`, {
     method: "DELETE",
   });
