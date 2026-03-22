@@ -142,7 +142,6 @@ export async function matriculeExiste(matricule) {
  * @returns {Promise<number>} ID du groupe.
  */
 export async function recupererOuCreerGroupe(nomGroupe) {
-  // Vérifier si le groupe existe
   const [groupeExistant] = await pool.query(
     "SELECT id_groupes_etudiants FROM groupes_etudiants WHERE nom_groupe = ?",
     [nomGroupe]
@@ -152,7 +151,6 @@ export async function recupererOuCreerGroupe(nomGroupe) {
     return groupeExistant[0].id_groupes_etudiants;
   }
 
-  // Créer le groupe s'il n'existe pas
   const [resultat] = await pool.query(
     "INSERT INTO groupes_etudiants (nom_groupe) VALUES (?)",
     [nomGroupe]
@@ -171,38 +169,42 @@ export async function importerEtudiants(etudiants) {
   const erreurs = [];
   const groupesCache = new Map();
 
-  // Validation des données
   for (let i = 0; i < etudiants.length; i++) {
-    const ligne = i + 2; // +2 car ligne 1 = en-tête, ligne 2 = première donnée
+    const ligne = i + 2;
     const etudiant = etudiants[i];
 
-    // Validation des champs obligatoires
-    if (!etudiant.matricule || etudiant.matricule.trim() === '') {
+    if (!etudiant.matricule || etudiant.matricule.trim() === "") {
       erreurs.push(`Ligne ${ligne} : matricule obligatoire.`);
       continue;
     }
-    if (!etudiant.nom || etudiant.nom.trim() === '') {
+    if (!etudiant.nom || etudiant.nom.trim() === "") {
       erreurs.push(`Ligne ${ligne} : nom obligatoire.`);
       continue;
     }
-    if (!etudiant.prenom || etudiant.prenom.trim() === '') {
+    if (!etudiant.prenom || etudiant.prenom.trim() === "") {
       erreurs.push(`Ligne ${ligne} : prénom obligatoire.`);
       continue;
     }
-    if (!etudiant.groupe || etudiant.groupe.trim() === '') {
+    if (!etudiant.groupe || etudiant.groupe.trim() === "") {
       erreurs.push(`Ligne ${ligne} : groupe obligatoire.`);
       continue;
     }
-    if (!etudiant.programme || etudiant.programme.trim() === '') {
+    if (!etudiant.programme || etudiant.programme.trim() === "") {
       erreurs.push(`Ligne ${ligne} : programme obligatoire.`);
       continue;
     }
-    if (!etudiant.etape || isNaN(etudiant.etape) || etudiant.etape < 1 || etudiant.etape > 8) {
-      erreurs.push(`Ligne ${ligne} : étape invalide (doit être un entier entre 1 et 8).`);
+    if (
+      !etudiant.etape ||
+      isNaN(etudiant.etape) ||
+      etudiant.etape < 1 ||
+      etudiant.etape > 8
+    ) {
+      erreurs.push(
+        `Ligne ${ligne} : étape invalide (doit être un entier entre 1 et 8).`
+      );
       continue;
     }
 
-    // Vérification de la longueur des champs
     if (etudiant.matricule.length > 50) {
       erreurs.push(`Ligne ${ligne} : matricule trop long (max 50 caractères).`);
       continue;
@@ -225,16 +227,14 @@ export async function importerEtudiants(etudiants) {
     }
   }
 
-  // Si des erreurs de validation, arrêter l'import
   if (erreurs.length > 0) {
     return {
       succes: false,
       message: "Import impossible.",
-      erreurs
+      erreurs,
     };
   }
 
-  // Démarrer une transaction
   const connexion = await pool.getConnection();
   await connexion.beginTransaction();
 
@@ -245,7 +245,6 @@ export async function importerEtudiants(etudiants) {
       const ligne = i + 2;
       const etudiant = etudiants[i];
 
-      // Vérifier l'unicité du matricule
       const matriculeUtilise = await connexion.query(
         "SELECT COUNT(*) as count FROM etudiants WHERE matricule = ?",
         [etudiant.matricule]
@@ -256,7 +255,6 @@ export async function importerEtudiants(etudiants) {
         continue;
       }
 
-      // Récupérer ou créer le groupe
       let idGroupe = groupesCache.get(etudiant.groupe);
       if (!idGroupe) {
         const [groupeExistant] = await connexion.query(
@@ -276,7 +274,6 @@ export async function importerEtudiants(etudiants) {
         groupesCache.set(etudiant.groupe, idGroupe);
       }
 
-      // Insérer l'étudiant
       await connexion.query(
         `INSERT INTO etudiants
          (matricule, nom, prenom, id_groupes_etudiants, programme, etape)
@@ -287,34 +284,31 @@ export async function importerEtudiants(etudiants) {
           etudiant.prenom,
           idGroupe,
           etudiant.programme,
-          etudiant.etape
+          etudiant.etape,
         ]
       );
 
       nombreImportes++;
     }
 
-    // Si des erreurs pendant l'insertion, rollback
     if (erreurs.length > 0) {
       await connexion.rollback();
       connexion.release();
       return {
         succes: false,
         message: "Import impossible.",
-        erreurs
+        erreurs,
       };
     }
 
-    // Commit de la transaction
     await connexion.commit();
     connexion.release();
 
     return {
       succes: true,
       message: "Import terminé avec succès.",
-      nombreImportes
+      nombreImportes,
     };
-
   } catch (erreur) {
     await connexion.rollback();
     connexion.release();
