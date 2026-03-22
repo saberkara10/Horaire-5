@@ -1,133 +1,314 @@
-import { startTransition, useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "../components/layout/AppShell.jsx";
-import { SalleFormModal } from "../components/salles/SalleFormModal.jsx";
-import { SallesFilters } from "../components/salles/SallesFilters.jsx";
-import { SallesHero } from "../components/salles/SallesHero.jsx";
-import { SallesTable } from "../components/salles/SallesTable.jsx";
-import { FeedbackBanner } from "../components/ui/FeedbackBanner.jsx";
-import { useSalles } from "../hooks/useSalles.js";
-import { calculerStatistiques, extraireTypes, filtrerSalles } from "../utils/salles.utils.js";
+import {
+  recupererSalles,
+  creerSalle,
+  modifierSalle,
+  supprimerSalle,
+} from "../services/salles.api.js";
+import "../styles/CrudPages.css";
 
-export function SallesPage({ moduleActif, onChangerModule }) {
-  const {
-    salles,
-    etatChargement,
-    messageErreur,
-    actionEnCours,
-    recharger,
-    creer,
-    modifier,
-    supprimer,
-  } = useSalles();
-
+export function SallesPage({ utilisateur, onLogout }) {
+  const [salles, setSalles] = useState([]);
+  const [chargement, setChargement] = useState(true);
+  const [erreur, setErreur] = useState("");
+  const [message, setMessage] = useState("");
   const [recherche, setRecherche] = useState("");
-  const [typeSelectionne, setTypeSelectionne] = useState("tous");
-  const [salleSelectionneeId, setSalleSelectionneeId] = useState(null);
-  const [messageSucces, setMessageSucces] = useState("");
-  const [etatModal, setEtatModal] = useState({ ouvert: false, mode: "creation" });
+  const [modalOuvert, setModalOuvert] = useState(false);
+  const [edition, setEdition] = useState(null);
 
-  const rechercheDifferee = useDeferredValue(recherche);
-  const types = useMemo(() => extraireTypes(salles), [salles]);
-  const statistiques = useMemo(() => calculerStatistiques(salles), [salles]);
+  const [formulaire, setFormulaire] = useState({
+    code: "",
+    type: "",
+    capacite: "",
+  });
 
-  const sallesFiltrees = useMemo(
-    () => filtrerSalles(salles, rechercheDifferee, typeSelectionne),
-    [salles, rechercheDifferee, typeSelectionne]
-  );
+  async function chargerSalles() {
+    setChargement(true);
+    setErreur("");
 
-  const salleSelectionnee = useMemo(
-    () => salles.find((salle) => salle.id_salle === salleSelectionneeId) || null,
-    [salles, salleSelectionneeId]
-  );
-
-  function ouvrirCreation() {
-    setMessageSucces("");
-    setEtatModal({ ouvert: true, mode: "creation" });
+    try {
+      const data = await recupererSalles();
+      setSalles(data || []);
+    } catch (error) {
+      setErreur(error.message || "Impossible de charger les salles.");
+    } finally {
+      setChargement(false);
+    }
   }
 
-  function ouvrirEdition(salle) {
-    setMessageSucces("");
-    setSalleSelectionneeId(salle.id_salle);
-    setEtatModal({ ouvert: true, mode: "edition" });
+  useEffect(() => {
+    chargerSalles();
+  }, []);
+
+  const sallesFiltrees = useMemo(() => {
+    const terme = recherche.trim().toLowerCase();
+
+    if (!terme) {
+      return salles;
+    }
+
+    return salles.filter((salle) => {
+      return (
+        String(salle.code || "").toLowerCase().includes(terme) ||
+        String(salle.type || "").toLowerCase().includes(terme) ||
+        String(salle.capacite || "").toLowerCase().includes(terme)
+      );
+    });
+  }, [salles, recherche]);
+
+  function ouvrirModal(salle = null) {
+    setEdition(salle);
+
+    if (salle) {
+      setFormulaire({
+        code: salle.code || "",
+        type: salle.type || "",
+        capacite: String(salle.capacite || ""),
+      });
+    } else {
+      setFormulaire({
+        code: "",
+        type: "",
+        capacite: "",
+      });
+    }
+
+    setErreur("");
+    setMessage("");
+    setModalOuvert(true);
   }
 
   function fermerModal() {
-    setEtatModal((etatActuel) => ({ ...etatActuel, ouvert: false }));
+    setModalOuvert(false);
+    setEdition(null);
+    setFormulaire({
+      code: "",
+      type: "",
+      capacite: "",
+    });
   }
 
-  async function soumettreSalle(donneesSalle) {
-    if (etatModal.mode === "creation") {
-      await creer(donneesSalle);
-      setMessageSucces("La salle a ete ajoutee avec succes.");
+  async function handleSoumettre(event) {
+    event.preventDefault();
+    setErreur("");
+    setMessage("");
+
+    try {
+      if (edition) {
+        await modifierSalle(edition.id_salle, {
+          type: formulaire.type,
+          capacite: Number(formulaire.capacite),
+        });
+        setMessage("Salle modifiée avec succès.");
+      } else {
+        await creerSalle({
+          code: formulaire.code,
+          type: formulaire.type,
+          capacite: Number(formulaire.capacite),
+        });
+        setMessage("Salle ajoutée avec succès.");
+      }
+
       fermerModal();
-      return;
+      await chargerSalles();
+    } catch (error) {
+      setErreur(error.message || "Erreur lors de l'enregistrement.");
     }
-
-    if (!salleSelectionnee) {
-      throw new Error("Aucune salle selectionnee.");
-    }
-
-    await modifier(salleSelectionnee.id_salle, donneesSalle);
-    setMessageSucces("La salle a ete mise a jour avec succes.");
-    fermerModal();
   }
 
-  async function supprimerSalleSelectionnee(salle) {
-    const suppressionConfirmee = window.confirm(
-      `Supprimer la salle ${salle.code} ?`
+  async function handleSupprimer(idSalle) {
+    const confirmation = window.confirm(
+      "Voulez-vous vraiment supprimer cette salle ?"
     );
 
-    if (!suppressionConfirmee) {
+    if (!confirmation) {
       return;
     }
 
-    await supprimer(salle.id_salle);
-    setMessageSucces("La salle a ete supprimee avec succes.");
+    setErreur("");
+    setMessage("");
+
+    try {
+      await supprimerSalle(idSalle);
+      setMessage("Salle supprimée avec succès.");
+      await chargerSalles();
+    } catch (error) {
+      setErreur(error.message || "Erreur lors de la suppression.");
+    }
   }
 
   return (
-    <AppShell moduleActif={moduleActif} onChangerModule={onChangerModule}>
-      <div className="page-layout">
-        <SallesHero
-          statistiques={statistiques}
-          onAjouter={ouvrirCreation}
-          surChargement={etatChargement === "loading"}
-        />
+    <AppShell
+      utilisateur={utilisateur}
+      onLogout={onLogout}
+      title="Salles"
+      subtitle="Gérez les salles disponibles dans l’établissement."
+    >
+      <div className="crud-page">
+        <div className="crud-page__header">
+          <button
+            type="button"
+            className="crud-page__add-button"
+            onClick={() => ouvrirModal()}
+          >
+            + Ajouter une salle
+          </button>
+        </div>
 
-        <FeedbackBanner type="success" message={messageSucces} />
-        <FeedbackBanner type="error" message={messageErreur} />
+        <div className="crud-page__toolbar">
+          <input
+            type="text"
+            className="crud-page__search"
+            placeholder="Rechercher une salle..."
+            value={recherche}
+            onChange={(event) => setRecherche(event.target.value)}
+          />
+        </div>
 
-        <SallesFilters
-          recherche={recherche}
-          onRechercheChange={setRecherche}
-          typeSelectionne={typeSelectionne}
-          types={types}
-          onTypeChange={setTypeSelectionne}
-          totalAffiche={sallesFiltrees.length}
-          totalGlobal={salles.length}
-          onRecharger={recharger}
-          surChargement={etatChargement === "loading"}
-        />
+        {erreur ? <div className="crud-page__alert crud-page__alert--error">{erreur}</div> : null}
+        {message ? <div className="crud-page__alert crud-page__alert--success">{message}</div> : null}
 
-        <SallesTable
-          salles={sallesFiltrees}
-          salleSelectionneeId={salleSelectionneeId}
-          onSelectionner={(id) => startTransition(() => setSalleSelectionneeId(id))}
-          onEditer={ouvrirEdition}
-          onSupprimer={supprimerSalleSelectionnee}
-          actionEnCours={actionEnCours}
-          surChargement={etatChargement === "loading"}
-          estEnErreur={etatChargement === "error"}
-        />
+        <section className="crud-page__table-card">
+          {chargement ? (
+            <p className="crud-page__state">Chargement...</p>
+          ) : (
+            <table className="crud-page__table">
+              <thead>
+                <tr>
+                  <th>Code</th>
+                  <th>Type</th>
+                  <th>Capacité</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
 
-        <SalleFormModal
-          estOuvert={etatModal.ouvert}
-          mode={etatModal.mode}
-          salle={etatModal.mode === "edition" ? salleSelectionnee : null}
-          onFermer={fermerModal}
-          onSoumettre={soumettreSalle}
-          actionEnCours={actionEnCours}
-        />
+              <tbody>
+                {sallesFiltrees.length === 0 ? (
+                  <tr>
+                    <td colSpan="4" className="crud-page__empty">
+                      Aucune salle trouvée.
+                    </td>
+                  </tr>
+                ) : (
+                  sallesFiltrees.map((salle) => (
+                    <tr key={salle.id_salle}>
+                      <td>{salle.code}</td>
+                      <td>{salle.type}</td>
+                      <td>{salle.capacite}</td>
+                      <td>
+                        <div className="crud-page__actions">
+                          <button
+                            type="button"
+                            className="crud-page__action crud-page__action--edit"
+                            onClick={() => ouvrirModal(salle)}
+                          >
+                            Modifier
+                          </button>
+
+                          <button
+                            type="button"
+                            className="crud-page__action crud-page__action--delete"
+                            onClick={() => handleSupprimer(salle.id_salle)}
+                          >
+                            Supprimer
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          )}
+        </section>
+
+        {modalOuvert ? (
+          <div className="crud-page__modal-overlay" onClick={fermerModal}>
+            <div
+              className="crud-page__modal"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="crud-page__modal-header">
+                <h2>{edition ? "Modifier une salle" : "Ajouter une salle"}</h2>
+                <button
+                  type="button"
+                  className="crud-page__close"
+                  onClick={fermerModal}
+                >
+                  ×
+                </button>
+              </div>
+
+              <form className="crud-page__form" onSubmit={handleSoumettre}>
+                {!edition ? (
+                  <label className="crud-page__field">
+                    <span>Code</span>
+                    <input
+                      type="text"
+                      placeholder="ex: B204"
+                      value={formulaire.code}
+                      onChange={(event) =>
+                        setFormulaire({
+                          ...formulaire,
+                          code: event.target.value,
+                        })
+                      }
+                      required
+                    />
+                  </label>
+                ) : null}
+
+                <label className="crud-page__field">
+                  <span>Type</span>
+                  <input
+                    type="text"
+                    placeholder="ex: Laboratoire"
+                    value={formulaire.type}
+                    onChange={(event) =>
+                      setFormulaire({
+                        ...formulaire,
+                        type: event.target.value,
+                      })
+                    }
+                    required
+                  />
+                </label>
+
+                <label className="crud-page__field">
+                  <span>Capacité</span>
+                  <input
+                    type="number"
+                    min="1"
+                    placeholder="ex: 30"
+                    value={formulaire.capacite}
+                    onChange={(event) =>
+                      setFormulaire({
+                        ...formulaire,
+                        capacite: event.target.value,
+                      })
+                    }
+                    required
+                  />
+                </label>
+
+                <div className="crud-page__modal-actions">
+                  <button
+                    type="button"
+                    className="crud-page__secondary-button"
+                    onClick={fermerModal}
+                  >
+                    Annuler
+                  </button>
+
+                  <button type="submit" className="crud-page__primary-button">
+                    {edition ? "Enregistrer" : "Ajouter"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        ) : null}
       </div>
     </AppShell>
   );

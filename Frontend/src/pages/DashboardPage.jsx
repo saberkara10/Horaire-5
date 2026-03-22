@@ -1,73 +1,149 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "../components/layout/AppShell.jsx";
-import { recupererStatistiques } from "../services/dashboard.api.js";
+import { recupererCours } from "../services/cours.api.js";
+import { recupererProfesseurs } from "../services/professeurs.api.js";
+import { recupererSalles } from "../services/salles.api.js";
+import { recupererEtudiants } from "../services/etudiantsService.js";
+import "../styles/DashboardPage.css";
 
-export function DashboardPage({ moduleActif, onChangerModule }) {
+function DashboardCard({ label, value, accent }) {
+  return (
+    <div className={`dashboard-card dashboard-card--${accent}`}>
+      <div className="dashboard-card__label">{label}</div>
+      <div className="dashboard-card__value">{value}</div>
+    </div>
+  );
+}
+
+export function DashboardPage({ utilisateur, onLogout }) {
   const [stats, setStats] = useState({
-    professeurs: 0,
-    etudiants: 0,
     cours: 0,
+    professeurs: 0,
     salles: 0,
+    etudiants: 0,
   });
-  const [loading, setLoading] = useState(true);
+  const [chargement, setChargement] = useState(true);
+  const [erreur, setErreur] = useState("");
+  const [cours, setCours] = useState([]);
+  const [professeurs, setProfesseurs] = useState([]);
 
   useEffect(() => {
     async function charger() {
+      setChargement(true);
+      setErreur("");
+
       try {
-        const data = await recupererStatistiques();
-        setStats(data);
-      } catch (err) {
-        console.error("Erreur chargement stats:", err);
+        const [coursData, profsData, sallesData, etudiantsData] =
+          await Promise.all([
+            recupererCours(),
+            recupererProfesseurs(),
+            recupererSalles(),
+            recupererEtudiants(),
+          ]);
+
+        setCours(coursData || []);
+        setProfesseurs(profsData || []);
+
+        setStats({
+          cours: (coursData || []).length,
+          professeurs: (profsData || []).length,
+          salles: (sallesData || []).length,
+          etudiants: (etudiantsData || []).length,
+        });
+      } catch (error) {
+        setErreur(error.message || "Impossible de charger le tableau de bord.");
       } finally {
-        setLoading(false);
+        setChargement(false);
       }
     }
 
     charger();
   }, []);
 
-  const cards = [
-    { label: "Professeurs", value: stats.professeurs, color: "#3b82f6" },
-    { label: "Étudiants", value: stats.etudiants, color: "#22c55e" },
-    { label: "Cours", value: stats.cours, color: "#a855f7" },
-    { label: "Salles", value: stats.salles, color: "#f97316" },
-  ];
+  const coursRecents = useMemo(() => cours.slice(0, 4), [cours]);
+  const profsRecents = useMemo(() => professeurs.slice(0, 4), [professeurs]);
 
   return (
-    <AppShell moduleActif={moduleActif} onChangerModule={onChangerModule}>
-      <div className="dashboard">
-        <h1 className="dashboard-title">Tableau de bord</h1>
+    <AppShell
+      utilisateur={utilisateur}
+      onLogout={onLogout}
+      title="Dashboard"
+      subtitle="Vue globale de la plateforme et accès rapide aux modules."
+    >
+      <div className="dashboard-page">
+        {erreur ? <div className="dashboard-page__alert">{erreur}</div> : null}
 
-        <div className="dashboard-cards">
-          {cards.map((card) => (
-            <div key={card.label} className="dashboard-card">
-              <div
-                className="dashboard-card-icon"
-                style={{ background: card.color }}
-              ></div>
-              <div className="dashboard-card-info">
-                <span className="dashboard-card-value">
-                  {loading ? "..." : card.value}
-                </span>
-                <span className="dashboard-card-label">{card.label}</span>
-              </div>
+        <section className="dashboard-page__stats">
+          <DashboardCard label="Cours" value={stats.cours} accent="blue" />
+          <DashboardCard
+            label="Professeurs"
+            value={stats.professeurs}
+            accent="purple"
+          />
+          <DashboardCard label="Salles" value={stats.salles} accent="teal" />
+          <DashboardCard
+            label="Étudiants"
+            value={stats.etudiants}
+            accent="pink"
+          />
+        </section>
+
+        <section className="dashboard-page__grid">
+          <div className="dashboard-panel">
+            <div className="dashboard-panel__header">
+              <h2>Cours récents</h2>
+              <span>{chargement ? "..." : `${coursRecents.length} élément(s)`}</span>
             </div>
-          ))}
-        </div>
 
-        <div className="dashboard-welcome">
-          <h2>Bienvenue</h2>
-          <p>
-            Utilisez le menu de gauche pour naviguer entre les différentes
-            sections de l'application.
-          </p>
-          <ul>
-            <li>Gérez les professeurs, étudiants, cours et salles</li>
-            <li>Importez des données via Excel</li>
-            <li>Générez automatiquement les horaires</li>
-            <li>Visualisez et exportez les horaires</li>
-          </ul>
-        </div>
+            <div className="dashboard-list">
+              {chargement ? (
+                <p className="dashboard-empty">Chargement...</p>
+              ) : coursRecents.length === 0 ? (
+                <p className="dashboard-empty">Aucun cours disponible.</p>
+              ) : (
+                coursRecents.map((item) => (
+                  <div className="dashboard-list__item" key={item.id_cours}>
+                    <div>
+                      <strong>{item.code}</strong>
+                      <p>{item.nom}</p>
+                    </div>
+                    <span>{item.programme}</span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          <div className="dashboard-panel">
+            <div className="dashboard-panel__header">
+              <h2>Professeurs</h2>
+              <span>{chargement ? "..." : `${profsRecents.length} élément(s)`}</span>
+            </div>
+
+            <div className="dashboard-list">
+              {chargement ? (
+                <p className="dashboard-empty">Chargement...</p>
+              ) : profsRecents.length === 0 ? (
+                <p className="dashboard-empty">Aucun professeur disponible.</p>
+              ) : (
+                profsRecents.map((item) => (
+                  <div
+                    className="dashboard-list__item"
+                    key={item.id_professeur}
+                  >
+                    <div>
+                      <strong>{item.matricule}</strong>
+                      <p>
+                        {item.prenom} {item.nom}
+                      </p>
+                    </div>
+                    <span>{item.specialite || "—"}</span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </section>
       </div>
     </AppShell>
   );

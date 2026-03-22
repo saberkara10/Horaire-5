@@ -534,7 +534,8 @@ npm test
 Tu peux aussi exécuter un test précis, par exemple :
 
 ```bash
-npx jest tests/cours.test.js
+npm
+ jest tests/cours.test.js
 ```
 
 Cette étape vient après, car les tests servent à valider le comportement du projet, pas à remplacer toutes les étapes de préparation.

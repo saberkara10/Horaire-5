@@ -1,7 +1,7 @@
 /**
  * Configuration principale de l'application Express.
  *
- * Initialise Express, sécurité, sessions, Passport et les routes métier.
+ * Initialise Express, securite, sessions, Passport et les routes metier.
  */
 
 import express from "express";
@@ -12,26 +12,24 @@ import compression from "compression";
 import passport from "passport";
 import dotenv from "dotenv";
 
-import "./auth.js";
-import { userAuth, userAdmin, userResponsable } from "./middlewares/auth.js";
-import authRoutes from "./routes/auth.routes.js";
-import sallesRoutes from "./routes/salles.routes.js";
-import coursRoutes from "./routes/cours.routes.js";
-import horaireRoutes from "./routes/horaire.routes.js";
-import professeursRoutes from "./routes/professeurs.routes.js";
+import "../auth.js";
+import { userAuth, userAdmin, userResponsable } from "../middlewares/auth.js";
+import authRoutes from "../routes/auth.routes.js";
+import sallesRoutes from "../routes/salles.routes.js";
+import coursRoutes from "../routes/cours.routes.js";
+import horaireRoutes from "../routes/horaire.routes.js";
+import professeursRoutes from "../routes/professeurs.routes.js";
+import etudiantsRoutes from "../routes/etudiants.routes.js";
 
 dotenv.config();
 
-// Validation des variables d'environnement
 const SESSION_SECRET = process.env.SESSION_SECRET;
 if (!SESSION_SECRET) {
   throw new Error("SESSION_SECRET manquant dans .env");
 }
 
-// Création de l'application
 const app = express();
 
-// Middlewares globaux
 app.use(helmet());
 app.use(compression());
 app.use(express.json());
@@ -61,7 +59,6 @@ app.use(
 app.use(passport.initialize());
 app.use(passport.session());
 
-// Routes utilitaires
 app.get("/api/health", (request, response) => {
   response.status(200).json({
     status: "OK",
@@ -75,14 +72,13 @@ app.get("/api/test", (request, response) => {
   });
 });
 
-// Routes métier
 authRoutes(app);
 sallesRoutes(app);
 coursRoutes(app);
 professeursRoutes(app);
 horaireRoutes(app);
+etudiantsRoutes(app);
 
-// Routes protégées
 app.get("/admin-only", userAuth, userAdmin, (request, response) => {
   response.status(200).json({
     message: "OK ADMIN",

@@ -1,98 +1,157 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { LoginPage } from "./pages/LoginPage.jsx";
 import { DashboardPage } from "./pages/DashboardPage.jsx";
 import { CoursPage } from "./pages/CoursPage.jsx";
 import { ProfesseursPage } from "./pages/ProfesseursPage.jsx";
 import { SallesPage } from "./pages/SallesPage.jsx";
-import {HorairePage} from "./pages/HorairePage.jsx"
-import { ImportExcelPage } from "./pages/ImportExcelPage.jsx";
-import "./styles/salles.css";
+import { EtudiantsImportPage } from "./pages/EtudiantsImportPage.jsx";
+import {
+  logoutUtilisateur,
+  recupererUtilisateurConnecte,
+} from "./services/auth.api.js";
 
 export default function App() {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [moduleActif, setModuleActif] = useState("dashboard");
+  const [utilisateur, setUtilisateur] = useState(null);
+  const [verificationSession, setVerificationSession] = useState(true);
 
   useEffect(() => {
     async function verifierSession() {
       try {
-        const response = await fetch("http://localhost:3000/auth/me", {
-          credentials: "include",
-        });
-
-        if (response.ok) {
-          const user = await response.json();
-          setUser(user);
-        }
-      } catch (err) {
-        // Pas de session
+        const user = await recupererUtilisateurConnecte();
+        setUtilisateur(user);
+      } catch {
+        setUtilisateur(null);
       } finally {
-        setLoading(false);
+        setVerificationSession(false);
       }
     }
 
     verifierSession();
   }, []);
 
-  if (loading) {
-    return <div>Chargement...</div>;
+  async function handleLogout() {
+    try {
+      await logoutUtilisateur();
+    } catch {
+      // ignore
+    } finally {
+      setUtilisateur(null);
+    }
   }
 
-  if (!user) {
-    return <LoginPage onLogin={setUser} />;
+  function handleLogin(user) {
+    setUtilisateur(user);
   }
 
-  if (moduleActif === "dashboard") {
+  if (verificationSession) {
     return (
-      <DashboardPage
-        moduleActif={moduleActif}
-        onChangerModule={setModuleActif}
-      />
+      <div className="app-loading-screen">
+        <div className="app-loading-screen__card">
+          <div className="app-loading-screen__spinner" />
+          <p>Vérification de la session...</p>
+        </div>
+      </div>
     );
   }
 
-  if (moduleActif === "cours") {
-    return (
-      <CoursPage
-        moduleActif={moduleActif}
-        onChangerModule={setModuleActif}
-      />
-    );
-  }
-
-  if (moduleActif === "professeurs") {
-    return (
-      <ProfesseursPage
-        moduleActif={moduleActif}
-        onChangerModule={setModuleActif}
-      />
-    );
-  }
-
- if (moduleActif === "horaire") {
   return (
-    <HorairePage
-      moduleActif={moduleActif}
-      onChangerModule={setModuleActif}
-    />
-  );
- }
-  
- if (moduleActif === "import") {
-  return (
-    <ImportExcelPage
-      moduleActif={moduleActif}
-      onChangerModule={setModuleActif}
-    />
-  );
- }
+    <BrowserRouter>
+      <Routes>
+        <Route
+          path="/login"
+          element={
+            utilisateur ? (
+              <Navigate to="/dashboard" replace />
+            ) : (
+              <LoginPage onLogin={handleLogin} />
+            )
+          }
+        />
 
+        <Route
+          path="/dashboard"
+          element={
+            utilisateur ? (
+              <DashboardPage utilisateur={utilisateur} onLogout={handleLogout} />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
 
+        <Route
+          path="/cours"
+          element={
+            utilisateur ? (
+              <CoursPage utilisateur={utilisateur} onLogout={handleLogout} />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
 
-  return (
-    <SallesPage
-      moduleActif={moduleActif}
-      onChangerModule={setModuleActif}
-    />
+        <Route
+          path="/professeurs"
+          element={
+            utilisateur ? (
+              <ProfesseursPage
+                utilisateur={utilisateur}
+                onLogout={handleLogout}
+              />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        <Route
+          path="/salles"
+          element={
+            utilisateur ? (
+              <SallesPage utilisateur={utilisateur} onLogout={handleLogout} />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        <Route
+          path="/import-etudiants"
+          element={
+            utilisateur ? (
+              <EtudiantsImportPage
+                utilisateur={utilisateur}
+                onLogout={handleLogout}
+              />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        <Route
+          path="/"
+          element={
+            utilisateur ? (
+              <Navigate to="/dashboard" replace />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        <Route
+          path="*"
+          element={
+            utilisateur ? (
+              <Navigate to="/dashboard" replace />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+      </Routes>
+    </BrowserRouter>
   );
 }
