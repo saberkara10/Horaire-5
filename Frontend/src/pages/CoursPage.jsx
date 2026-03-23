@@ -1,197 +1,383 @@
-import {
-  startTransition,
-  useDeferredValue,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "../components/layout/AppShell.jsx";
-import { CoursDetails } from "../components/cours/CoursDetails.jsx";
-import { CoursFilters } from "../components/cours/CoursFilters.jsx";
-import { CoursFormModal } from "../components/cours/CoursFormModal.jsx";
-import { CoursHero } from "../components/cours/CoursHero.jsx";
-import { CoursTable } from "../components/cours/CoursTable.jsx";
-import { FeedbackBanner } from "../components/ui/FeedbackBanner.jsx";
-import { useCours } from "../hooks/useCours.js";
 import {
-  calculerStatistiquesCours,
-  extraireEtapes,
-  extraireProgrammes,
-  filtrerCours,
-} from "../utils/cours.utils.js";
+  recupererCours,
+  creerCours,
+  modifierCours,
+  supprimerCours,
+} from "../services/cours.api.js";
+import "../styles/CrudPages.css";
 
-export function CoursPage({ moduleActif, onChangerModule }) {
-  const {
-    cours,
-    typesSalleDisponibles,
-    etatChargement,
-    messageErreur,
-    actionEnCours,
-    recharger,
-    creer,
-    modifier,
-    supprimer,
-  } = useCours();
+const ETAPES_DISPONIBLES = ["1", "2", "3", "4"];
 
+export function CoursPage({ utilisateur, onLogout }) {
+  const [cours, setCours] = useState([]);
+  const [chargement, setChargement] = useState(true);
+  const [erreur, setErreur] = useState("");
+  const [message, setMessage] = useState("");
   const [recherche, setRecherche] = useState("");
-  const [programmeSelectionne, setProgrammeSelectionne] = useState("tous");
-  const [etapeSelectionnee, setEtapeSelectionnee] = useState("toutes");
-  const [coursSelectionneId, setCoursSelectionneId] = useState(null);
-  const [messageSucces, setMessageSucces] = useState("");
-  const [etatModal, setEtatModal] = useState({ ouvert: false, mode: "creation" });
+  const [modalOuvert, setModalOuvert] = useState(false);
+  const [edition, setEdition] = useState(null);
 
-  const rechercheDifferee = useDeferredValue(recherche);
-  const programmes = useMemo(() => extraireProgrammes(cours), [cours]);
-  const etapes = useMemo(() => extraireEtapes(cours), [cours]);
-  const statistiques = useMemo(() => calculerStatistiquesCours(cours), [cours]);
+  const [formulaire, setFormulaire] = useState({
+    code: "",
+    nom: "",
+    duree: "1",
+    programme: "",
+    etape_etude: "1",
+    type_salle: "",
+  });
 
-  const coursFiltres = useMemo(
-    () => filtrerCours(cours, rechercheDifferee, programmeSelectionne, etapeSelectionnee),
-    [cours, rechercheDifferee, programmeSelectionne, etapeSelectionnee]
-  );
+  async function chargerCours() {
+    setChargement(true);
+    setErreur("");
 
-  useEffect(() => {
-    if (coursFiltres.length === 0) {
-      setCoursSelectionneId(null);
-      return;
+    try {
+      const data = await recupererCours();
+      setCours(data || []);
+    } catch (error) {
+      setErreur(error.message || "Impossible de récupérer les cours.");
+    } finally {
+      setChargement(false);
     }
-
-    const selectionExisteEncore = coursFiltres.some(
-      (element) => element.id_cours === coursSelectionneId
-    );
-
-    if (!selectionExisteEncore) {
-      setCoursSelectionneId(coursFiltres[0].id_cours);
-    }
-  }, [coursFiltres, coursSelectionneId]);
-
-  const coursSelectionne = useMemo(
-    () => cours.find((element) => element.id_cours === coursSelectionneId) || null,
-    [cours, coursSelectionneId]
-  );
-
-  function ouvrirCreation() {
-    setMessageSucces("");
-    setEtatModal({ ouvert: true, mode: "creation" });
   }
 
-  function ouvrirEdition() {
-    if (!coursSelectionne) {
-      return;
+  useEffect(() => {
+    chargerCours();
+  }, []);
+
+  const coursFiltres = useMemo(() => {
+    const terme = recherche.trim().toLowerCase();
+
+    if (!terme) {
+      return cours;
     }
 
-    setMessageSucces("");
-    setEtatModal({ ouvert: true, mode: "edition" });
+    return cours.filter((element) => {
+      return (
+        String(element.code || "").toLowerCase().includes(terme) ||
+        String(element.nom || "").toLowerCase().includes(terme) ||
+        String(element.programme || "").toLowerCase().includes(terme) ||
+        String(element.type_salle || "").toLowerCase().includes(terme) ||
+        String(element.etape_etude || "").toLowerCase().includes(terme)
+      );
+    });
+  }, [cours, recherche]);
+
+  function ouvrirModal(coursAEditer = null) {
+    setEdition(coursAEditer);
+
+    if (coursAEditer) {
+      setFormulaire({
+        code: coursAEditer.code || "",
+        nom: coursAEditer.nom || "",
+        duree: String(coursAEditer.duree || "1"),
+        programme: coursAEditer.programme || "",
+        etape_etude: String(coursAEditer.etape_etude || "1"),
+        type_salle: coursAEditer.type_salle || "",
+      });
+    } else {
+      setFormulaire({
+        code: "",
+        nom: "",
+        duree: "1",
+        programme: "",
+        etape_etude: "1",
+        type_salle: "",
+      });
+    }
+
+    setErreur("");
+    setMessage("");
+    setModalOuvert(true);
   }
 
   function fermerModal() {
-    setEtatModal((etatActuel) => ({ ...etatActuel, ouvert: false }));
-  }
-
-  function selectionnerCours(idCours) {
-    startTransition(() => {
-      setCoursSelectionneId(idCours);
-      setMessageSucces("");
+    setModalOuvert(false);
+    setEdition(null);
+    setFormulaire({
+      code: "",
+      nom: "",
+      duree: "1",
+      programme: "",
+      etape_etude: "1",
+      type_salle: "",
     });
   }
 
-  async function soumettreCours(donneesCours) {
-    if (etatModal.mode === "creation") {
-      const nouveauCours = await creer(donneesCours);
-      setMessageSucces("Le cours a ete ajoute avec succes.");
+  async function handleSoumettre(event) {
+    event.preventDefault();
+    setErreur("");
+    setMessage("");
+
+    try {
+      const payload = {
+        ...formulaire,
+        duree: Number(formulaire.duree),
+        etape_etude: String(formulaire.etape_etude),
+      };
+
+      if (edition) {
+        await modifierCours(edition.id_cours, payload);
+        setMessage("Cours modifié avec succès.");
+      } else {
+        await creerCours(payload);
+        setMessage("Cours créé avec succès.");
+      }
+
       fermerModal();
-      startTransition(() => {
-        setCoursSelectionneId(nouveauCours.id_cours);
-      });
-      return;
+      await chargerCours();
+    } catch (error) {
+      setErreur(error.message || "Erreur lors de la sauvegarde.");
     }
-
-    if (!coursSelectionne) {
-      throw new Error("Aucun cours selectionne.");
-    }
-
-    const coursModifie = await modifier(coursSelectionne.id_cours, donneesCours);
-    setMessageSucces("Le cours a ete mis a jour avec succes.");
-    fermerModal();
-    startTransition(() => {
-      setCoursSelectionneId(coursModifie.id_cours);
-    });
   }
 
-  async function supprimerCoursSelectionne() {
-    if (!coursSelectionne) {
-      return;
-    }
-
-    const suppressionConfirmee = window.confirm(
-      `Supprimer le cours ${coursSelectionne.code} ?`
+  async function handleSupprimer(idCours) {
+    const confirmation = window.confirm(
+      "Voulez-vous vraiment supprimer ce cours ?"
     );
 
-    if (!suppressionConfirmee) {
+    if (!confirmation) {
       return;
     }
 
-    await supprimer(coursSelectionne.id_cours);
-    setMessageSucces("Le cours a ete supprime avec succes.");
+    setErreur("");
+    setMessage("");
+
+    try {
+      await supprimerCours(idCours);
+      setMessage("Cours supprimé avec succès.");
+      await chargerCours();
+    } catch (error) {
+      setErreur(error.message || "Erreur lors de la suppression.");
+    }
   }
 
   return (
-    <AppShell moduleActif={moduleActif} onChangerModule={onChangerModule}>
-      <div className="page-layout">
-        <CoursHero
-          statistiques={statistiques}
-          onAjouter={ouvrirCreation}
-          surChargement={etatChargement === "loading"}
-        />
+    <AppShell
+      utilisateur={utilisateur}
+      onLogout={onLogout}
+      title="Cours"
+      subtitle="Gérez les cours, programmes, étapes et types de salles."
+    >
+      <div className="crud-page">
+        <div className="crud-page__header">
+          <button
+            type="button"
+            className="crud-page__add-button"
+            onClick={() => ouvrirModal()}
+          >
+            + Ajouter un cours
+          </button>
+        </div>
 
-        <FeedbackBanner type="success" message={messageSucces} />
-        <FeedbackBanner type="error" message={messageErreur} />
-
-        <CoursFilters
-          recherche={recherche}
-          onRechercheChange={setRecherche}
-          programmeSelectionne={programmeSelectionne}
-          programmes={programmes}
-          onProgrammeChange={setProgrammeSelectionne}
-          etapeSelectionnee={etapeSelectionnee}
-          etapes={etapes}
-          onEtapeChange={setEtapeSelectionnee}
-          totalAffiche={coursFiltres.length}
-          totalGlobal={cours.length}
-          onRecharger={recharger}
-          surChargement={etatChargement === "loading"}
-        />
-
-        <div className="content-grid">
-          <CoursTable
-            cours={coursFiltres}
-            coursSelectionneId={coursSelectionneId}
-            onSelectionner={selectionnerCours}
-            actionEnCours={actionEnCours}
-            surChargement={etatChargement === "loading"}
-            surRafraichissement={etatChargement === "refreshing"}
-            estEnErreur={etatChargement === "error"}
-            messageErreur={messageErreur}
-          />
-
-          <CoursDetails
-            cours={coursSelectionne}
-            onEditer={ouvrirEdition}
-            onSupprimer={supprimerCoursSelectionne}
-            suppressionDesactivee={!coursSelectionne || actionEnCours !== ""}
-            actionEnCours={actionEnCours}
+        <div className="crud-page__toolbar">
+          <input
+            type="text"
+            className="crud-page__search"
+            placeholder="Rechercher un cours..."
+            value={recherche}
+            onChange={(event) => setRecherche(event.target.value)}
           />
         </div>
 
-        <CoursFormModal
-          estOuvert={etatModal.ouvert}
-          mode={etatModal.mode}
-          cours={etatModal.mode === "edition" ? coursSelectionne : null}
-          typesSalleDisponibles={typesSalleDisponibles}
-          onFermer={fermerModal}
-          onSoumettre={soumettreCours}
-          actionEnCours={actionEnCours}
-        />
+        {erreur ? <div className="crud-page__alert crud-page__alert--error">{erreur}</div> : null}
+        {message ? <div className="crud-page__alert crud-page__alert--success">{message}</div> : null}
+
+        <section className="crud-page__table-card">
+          {chargement ? (
+            <p className="crud-page__state">Chargement...</p>
+          ) : (
+            <table className="crud-page__table">
+              <thead>
+                <tr>
+                  <th>Code</th>
+                  <th>Nom</th>
+                  <th>Durée</th>
+                  <th>Programme</th>
+                  <th>Étape</th>
+                  <th>Type salle</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {coursFiltres.length === 0 ? (
+                  <tr>
+                    <td colSpan="7" className="crud-page__empty">
+                      Aucun cours trouvé.
+                    </td>
+                  </tr>
+                ) : (
+                  coursFiltres.map((element) => (
+                    <tr key={element.id_cours}>
+                      <td>{element.code}</td>
+                      <td>{element.nom}</td>
+                      <td>{element.duree}</td>
+                      <td>{element.programme}</td>
+                      <td>{element.etape_etude}</td>
+                      <td>{element.type_salle}</td>
+                      <td>
+                        <div className="crud-page__actions">
+                          <button
+                            type="button"
+                            className="crud-page__action crud-page__action--edit"
+                            onClick={() => ouvrirModal(element)}
+                          >
+                            Modifier
+                          </button>
+
+                          <button
+                            type="button"
+                            className="crud-page__action crud-page__action--delete"
+                            onClick={() => handleSupprimer(element.id_cours)}
+                          >
+                            Supprimer
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          )}
+        </section>
+
+        {modalOuvert ? (
+          <div className="crud-page__modal-overlay" onClick={fermerModal}>
+            <div
+              className="crud-page__modal"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="crud-page__modal-header">
+                <h2>{edition ? "Modifier un cours" : "Ajouter un cours"}</h2>
+                <button
+                  type="button"
+                  className="crud-page__close"
+                  onClick={fermerModal}
+                >
+                  ×
+                </button>
+              </div>
+
+              <form className="crud-page__form" onSubmit={handleSoumettre}>
+                <label className="crud-page__field">
+                  <span>Code</span>
+                  <input
+                    type="text"
+                    placeholder="ex: INF101"
+                    value={formulaire.code}
+                    onChange={(event) =>
+                      setFormulaire({
+                        ...formulaire,
+                        code: event.target.value,
+                      })
+                    }
+                    required
+                  />
+                </label>
+
+                <label className="crud-page__field">
+                  <span>Nom</span>
+                  <input
+                    type="text"
+                    placeholder="ex: Développement Web"
+                    value={formulaire.nom}
+                    onChange={(event) =>
+                      setFormulaire({
+                        ...formulaire,
+                        nom: event.target.value,
+                      })
+                    }
+                    required
+                  />
+                </label>
+
+                <label className="crud-page__field">
+                  <span>Durée</span>
+                  <input
+                    type="number"
+                    min="1"
+                    value={formulaire.duree}
+                    onChange={(event) =>
+                      setFormulaire({
+                        ...formulaire,
+                        duree: event.target.value,
+                      })
+                    }
+                    required
+                  />
+                </label>
+
+                <label className="crud-page__field">
+                  <span>Programme</span>
+                  <input
+                    type="text"
+                    placeholder="ex: Informatique"
+                    value={formulaire.programme}
+                    onChange={(event) =>
+                      setFormulaire({
+                        ...formulaire,
+                        programme: event.target.value,
+                      })
+                    }
+                    required
+                  />
+                </label>
+
+                <label className="crud-page__field">
+                  <span>Étape</span>
+                  <select
+                    value={formulaire.etape_etude}
+                    onChange={(event) =>
+                      setFormulaire({
+                        ...formulaire,
+                        etape_etude: event.target.value,
+                      })
+                    }
+                  >
+                    {ETAPES_DISPONIBLES.map((etape) => (
+                      <option key={etape} value={etape}>
+                        {etape}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="crud-page__field">
+                  <span>Type de salle</span>
+                  <input
+                    type="text"
+                    placeholder="ex: Laboratoire"
+                    value={formulaire.type_salle}
+                    onChange={(event) =>
+                      setFormulaire({
+                        ...formulaire,
+                        type_salle: event.target.value,
+                      })
+                    }
+                    required
+                  />
+                </label>
+
+                <div className="crud-page__modal-actions">
+                  <button
+                    type="button"
+                    className="crud-page__secondary-button"
+                    onClick={fermerModal}
+                  >
+                    Annuler
+                  </button>
+
+                  <button type="submit" className="crud-page__primary-button">
+                    {edition ? "Enregistrer" : "Ajouter"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        ) : null}
       </div>
     </AppShell>
   );

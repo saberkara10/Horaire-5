@@ -5,18 +5,9 @@
  * Les validations sont appliquees avant l'appel au modele.
  */
 
-import {
-  codeSalleIsValide,
-  typeSalleIsValide,
-  capaciteSalleIsValide,
-} from "../src/validations/salles.validation.js";
-import {
-  getAllSalles,
-  getSalleById,
-  addSalle,
-  modifySalle,
-  deleteSalle,
-} from "../src/model/salle.js";
+// pas d'authentification sur ces routes pour usage local simple
+import { codeSalleIsValide, typeSalleIsValide, capaciteSalleIsValide } from "../src/validations/salles.validation.js";
+import { getAllSalles, getSalleById, addSalle, modifySalle, deleteSalle } from "../src/model/salle.js";
 
 /**
  * Initialiser les routes des salles.
@@ -24,92 +15,93 @@ import {
  * @param {import("express").Express} app Application Express.
  */
 export default function sallesRoutes(app) {
-  app.get("/api/salles", async (request, response) => {
-    try {
-      const salles = await getAllSalles();
-      response.status(200).json(salles);
-    } catch (error) {
-      response.status(500).json({ message: "Erreur serveur." });
-    }
-  });
+    /**
+     * GET /api/salles
+     * Recuperer toutes les salles.
+     */
+    app.get("/api/salles", async (request, response) => {
+        const salles = await getAllSalles();
+        response.status(200).json(salles);
+    });
 
-  app.get("/api/salles/:id", async (request, response) => {
-    try {
-      const salle = await getSalleById(Number(request.params.id));
+    /**
+     * GET /api/salles/:id
+     * Recuperer une salle par son identifiant.
+     */
+    app.get("/api/salles/:id", async (request, response) => {
+        const salle = await getSalleById(request.params.id);
 
-      if (!salle) {
-        return response.status(404).json({ message: "Salle introuvable." });
-      }
-
-      response.status(200).json(salle);
-    } catch (error) {
-      response.status(500).json({ message: "Erreur serveur." });
-    }
-  });
-
-  app.post(
-    "/api/salles",
-    codeSalleIsValide,
-    typeSalleIsValide,
-    capaciteSalleIsValide,
-    async (request, response) => {
-      try {
-        const resultatInsertion = await addSalle(
-          request.body.code,
-          request.body.type,
-          request.body.capacite
-        );
-        const salleAjoutee = await getSalleById(resultatInsertion.insertId);
-
-        response.status(201).json(salleAjoutee);
-      } catch (error) {
-        if (error.code === "ER_DUP_ENTRY") {
-          return response
-            .status(409)
-            .json({ message: "Le code de salle existe deja." });
+        if (salle) {
+            response.status(200).json(salle);
         }
+        else {
+            response.status(404).end();
+        }
+    });
 
-        response.status(500).json({ message: "Erreur serveur." });
-      }
-    }
-  );
+    /**
+     * POST /api/salles
+     * Ajouter une nouvelle salle.
+     */
+    app.post(
+        "/api/salles",
+        codeSalleIsValide,
+        typeSalleIsValide,
+        capaciteSalleIsValide,
+        async (request, response) => {
+            try {
+                await addSalle(
+                    request.body.code,
+                    request.body.type,
+                    request.body.capacite
+                );
+                response.status(201).end();
+            }
+            catch (error) {
+                if (error.code === "ER_DUP_ENTRY") {
+                    response.status(409).end();
+                }
+            }
+        }
+    );
 
-  app.put(
-    "/api/salles/:id",
-    typeSalleIsValide,
-    capaciteSalleIsValide,
-    async (request, response) => {
-      try {
-        const idSalle = Number(request.params.id);
-        const salle = await getSalleById(idSalle);
+    /**
+     * PUT /api/salles/:id
+     * Modifier une salle existante.
+     */
+    app.put(
+        "/api/salles/:id",
+        typeSalleIsValide,
+        capaciteSalleIsValide,
+        async (request, response) => {
+            const salle = await getSalleById(request.params.id);
+
+            if (!salle) {
+                return response.status(404).end();
+            }
+
+            await modifySalle(
+                request.params.id,
+                request.body.type,
+                request.body.capacite
+            );
+
+            response.status(200).end();
+        }
+    );
+
+    /**
+     * DELETE /api/salles/:id
+     * Supprimer une salle.
+     */
+    app.delete("/api/salles/:id", async (request, response) => {
+        const salle = await getSalleById(request.params.id);
 
         if (!salle) {
-          return response.status(404).json({ message: "Salle introuvable." });
+            return response.status(404).end();
         }
 
-        await modifySalle(idSalle, request.body.type, request.body.capacite);
-
-        const salleModifiee = await getSalleById(idSalle);
-        response.status(200).json(salleModifiee);
-      } catch (error) {
-        response.status(500).json({ message: "Erreur serveur." });
-      }
-    }
-  );
-
-  app.delete("/api/salles/:id", async (request, response) => {
-    try {
-      const idSalle = Number(request.params.id);
-      const salle = await getSalleById(idSalle);
-
-      if (!salle) {
-        return response.status(404).json({ message: "Salle introuvable." });
-      }
-
-      await deleteSalle(idSalle);
-      response.status(200).json({ message: "Salle supprimee." });
-    } catch (error) {
-      response.status(500).json({ message: "Erreur serveur." });
-    }
-  });
+        await deleteSalle(request.params.id);
+        response.status(200).end();
+    });
 }

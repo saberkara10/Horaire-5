@@ -1,43 +1,184 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { LoginPage } from "./pages/LoginPage.jsx";
+import { DashboardPage } from "./pages/DashboardPage.jsx";
 import { CoursPage } from "./pages/CoursPage.jsx";
-import { EtudiantsPage } from "./pages/EtudiantsPage.jsx";
 import { ProfesseursPage } from "./pages/ProfesseursPage.jsx";
 import { SallesPage } from "./pages/SallesPage.jsx";
+import { EtudiantsImportPage } from "./pages/EtudiantsImportPage.jsx";
+import {
+  logoutUtilisateur,
+  recupererUtilisateurConnecte,
+} from "./services/auth.api.js";
+import { PlanningEtudiantPage } from "./pages/PlanningEtudiantPage.jsx";
+import { AffectationsPage } from "./pages/AffectationsPage.jsx";
+
 
 export default function App() {
-  const [moduleActif, setModuleActif] = useState("professeurs");
+  const [utilisateur, setUtilisateur] = useState(null);
+  const [verificationSession, setVerificationSession] = useState(true);
 
-  if (moduleActif === "salles") {
-    return (
-      <SallesPage
-        moduleActif={moduleActif}
-        onChangerModule={setModuleActif}
-      />
-    );
+  useEffect(() => {
+    async function verifierSession() {
+      try {
+        const user = await recupererUtilisateurConnecte();
+        setUtilisateur(user);
+      } catch {
+        setUtilisateur(null);
+      } finally {
+        setVerificationSession(false);
+      }
+    }
+
+    verifierSession();
+  }, []);
+
+  async function handleLogout() {
+    try {
+      await logoutUtilisateur();
+    } catch {
+      // ignore
+    } finally {
+      setUtilisateur(null);
+    }
   }
 
-  if (moduleActif === "cours") {
-    return (
-      <CoursPage
-        moduleActif={moduleActif}
-        onChangerModule={setModuleActif}
-      />
-    );
+  function handleLogin(user) {
+    setUtilisateur(user);
   }
 
-  if (moduleActif === "etudiants") {
+  if (verificationSession) {
     return (
-      <EtudiantsPage
-        moduleActif={moduleActif}
-        onChangerModule={setModuleActif}
-      />
+      <div className="app-loading-screen">
+        <div className="app-loading-screen__card">
+          <div className="app-loading-screen__spinner" />
+          <p>Vérification de la session...</p>
+        </div>
+      </div>
     );
   }
 
   return (
-    <ProfesseursPage
-      moduleActif={moduleActif}
-      onChangerModule={setModuleActif}
-    />
+    <BrowserRouter>
+      <Routes>
+        <Route
+          path="/login"
+          element={
+            utilisateur ? (
+              <Navigate to="/dashboard" replace />
+            ) : (
+              <LoginPage onLogin={handleLogin} />
+            )
+          }
+        />
+
+        <Route
+          path="/dashboard"
+          element={
+            utilisateur ? (
+              <DashboardPage utilisateur={utilisateur} onLogout={handleLogout} />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        <Route
+          path="/cours"
+          element={
+            utilisateur ? (
+              <CoursPage utilisateur={utilisateur} onLogout={handleLogout} />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        <Route
+          path="/professeurs"
+          element={
+            utilisateur ? (
+              <ProfesseursPage
+                utilisateur={utilisateur}
+                onLogout={handleLogout}
+              />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        <Route
+          path="/salles"
+          element={
+            utilisateur ? (
+              <SallesPage utilisateur={utilisateur} onLogout={handleLogout} />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        <Route
+          path="/import-etudiants"
+          element={
+            utilisateur ? (
+              <EtudiantsImportPage
+                utilisateur={utilisateur}
+                onLogout={handleLogout}
+              />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+        <Route
+  path="/affectations"
+  element={
+    utilisateur ? (
+      <AffectationsPage
+        utilisateur={utilisateur}
+        onLogout={handleLogout}
+      />
+    ) : (
+      <Navigate to="/login" replace />
+    )
+  }
+/>
+
+        <Route
+  path="/planning-etudiant/:id"
+  element={
+    utilisateur ? (
+      <PlanningEtudiantPage />
+    ) : (
+      <Navigate to="/login" replace />
+    )
+  }
+/>
+
+        <Route
+          path="/"
+          element={
+            utilisateur ? (
+              <Navigate to="/dashboard" replace />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        <Route
+          path="*"
+          element={
+            utilisateur ? (
+              <Navigate to="/dashboard" replace />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+      </Routes>
+    </BrowserRouter>
   );
 }

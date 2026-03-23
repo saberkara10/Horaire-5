@@ -1,0 +1,122 @@
+.planning-container {
+  padding: 40px;
+  color: white;
+}
+
+.planning-retour {
+  background: none;
+  border: none;
+  color: #a78bfa;
+  cursor: pointer;
+  font-size: 0.95rem;
+  padding: 0;
+  margin-bottom: 24px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.planning-retour:hover {
+  color: white;
+}
+
+.planning-titre {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 24px;
+}
+
+.planning-sous-titre {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 32px 0 16px;
+}
+
+.planning-infos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin-bottom: 8px;
+}
+
+.planning-info-item {
+  display: flex;
+  flex-direction: column;
+  min-width: 140px;
+}
+
+.planning-label {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+
+.planning-valeur {
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.planning-table-wrapper {
+  overflow-x: auto;
+}
+
+.planning-table {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  overflow: hidden;
+  border-collapse: collapse;
+}
+
+.planning-table th,
+.planning-table td {
+  padding: 1rem;
+  text-align: left;
+}
+
+.planning-table tr {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.planning-code {
+  display: block;
+  font-size: 0.75rem;
+  color: #a78bfa;
+  font-weight: 600;
+}
+
+.planning-nom-cours {
+  display: block;
+  font-size: 0.9rem;
+}
+
+.planning-salle {
+  display: block;
+  font-weight: 600;
+}
+
+.planning-type-salle {
+  display: block;
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+.planning-message {
+  padding: 40px;
+  color: white;
+}
+
+.planning-erreur {
+  color: #f87171;
+}
+
+.planning-vide {
+  color: #94a3b8;
+  font-style: italic;
+  padding: 20px 0;
+}

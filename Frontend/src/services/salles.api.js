@@ -1,31 +1,29 @@
-import { requeteApi } from "./api.js";
+import { apiRequest } from "./api.js";
+
+const BASE_URL = "/api/salles";
 
 export async function recupererSalles() {
-  return requeteApi("/salles");
+  return apiRequest(BASE_URL);
 }
 
-export async function creerSalle(donneesSalle) {
-  return requeteApi("/salles", {
+export async function creerSalle(salle) {
+  return apiRequest(BASE_URL, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(donneesSalle),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(salle),
   });
 }
 
-export async function modifierSalle(idSalle, donneesSalle) {
-  return requeteApi(`/salles/${idSalle}`, {
+export async function modifierSalle(id, salle) {
+  return apiRequest(`${BASE_URL}/${id}`, {
     method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(donneesSalle),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(salle),
   });
 }
 
-export async function supprimerSalle(idSalle) {
-  return requeteApi(`/salles/${idSalle}`, {
+export async function supprimerSalle(id) {
+  return apiRequest(`${BASE_URL}/${id}`, {
     method: "DELETE",
   });
 }
