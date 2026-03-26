@@ -61,3 +61,19 @@ export function userResponsable(request, response, next) {
 
     response.status(401).end();
 }
+
+/**
+ * Middleware qui valide que l'utilisateur possede le role ADMIN ou RESPONSABLE.
+ * @param {import("express").Request} request Objet de requete HTTP.
+ * @param {import("express").Response} response Objet de reponse HTTP.
+ * @param {import("express").NextFunction} next Fonction pour passer au prochain middleware.
+ */
+export function userAdminOrResponsable(request, response, next) {
+    const roles = Array.isArray(request.user?.roles) ? request.user.roles : [];
+
+    if (roles.includes("ADMIN") || roles.includes("RESPONSABLE")) {
+        return next();
+    }
+
+    response.status(403).json({ message: "Acces refuse." });
+}

@@ -152,6 +152,27 @@ CREATE TABLE `professeurs` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Table structure for table `disponibilites_professeurs`
+--
+
+DROP TABLE IF EXISTS `disponibilites_professeurs`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `disponibilites_professeurs` (
+  `id_disponibilite_professeur` int NOT NULL AUTO_INCREMENT,
+  `id_professeur` int NOT NULL,
+  `jour_semaine` tinyint NOT NULL,
+  `heure_debut` time NOT NULL,
+  `heure_fin` time NOT NULL,
+  PRIMARY KEY (`id_disponibilite_professeur`),
+  UNIQUE KEY `uniq_disponibilite_professeur` (`id_professeur`,`jour_semaine`,`heure_debut`,`heure_fin`),
+  CONSTRAINT `fk_disponibilite_professeur` FOREIGN KEY (`id_professeur`) REFERENCES `professeurs` (`id_professeur`) ON DELETE CASCADE,
+  CONSTRAINT `chk_disponibilite_jour` CHECK ((`jour_semaine` between 1 and 5)),
+  CONSTRAINT `chk_disponibilite_heure` CHECK ((`heure_debut` < `heure_fin`))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `salles`
 --
 
