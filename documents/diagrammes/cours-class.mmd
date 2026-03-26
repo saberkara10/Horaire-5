@@ -1,0 +1,29 @@
+classDiagram
+    class Cours {
+        +id_cours : int
+        +code : string
+        +nom : string
+        +duree : int
+        +programme : string
+        +etape_etude : string
+        +type_salle : string
+        +archive : boolean
+    }
+
+    class Salle {
+        +id_salle : int
+        +code : string
+        +type : string
+        +capacite : int
+    }
+
+    class AffectationCours {
+        +id_affectation_cours : int
+        +id_cours : int
+        +id_professeur : int
+        +id_salle : int
+        +id_plage_horaires : int
+    }
+
+    Cours "1" --> "0..*" AffectationCours : est_planifie
+    Salle "1" --> "0..*" AffectationCours : utilise
