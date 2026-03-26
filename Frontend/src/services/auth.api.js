@@ -17,10 +17,12 @@ export async function loginUtilisateur({ email, password }) {
 
 export async function recupererUtilisateurConnecte() {
   try {
-    return await apiRequest(`${AUTH_BASE_URL}/me`, {
+    const response = await apiRequest(`${AUTH_BASE_URL}/me`, {
       method: "GET",
       credentials: "include",
     });
+
+    return response?.user ?? response;
   } catch {
     return null;
   }

@@ -67,7 +67,7 @@ app.get("/api/groupes", async (request, response) => {
 
 // Initialiser routes
 coursRoutes(app);
-authRoutes(app);
+app.use("/auth", authRoutes);
 professeursRoutes(app);
 sallesRoutes(app);
 etudiantsRoutes(app);
