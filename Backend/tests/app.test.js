@@ -32,9 +32,7 @@ describe("Tests app.js", () => {
 
   test("GET /api/groupes retourne 200", async () => {
     queryMock.mockResolvedValue([
-      [
-        { id_groupes_etudiants: 1, nom_groupe: "INF2025-A" },
-      ],
+      [{ id_groupes_etudiants: 1, nom_groupe: "INF2025-A" }],
     ]);
 
     const response = await request(app).get("/api/groupes");

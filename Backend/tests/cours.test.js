@@ -303,3 +303,14 @@ describe("Tests routes Cours", () => {
     expect(response.body.message).toBe("Erreur serveur.");
   });
 });
+
+let consoleErrorSpy;
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  consoleErrorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+});
+
+afterEach(() => {
+  consoleErrorSpy.mockRestore();
+});
