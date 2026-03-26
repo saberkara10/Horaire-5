@@ -1,0 +1,23 @@
+classDiagram
+    class Salle {
+        +id_salle : int
+        +code : string
+        +type : string
+        +capacite : int
+    }
+
+    class Cours {
+        +id_cours : int
+        +type_salle : string
+    }
+
+    class AffectationCours {
+        +id_affectation_cours : int
+        +id_salle : int
+        +id_cours : int
+        +id_professeur : int
+        +id_plage_horaires : int
+    }
+
+    Salle "1" --> "0..*" AffectationCours : accueille
+    Cours "0..*" ..> Salle : exige_un_type_compatible

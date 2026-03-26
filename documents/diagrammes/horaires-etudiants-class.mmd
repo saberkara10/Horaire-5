@@ -1,0 +1,32 @@
+classDiagram
+    class EtudiantImporte {
+        +matricule : string
+        +nom : string
+        +prenom : string
+        +groupe : string
+        +programme : string
+        +etape : int
+    }
+
+    class GroupeEtudiants {
+        +id_groupes_etudiants : int
+        +nom_groupe : string
+    }
+
+    class AffectationGroupes {
+        +id_affectation_groupes : int
+        +id_groupes_etudiants : int
+        +id_affectation_cours : int
+    }
+
+    class AffectationCours {
+        +id_affectation_cours : int
+        +id_cours : int
+        +id_professeur : int
+        +id_salle : int
+        +id_plage_horaires : int
+    }
+
+    EtudiantImporte ..> GroupeEtudiants : appartient_a
+    GroupeEtudiants "1" --> "0..*" AffectationGroupes : relie
+    AffectationCours "1" --> "0..*" AffectationGroupes : contient

@@ -1,0 +1,18 @@
+classDiagram
+    class Professeur {
+        +id_professeur : int
+        +matricule : string
+        +nom : string
+        +prenom : string
+        +specialite : string
+    }
+
+    class AffectationCours {
+        +id_affectation_cours : int
+        +id_professeur : int
+        +id_cours : int
+        +id_salle : int
+        +id_plage_horaires : int
+    }
+
+    Professeur "1" --> "0..*" AffectationCours : enseigne

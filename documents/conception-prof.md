@@ -2,100 +2,76 @@
 
 ## 1. Objectif du module
 
-Le module de gestion des professeurs permet la création, la consultation, la modification et la suppression des professeurs dans le système de gestion des horaires.
+Le module professeurs permet de :
 
-Il constitue une entité centrale utilisée dans la planification académique et l’affectation des cours.
+- creer un professeur ;
+- consulter la liste des professeurs ;
+- modifier un professeur existant ;
+- supprimer un professeur seulement s'il n'est pas deja utilise dans une affectation.
+
+Ce document est aligne avec :
+
+- `Backend/routes/professeurs.routes.js`
+- `Backend/src/validations/professeurs.validation.js`
+- `Backend/src/model/professeurs.model.js`
+- `Backend/Database/GDH5.sql`
+
+## Statut actuel dans le projet
+
+Le module Professeurs est effectivement actif dans le backend principal lance par defaut, via `Backend/src/app.js`.
+
+La relation avec `affectation_cours` existe deja au niveau base de donnees, meme si la planification complete n'est pas encore branchee dans le meme point d'entree.
 
 ---
 
-## 2. Rôle du professeur dans le système
+## 2. Diagramme UML de classes
 
-Le professeur est une entité principale du système.  
-Il est utilisé pour :
+![Diagramme UML de classes du module professeurs](diagrammes/professeurs-class.svg)
 
-- être enregistré dans la base de données,
-- être consulté dans les interfaces administratives,
-- être associé aux horaires et aux cours,
-- garantir une identification unique via son matricule.
+### Lecture du schema
+
+- la classe metier principale est `Professeur` ;
+- `AffectationCours` depend de `Professeur` via `id_professeur` ;
+- cette relation explique pourquoi la suppression doit etre controlee.
 
 ---
 
-## 3. Structure de la table `professeurs`
+## 3. Diagramme UML de sequence de suppression
 
-La conception est strictement alignée avec la structure de la base de données.
+![Diagramme UML de sequence de suppression d un professeur](diagrammes/professeurs-sequence.svg)
 
-### Table : `professeurs`
+### Lecture du schema
+
+- l'identifiant est valide ;
+- le professeur est recherche en base ;
+- le backend verifie s'il est deja utilise dans `affectation_cours` ;
+- la suppression n'a lieu que si aucune affectation ne le reference.
+
+---
+
+## 4. Structure de donnees
+
+### Table `professeurs`
 
 | Champ | Type | Contraintes | Description |
 |--------|--------|------------|------------|
-| id_professeur | INT | PRIMARY KEY, AUTO_INCREMENT | Identifiant technique unique |
-| matricule | VARCHAR(50) | NOT NULL, UNIQUE | Identifiant métier unique du professeur |
-| nom | VARCHAR(100) | NOT NULL | Nom de famille |
-| prenom | VARCHAR(100) | NOT NULL | Prénom |
-| specialite | VARCHAR(100) | NULL autorisé | Matière ou domaine enseigné |
+| `id_professeur` | INT | PK, AUTO_INCREMENT | Identifiant technique |
+| `matricule` | VARCHAR(50) | NOT NULL, UNIQUE | Identifiant metier |
+| `nom` | VARCHAR(100) | NOT NULL | Nom |
+| `prenom` | VARCHAR(100) | NOT NULL | Prenom |
+| `specialite` | VARCHAR(100) | NULL | Specialite |
 
 ---
 
-## 4. Contraintes d’intégrité
+## 5. Regles metier
 
-- `id_professeur` est la clé primaire.
-- `matricule` est unique afin d’éviter les doublons.
-- `nom` et `prenom` sont obligatoires.
-- `specialite` est optionnelle.
-
----
-
-## 5. Règles de validation (côté backend)
-
-### 5.1 Matricule
-- obligatoire
-- maximum 50 caractères
-- doit être unique
-
-### 5.2 Nom et prénom
-- obligatoires
-- ne peuvent pas être vides
-- maximum 100 caractères
-
-### 5.3 Spécialité
-- optionnelle
-- maximum 100 caractères
+- le `matricule` est unique ;
+- `nom` et `prenom` sont obligatoires ;
+- `specialite` est facultative ;
+- un professeur deja lie a une affectation ne doit pas etre supprime.
 
 ---
 
-## 6. Fonctionnalités prévues (CRUD)
+## 6. Conclusion
 
-Le module doit permettre :
-
-- **Créer** un professeur
-- **Lire** la liste des professeurs
-- **Lire** un professeur par identifiant
-- **Modifier** les informations d’un professeur
-- **Supprimer** un professeur (si aucune contrainte métier ne l’empêche)
-
----
-
-## 7. Intégration avec les autres modules
-
-Le champ `id_professeur` sera utilisé comme clé de référence dans les tables liées aux horaires et aux cours.
-
-Deux types d’identifiants sont utilisés :
-
-- `id_professeur` → identifiant technique interne (clé primaire)
-- `matricule` → identifiant métier unique utilisé pour distinguer les professeurs
-
-Cette séparation garantit une meilleure organisation des données et facilite les relations entre les tables.
-
----
-
-## 8. Conclusion
-
-La conception du module Professeurs est cohérente avec la structure réelle de la base de données.
-
-Elle garantit :
-
-- l’intégrité des données,
-- l’unicité des professeurs via le matricule,
-- une intégration fluide avec les modules horaires et cours.
-
-Ce document constitue la base pour le développement des routes API, des contrôleurs et des tests du module.
+Le module professeurs alimente directement la planification. Les diagrammes montrent que sa coherence depend de la relation entre la fiche professeur et les affectations existantes.
