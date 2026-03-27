@@ -92,3 +92,20 @@ export async function deleteSalle(idSalle) {
     );
     return result;
 }
+
+/**
+ * Verifie si une salle est deja utilisee dans une affectation.
+ * @param {number} idSalle L'identifiant de la salle.
+ * @returns {Promise<boolean>} true si la salle est deja affectee.
+ */
+export async function salleEstDejaAffectee(idSalle) {
+    const [lignes] = await pool.query(
+        `SELECT 1
+        FROM affectation_cours
+        WHERE id_salle = ?
+        LIMIT 1;`,
+        [idSalle]
+    );
+
+    return lignes.length > 0;
+}

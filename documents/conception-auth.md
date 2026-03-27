@@ -1,139 +1,100 @@
-# Authentification
+# Conception du module d'authentification
 
-Ce document décrit l'implémentation du système d'authentification
-réalisé lors du Sprint 1 du projet **Gestion des horaires**.
+## 1. Objectif du module
 
-Les fonctionnalités mises en place correspondent aux tickets suivants :
-- GDH5-47
-- GDH5-48
-- GDH5-49
-- GDH5-50
-- GDH5-51
-- GDH5-66
+Le module d'authentification permet de :
 
+- connecter un utilisateur a partir de son courriel et de son mot de passe ;
+- creer et conserver une session serveur ;
+- retourner l'utilisateur connecte ;
+- deconnecter proprement l'utilisateur.
 
----
+Ce document est aligne avec :
 
-## GDH5-47 – Création de la table utilisateurs
+- `Backend/app.js`
+- `Backend/routes/auth.routes.js`
+- `Backend/db.js`
+- `Backend/Database/GDH5.sql`
 
-Une table `utilisateurs` a été créée dans la base de données MySQL afin
-de stocker les informations des comptes utilisateurs.
+## Statut actuel dans le projet
 
-### Champs principaux
-- id (clé primaire)
-- email (unique)
-- mot_de_passe_hash
-- nom
-- prenom
-- actif
-- created_at / updated_at
+Le module d'authentification existe bien dans le depot, mais il est monte dans `Backend/app.js`, alors que le serveur principal lance par `Backend/package.json` demarre `Backend/src/server.js`, qui charge `Backend/src/app.js`.
 
-Les mots de passe ne sont **jamais stockés en clair**.
+Autrement dit :
+
+- le module auth est bien implemente ;
+- une suite de tests existe dans `Backend/tests/auth.test.js` ;
+- mais il ne partage pas encore le meme point d'entree que les routes metier principales lancees par defaut.
 
 ---
 
-## GDH5-48 – Ajout d'un utilisateur administrateur
+## 2. Structure de donnees utilisee
 
-Un script d'initialisation (`admin.js`) a été créé pour :
-- insérer un utilisateur ADMIN par défaut
-- hacher le mot de passe avec bcrypt
-- associer le rôle ADMIN via la table `utilisateur_roles`
+### Table `utilisateurs`
 
-Ce script est exécuté manuellement pour initialiser la base de données.
-
----
-
-## GDH5-49 – Création de la route login
-
-### Route
-- **POST** `/auth/login`
-
-### Données attendues
-```json
-{
-  "email": "admin@ecole.ca",
-  "password": "Admin123!"
-}
-```
-
-## Fonctionnement de la route de connexion
-
-La route **POST /auth/login** suit les étapes suivantes :
-
-- normalisation de l'email (conversion en minuscules et suppression des espaces)
-- recherche de l'utilisateur dans la table `utilisateurs`
-- vérification que le compte est actif
-- récupération des rôles associés à l'utilisateur
-- création d'une session utilisateur
-
-### Informations stockées en session
-
-Les données suivantes sont stockées dans `req.session.user` :
-
-- id
-- email
-- nom
-- prénom
-- rôles
+| Champ | Type | Contraintes | Description |
+|--------|--------|------------|------------|
+| `id_utilisateur` | INT | PK, AUTO_INCREMENT | Identifiant technique |
+| `nom` | VARCHAR(100) | NOT NULL | Nom |
+| `prenom` | VARCHAR(100) | NOT NULL | Prenom |
+| `email` | VARCHAR(150) | NOT NULL, UNIQUE | Identifiant de connexion |
+| `motdepasse` | VARCHAR(255) | NOT NULL | Mot de passe hache |
+| `role` | VARCHAR(50) | NOT NULL | Role applicatif |
 
 ---
 
-## GDH5-50 – Vérification du mot de passe
+## 3. Diagramme UML de sequence du login
 
-La vérification du mot de passe est réalisée à l'aide de **bcrypt** :
+![Diagramme UML de sequence du login](diagrammes/auth-sequence.svg)
 
-- le mot de passe fourni est comparé au hash stocké en base de données
-- en cas d'échec, la connexion est refusée
-- aucun mot de passe en clair n'est exposé ou retourné au client
+### Lecture du schema
 
----
-
-## GDH5-66 – Définition du mécanisme d'authentification
-
-Le mécanisme d'authentification repose sur les éléments suivants :
-
-- Express
-- express-session
-- stockage de l'utilisateur authentifié dans `req.session.user`
-
-Un middleware `authRequired` a été implémenté afin de :
-
-- vérifier l'existence d'une session utilisateur active
-- protéger les routes sensibles nécessitant une authentification
-
-### Exemple d'utilisation
-
-```js
-app.get("/protected", authRequired, (req, res) => {
-  res.json({ message: "Accès autorisé" });
-});
-```
+- le frontend envoie les identifiants a `POST /auth/login` ;
+- la logique de route interroge directement MySQL via `pool.query` ;
+- le mot de passe est valide avec `bcrypt` ;
+- la session est creee uniquement si les controles passent.
 
 ---
 
-## GDH5-51 – Test du login avec Postman
+## 4. Diagramme UML de sequence de la session
 
-### test de connexion avec des identifiants valides
-![Connexion réussie](image/Postman_Login_Reussi.jpeg)
+![Diagramme UML de sequence de consultation et deconnexion](diagrammes/auth-session-sequence.svg)
 
-### test avec un mot de passe incorrect
-![mot de passe incorrect](image/Postman_Login_Echec.jpeg)
+### Lecture du schema
 
-### test d'accès sans authentification
-![Acces sans authentification](image/Postman3.jpeg)
-
-### test de récupération de la session via la route **/auth/me**
-![Session active](image/Postman4.jpeg)
+- `GET /auth/me` verifie la presence de `req.session.user` ;
+- si la session existe, l'utilisateur connecte est retourne ;
+- `POST /auth/logout` detruit la session serveur.
 
 ---
 
-## Conclusion
+## 5. Regles metier
 
-Ce document décrit :
-1. la structure de la table `utilisateurs`
-2. le fonctionnement de la route de connexion
-3. la gestion des sessions utilisateur
-4. le lien avec la gestion des rôles (ADMIN, RESPONSABLE)
+- `email` et `password` sont obligatoires au login ;
+- l'email est normalise en minuscules ;
+- le mot de passe n'est jamais compare en clair ;
+- le role expose au frontend provient du champ `utilisateurs.role` ;
+- la session est stockee cote serveur avec `express-session` ;
+- l'objet de session contient actuellement le champ `role`.
 
-La gestion détaillée des rôles est documentée dans un fichier séparé :
-`docs/gestion-des-roles.md`
+## Point de vigilance de coherence
+
+Le middleware `authorize` lit `req.session.user.roles`, alors que la route de login stocke actuellement `req.session.user.role`.
+
+En l'etat :
+
+- les routes protegees par role existent bien dans le depot ;
+- mais une session creee par `POST /auth/login` ne fournit pas la structure attendue par `authorize` ;
+- un acces a `/admin-only` ou `/responsable-only` peut donc etre refuse malgre un role applicatif valide.
+
+Ce document n'efface pas cet ecart : il le rend explicite pour eviter toute contradiction entre la conception et le code reellement present.
+
+---
+
+## 6. Conclusion
+
+Les diagrammes montrent clairement que l'authentification repose sur trois elements principaux :
+
+- la route de connexion ;
+- la lecture de l'utilisateur en base ;
+- la session serveur.

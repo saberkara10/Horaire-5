@@ -1,0 +1,15 @@
+classDiagram
+    class Cours
+    class Professeur
+    class Salle
+    class PlageHoraire
+    class GroupeEtudiants
+    class AffectationCours
+    class AffectationGroupes
+
+    Cours "1" --> "0..*" AffectationCours : planifie
+    Professeur "1" --> "0..*" AffectationCours : enseigne
+    Salle "1" --> "0..*" AffectationCours : reserve
+    PlageHoraire "1" --> "0..*" AffectationCours : positionne
+    AffectationCours "1" --> "0..*" AffectationGroupes : reference
+    GroupeEtudiants "1" --> "0..*" AffectationGroupes : participe

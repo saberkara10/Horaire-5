@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { X } from "lucide-react";
 
 const ETAT_INITIAL = {
   code: "",
@@ -72,77 +73,80 @@ export function SalleFormModal({
     });
   }
 
-  const titre = mode === "creation" ? "Ajouter une salle" : "Modifier la salle";
-  const libelleBouton =
-    mode === "creation" ? "Creer la salle" : "Enregistrer les modifications";
+  const titre = mode === "edition" ? "Modifier une salle" : "Ajouter une salle";
+  const estEnTraitement =
+    actionEnCours === "creation" || actionEnCours?.startsWith("modification-");
 
   return (
-    <div className="modal-backdrop" role="presentation" onClick={onFermer}>
-      <section
+    <div className="modal-overlay" role="presentation" onClick={onFermer}>
+      <div
         className="modal-card"
         role="dialog"
         aria-modal="true"
         aria-labelledby="salle-form-title"
         onClick={(event) => event.stopPropagation()}
       >
-        <header className="modal-card__header">
-          <div>
-            <p className="eyebrow">Gestion des horaires</p>
-            <h2 id="salle-form-title">{titre}</h2>
-          </div>
-          <button className="modal-close" type="button" onClick={onFermer} aria-label="Fermer">
-            x
+        <div className="modal-header">
+          <h2 className="modal-title" id="salle-form-title">
+            {titre}
+          </h2>
+          <button type="button" onClick={onFermer} className="modal-close" aria-label="Fermer">
+            <X />
           </button>
-        </header>
+        </div>
 
-        <form className="form-grid" onSubmit={gererSoumission}>
-          <label className="field">
-            <span>Code</span>
+        {erreurLocale ? <div className="modal-error">{erreurLocale}</div> : null}
+
+        <form onSubmit={gererSoumission} className="modal-form">
+          <div className="modal-form-row">
+            <div className="modal-field">
+              <label>Code</label>
+              <input
+                type="text"
+                required
+                maxLength={50}
+                disabled={mode === "edition"}
+                value={valeurs.code}
+                onChange={(event) => mettreAJourChamp("code", event.target.value)}
+                placeholder="A-101"
+              />
+            </div>
+
+            <div className="modal-field">
+              <label>Capacite</label>
+              <input
+                type="number"
+                required
+                min="1"
+                value={valeurs.capacite}
+                onChange={(event) => mettreAJourChamp("capacite", event.target.value)}
+                placeholder="30"
+              />
+            </div>
+          </div>
+
+          <div className="modal-field">
+            <label>Type</label>
             <input
               type="text"
-              value={valeurs.code}
+              required
               maxLength={50}
-              disabled={mode === "edition"}
-              onChange={(event) => mettreAJourChamp("code", event.target.value)}
-            />
-          </label>
-
-          <label className="field">
-            <span>Type</span>
-            <input
-              type="text"
               value={valeurs.type}
-              maxLength={50}
               onChange={(event) => mettreAJourChamp("type", event.target.value)}
+              placeholder="Laboratoire"
             />
-          </label>
+          </div>
 
-          <label className="field field--full">
-            <span>Capacite</span>
-            <input
-              type="number"
-              min="1"
-              value={valeurs.capacite}
-              onChange={(event) => mettreAJourChamp("capacite", event.target.value)}
-            />
-          </label>
-
-          {erreurLocale ? (
-            <p className="feedback-banner feedback-banner--error field--full">{erreurLocale}</p>
-          ) : null}
-
-          <div className="modal-card__footer field--full">
-            <button className="button button--ghost" type="button" onClick={onFermer}>
-              Annuler
+          <div className="modal-actions">
+            <button type="submit" disabled={estEnTraitement} className="modal-submit">
+              {estEnTraitement ? "Enregistrement..." : mode === "edition" ? "Modifier" : "Ajouter"}
             </button>
-            <button className="button button--primary" type="submit">
-              {actionEnCours === "creation" || actionEnCours?.startsWith("modification-")
-                ? "Enregistrement..."
-                : libelleBouton}
+            <button type="button" onClick={onFermer} className="modal-cancel">
+              Annuler
             </button>
           </div>
         </form>
-      </section>
+      </div>
     </div>
   );
 }

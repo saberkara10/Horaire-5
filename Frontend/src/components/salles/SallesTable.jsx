@@ -1,9 +1,12 @@
+import { Edit2, Trash2 } from "lucide-react";
 import { construireLibelleSalle } from "../../utils/salles.utils.js";
 
 export function SallesTable({
   salles,
   salleSelectionneeId,
   onSelectionner,
+  onEditer,
+  onSupprimer,
   actionEnCours,
   surChargement,
   surRafraichissement,
@@ -12,90 +15,90 @@ export function SallesTable({
 }) {
   if (surChargement) {
     return (
-      <section className="panel panel--centered">
-        <div className="loader" aria-hidden="true" />
-        <p>Chargement des salles...</p>
-      </section>
+      <div className="salles-table-container">
+        <div className="salles-table-loading">Chargement des salles...</div>
+      </div>
     );
   }
 
   if (estEnErreur) {
     return (
-      <section className="panel panel--centered">
-        <h2>Connexion impossible au module salles</h2>
-        <p>{messageErreur || "Le serveur n'a pas repondu correctement."}</p>
-      </section>
+      <div className="salles-table-container">
+        <div className="salles-table-error">
+          {messageErreur || "Erreur lors du chargement des salles."}
+        </div>
+      </div>
     );
   }
 
   if (salles.length === 0) {
     return (
-      <section className="panel panel--centered">
-        <h2>Aucune salle a afficher</h2>
-        <p>
-          Aucune salle ne correspond aux criteres actuels. Ajoutez une salle ou
-          ajustez vos filtres.
-        </p>
-      </section>
+      <div className="salles-table-container">
+        <div className="salles-table-empty">Aucune salle trouvee</div>
+      </div>
     );
   }
 
   return (
-    <section className="panel">
-      <div className="table-header">
-        <div>
-          <h2>Liste des salles</h2>
-          <p>Vue operationnelle des espaces disponibles pour la planification.</p>
-        </div>
-        {surRafraichissement ? (
-          <span className="status-pill status-pill--busy">Actualisation...</span>
-        ) : null}
-      </div>
+    <div className="salles-table-container">
+      {surRafraichissement ? (
+        <div className="salles-table-loading">Actualisation...</div>
+      ) : null}
 
-      <div className="table-wrapper">
-        <table className="teachers-table">
-          <thead>
-            <tr>
-              <th>Salle</th>
-              <th>Type</th>
-              <th>Capacite</th>
-              <th>Statut</th>
-            </tr>
-          </thead>
-          <tbody>
-            {salles.map((salle) => {
-              const estSelectionnee = salle.id_salle === salleSelectionneeId;
-              const estEnAction =
-                actionEnCours === `modification-${salle.id_salle}` ||
-                actionEnCours === `suppression-${salle.id_salle}`;
+      <table className="salles-table">
+        <thead>
+          <tr>
+            <th>Salle</th>
+            <th>Type</th>
+            <th>Capacite</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {salles.map((salle) => {
+            const estSelectionnee = salle.id_salle === salleSelectionneeId;
+            const actionsDesactivees = actionEnCours !== "";
 
-              return (
-                <tr
-                  key={salle.id_salle}
-                  className={estSelectionnee ? "is-selected" : ""}
-                  onClick={() => onSelectionner(salle.id_salle)}
-                >
-                  <td data-label="Salle">
-                    <div className="course-identity">
-                      <div>
-                        <strong>{construireLibelleSalle(salle)}</strong>
-                        <span>ID #{salle.id_salle}</span>
-                      </div>
-                    </div>
-                  </td>
-                  <td data-label="Type">{salle.type}</td>
-                  <td data-label="Capacite">{salle.capacite} places</td>
-                  <td data-label="Statut">
-                    <span className={`status-pill ${estEnAction ? "status-pill--busy" : ""}`}>
-                      {estEnAction ? "Mise a jour..." : "Disponible"}
-                    </span>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </section>
+            return (
+              <tr
+                key={salle.id_salle}
+                onClick={() => onSelectionner(salle.id_salle)}
+                className={estSelectionnee ? "selected" : ""}
+              >
+                <td className="code">{construireLibelleSalle(salle)}</td>
+                <td>{salle.type}</td>
+                <td>{salle.capacite} places</td>
+                <td>
+                  <div className="salles-table-actions">
+                    <button
+                      type="button"
+                      className="edit-button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onEditer?.(salle);
+                      }}
+                      disabled={actionsDesactivees}
+                    >
+                      <Edit2 />
+                    </button>
+                    <button
+                      type="button"
+                      className="delete-button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onSupprimer?.(salle);
+                      }}
+                      disabled={actionsDesactivees}
+                    >
+                      <Trash2 />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }

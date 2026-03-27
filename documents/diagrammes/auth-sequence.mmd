@@ -1,0 +1,31 @@
+sequenceDiagram
+    actor Utilisateur
+    participant Frontend
+    participant RouteAuth as Route /auth/login
+    participant RouteLogic as auth.routes.js
+    participant Bcrypt
+    participant Session
+    participant MySQL
+
+    Utilisateur->>Frontend: Saisit email et mot de passe
+    Frontend->>RouteAuth: POST /auth/login
+    RouteAuth->>RouteLogic: Normaliser l'email
+    RouteLogic->>MySQL: SELECT id_utilisateur, email, motdepasse, nom, prenom, role FROM utilisateurs WHERE email = ?
+    MySQL-->>RouteLogic: ligne utilisateur ou aucune ligne
+    RouteLogic-->>RouteAuth: resultat
+
+    alt utilisateur introuvable
+        RouteAuth-->>Frontend: 401 Identifiants invalides
+    else utilisateur trouve
+        RouteAuth->>Bcrypt: compare(password, hash)
+        Bcrypt-->>RouteAuth: true ou false
+
+        alt mot de passe invalide
+            RouteAuth-->>Frontend: 401 Identifiants invalides
+        else mot de passe valide
+            RouteAuth->>RouteLogic: Construire {id, email, nom, prenom, role}
+            RouteAuth->>Session: req.session.user = {id, email, nom, prenom, role}
+            Session-->>RouteAuth: session active
+            RouteAuth-->>Frontend: 200 Connexion reussie
+        end
+    end

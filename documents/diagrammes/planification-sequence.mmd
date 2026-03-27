@@ -1,0 +1,26 @@
+sequenceDiagram
+    actor Responsable
+    participant Frontend
+    participant ModulePlanif as Module planification
+    participant Validation
+    participant MySQL
+
+    Responsable->>Frontend: Choisit cours, professeur, salle, date, heure, groupes
+    Frontend->>ModulePlanif: Creer une affectation
+    ModulePlanif->>Validation: Verifier identifiants et contraintes
+    Validation->>MySQL: Lire cours, professeur, salle, groupes
+    MySQL-->>Validation: ressources valides
+    Validation->>MySQL: Rechercher conflits de salle, professeur et groupe
+    MySQL-->>Validation: conflits ou disponibilite
+
+    alt conflit detecte
+        Validation-->>ModulePlanif: refus de creation
+        ModulePlanif-->>Frontend: message d'erreur metier
+    else ressources disponibles
+        ModulePlanif->>MySQL: INSERT plages_horaires
+        ModulePlanif->>MySQL: INSERT affectation_cours
+        loop pour chaque groupe
+            ModulePlanif->>MySQL: INSERT affectation_groupes
+        end
+        ModulePlanif-->>Frontend: confirmation de planification
+    end

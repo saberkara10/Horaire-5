@@ -1,0 +1,21 @@
+sequenceDiagram
+    actor Utilisateur
+    participant Frontend
+    participant RouteMe as Route /auth/me
+    participant RouteLogout as Route /auth/logout
+    participant Session
+
+    Utilisateur->>Frontend: Ouvre l'application
+    Frontend->>RouteMe: GET /auth/me
+    RouteMe->>Session: Lire req.session.user
+
+    alt session absente
+        RouteMe-->>Frontend: 401 Authentification requise
+    else session presente
+        RouteMe-->>Frontend: 200 { user: req.session.user }
+        Utilisateur->>Frontend: Clique sur deconnexion
+        Frontend->>RouteLogout: POST /auth/logout
+        RouteLogout->>Session: Detruire la session
+        Session-->>RouteLogout: Session supprimee
+        RouteLogout-->>Frontend: 200 Deconnexion reussie + clearCookie(sid)
+    end

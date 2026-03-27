@@ -1,0 +1,30 @@
+sequenceDiagram
+    actor Responsable
+    participant Frontend
+    participant RouteCours as Route /api/cours
+    participant Validation as cours.validations.js
+    participant ModelCours as cours.model.js
+    participant MySQL
+
+    Responsable->>Frontend: Soumet un nouveau cours
+    Frontend->>RouteCours: POST /api/cours
+    RouteCours->>Validation: validerCreateCours()
+    Validation->>ModelCours: recupererCoursParCode(code)
+    ModelCours->>MySQL: SELECT id_cours, code, nom, duree, programme, etape_etude, type_salle FROM cours WHERE code = ? LIMIT 1
+    MySQL-->>ModelCours: resultat
+    Validation->>ModelCours: typeSalleExiste(type_salle)
+    ModelCours->>MySQL: SELECT 1 FROM salles WHERE type = ? LIMIT 1
+    MySQL-->>ModelCours: resultat
+
+    alt code deja utilise ou type de salle absent
+        Validation-->>RouteCours: erreur 400 ou 409
+        RouteCours-->>Frontend: creation refusee
+    else validation reussie
+        RouteCours->>ModelCours: ajouterCours(payload)
+        ModelCours->>MySQL: INSERT INTO cours (code, nom, duree, programme, etape_etude, type_salle)
+        MySQL-->>ModelCours: insertId
+        ModelCours->>MySQL: SELECT id_cours, code, nom, duree, programme, etape_etude, type_salle FROM cours WHERE id_cours = insertId LIMIT 1
+        MySQL-->>ModelCours: cours cree
+        ModelCours-->>RouteCours: objet cours
+        RouteCours-->>Frontend: 201 cours cree
+    end

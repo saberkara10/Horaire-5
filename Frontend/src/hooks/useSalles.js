@@ -69,6 +69,10 @@ export function useSalles() {
     };
   }, []);
 
+  async function recharger() {
+    return chargerSalles({ conserverListe: salles.length > 0 });
+  }
+
   async function executerAction(action, identifiantAction, appliquerResultat) {
     setActionEnCours(identifiantAction);
     setMessageErreur("");
@@ -91,7 +95,7 @@ export function useSalles() {
     etatChargement,
     messageErreur,
     actionEnCours,
-    recharger: () => chargerSalles({ conserverListe: salles.length > 0 }),
+    recharger,
     creer: (donneesSalle) =>
       executerAction(() => creerSalle(donneesSalle), "creation", (nouvelleSalle) => {
         setSalles((listeActuelle) =>

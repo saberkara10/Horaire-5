@@ -1,0 +1,33 @@
+sequenceDiagram
+    actor Responsable
+    participant Frontend
+    participant RouteProf as Route /api/professeurs/:id
+    participant Validation as professeurs.validation.js
+    participant ModelProf as professeurs.model.js
+    participant MySQL
+
+    Responsable->>Frontend: Demande la suppression d'un professeur
+    Frontend->>RouteProf: DELETE /api/professeurs/:id
+    RouteProf->>Validation: validerIdProfesseur()
+    Validation->>ModelProf: recupererProfesseurParId(id)
+    ModelProf->>MySQL: SELECT id_professeur, matricule, nom, prenom, specialite FROM professeurs WHERE id_professeur = ? LIMIT 1
+    MySQL-->>ModelProf: professeur ou aucune ligne
+
+    alt professeur introuvable
+        Validation-->>RouteProf: erreur 404
+        RouteProf-->>Frontend: 404 Professeur introuvable
+    else professeur trouve
+        Validation->>ModelProf: professeurEstDejaAffecte(id)
+        ModelProf->>MySQL: SELECT 1 FROM affectation_cours WHERE id_professeur = ? LIMIT 1
+        MySQL-->>ModelProf: utilise ou libre
+
+        alt professeur deja affecte
+            Validation-->>RouteProf: erreur 400
+            RouteProf-->>Frontend: 400 Suppression impossible : professeur deja affecte
+        else professeur libre
+            RouteProf->>ModelProf: supprimerProfesseur(id)
+            ModelProf->>MySQL: DELETE FROM professeurs WHERE id_professeur = ? LIMIT 1
+            MySQL-->>ModelProf: suppression
+            RouteProf-->>Frontend: 200 Professeur supprime
+        end
+    end

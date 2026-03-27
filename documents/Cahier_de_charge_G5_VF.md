@@ -91,8 +91,6 @@ Dans un établissement d'enseignement comme le Collège La Cité, la gestion des
 
 **Cas d'utilisation 1 : Ajouter un professeur**
 
-![Ajout professeur](images/cas_utilisation.jpeg)
-
 Le responsable administratif accède au module de gestion des professeurs et choisit d'ajouter un nouveau professeur. Il renseigne les informations personnelles et professionnelles du professeur, telles que le nom, le matricule, la spécialité ainsi que ses disponibilités. Le système valide les données saisies, vérifie l'unicité du matricule et s'assure de la cohérence des informations avant d'enregistrer le professeur. Une confirmation est ensuite affichée pour indiquer que l'ajout a été effectué avec succès.
 
 **Cas d'utilisation 2 : Ajouter un cours**
@@ -187,27 +185,9 @@ L'interface utilisateur doit permettre une prise en main rapide et efficace de l
 
 #### Wireframes
 
-Schémas démontrant la base de l'interface graphique :
+Les wireframes ne sont pas integres dans cette version Markdown, car les fichiers images associes ne sont pas presents dans le dossier `documents`.
 
-![Wireframe 1](images/tableau_de_bord.jpeg)
-
-![Wireframe 2](images/ajouter_cours.jpeg)
-
-![Wireframe 3](images/ajouter_salle.jpeg)
-
-![Wireframe 4](images/ajouter_proesseur.jpeg)
-
-![Wireframe 5](images/calendrier.jpeg)
-
-![Wireframe 6](images/emploi_temps.jpeg)
-
-![Wireframe 7](images/associer_etudiant_cours.jpeg)
-
-![Wireframe 8](images/liste_etudiants.jpeg)
-
-
-
-
+La version `.docx` du cahier des charges reste la reference visuelle quand les captures doivent etre consultees.
 
 ### 2.4. Conditions d'utilisation
 

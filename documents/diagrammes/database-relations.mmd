@@ -1,0 +1,68 @@
+erDiagram
+    UTILISATEURS {
+        int id_utilisateur PK
+        string nom
+        string prenom
+        string email UK
+        string motdepasse
+        string role
+    }
+
+    COURS {
+        int id_cours PK
+        string code UK
+        string nom
+        int duree
+        string programme
+        string etape_etude
+        string type_salle
+        boolean archive
+    }
+
+    PROFESSEURS {
+        int id_professeur PK
+        string matricule UK
+        string nom
+        string prenom
+        string specialite
+    }
+
+    SALLES {
+        int id_salle PK
+        string code UK
+        string type
+        int capacite
+    }
+
+    PLAGES_HORAIRES {
+        int id_plage_horaires PK
+        date date
+        time heure_debut
+        time heure_fin
+    }
+
+    GROUPES_ETUDIANTS {
+        int id_groupes_etudiants PK
+        string nom_groupe UK
+    }
+
+    AFFECTATION_COURS {
+        int id_affectation_cours PK
+        int id_cours FK
+        int id_professeur FK
+        int id_salle FK
+        int id_plage_horaires FK
+    }
+
+    AFFECTATION_GROUPES {
+        int id_affectation_groupes PK
+        int id_groupes_etudiants FK
+        int id_affectation_cours FK
+    }
+
+    COURS ||--o{ AFFECTATION_COURS : planifie
+    PROFESSEURS ||--o{ AFFECTATION_COURS : enseigne
+    SALLES ||--o{ AFFECTATION_COURS : accueille
+    PLAGES_HORAIRES ||--o{ AFFECTATION_COURS : positionne
+    GROUPES_ETUDIANTS ||--o{ AFFECTATION_GROUPES : concerne
+    AFFECTATION_COURS ||--o{ AFFECTATION_GROUPES : associe

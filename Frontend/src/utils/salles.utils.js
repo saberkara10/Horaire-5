@@ -8,8 +8,36 @@ export function extraireTypesSalle(salles) {
   );
 }
 
+export function extraireTypes(salles) {
+  return extraireTypesSalle(salles);
+}
+
+export function calculerStatistiquesSalles(salles) {
+  const capaciteTotale = salles.reduce(
+    (somme, salle) => somme + Number(salle.capacite || 0),
+    0
+  );
+
+  return {
+    total: salles.length,
+    types: extraireTypesSalle(salles).length,
+    capaciteTotale,
+    capaciteMoyenne: salles.length > 0 ? Math.round(capaciteTotale / salles.length) : 0,
+  };
+}
+
+export function calculerStatistiques(salles) {
+  const statistiques = calculerStatistiquesSalles(salles);
+
+  return {
+    total: statistiques.total,
+    types: statistiques.types,
+    capaciteTotale: statistiques.capaciteTotale,
+  };
+}
+
 export function filtrerSalles(salles, recherche, typeSelectionne) {
-  const rechercheNormalisee = recherche.trim().toLowerCase();
+  const rechercheNormalisee = String(recherche || "").trim().toLowerCase();
 
   return salles.filter((salle) => {
     const typeOk = typeSelectionne === "tous" || salle.type === typeSelectionne;
@@ -27,20 +55,6 @@ export function filtrerSalles(salles, recherche, typeSelectionne) {
       salle.type,
       String(salle.capacite),
       construireLibelleSalle(salle),
-    ].some((valeur) => valeur?.toLowerCase().includes(rechercheNormalisee));
+    ].some((valeur) => String(valeur || "").toLowerCase().includes(rechercheNormalisee));
   });
-}
-
-export function calculerStatistiquesSalles(salles) {
-  const capaciteTotale = salles.reduce(
-    (somme, salle) => somme + Number(salle.capacite || 0),
-    0
-  );
-
-  return {
-    total: salles.length,
-    types: extraireTypesSalle(salles).length,
-    capaciteTotale,
-    capaciteMoyenne: salles.length > 0 ? Math.round(capaciteTotale / salles.length) : 0,
-  };
 }
