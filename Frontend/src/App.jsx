@@ -10,6 +10,9 @@ import {
   logoutUtilisateur,
   recupererUtilisateurConnecte,
 } from "./services/auth.api.js";
+import { PlanningEtudiantPage } from "./pages/PlanningEtudiantPage.jsx";
+import { AffectationsPage } from "./pages/AffectationsPage.jsx";
+
 
 export default function App() {
   const [utilisateur, setUtilisateur] = useState(null);
@@ -129,6 +132,30 @@ export default function App() {
             )
           }
         />
+        <Route
+  path="/affectations"
+  element={
+    utilisateur ? (
+      <AffectationsPage
+        utilisateur={utilisateur}
+        onLogout={handleLogout}
+      />
+    ) : (
+      <Navigate to="/login" replace />
+    )
+  }
+/>
+
+        <Route
+  path="/planning-etudiant/:id"
+  element={
+    utilisateur ? (
+      <PlanningEtudiantPage />
+    ) : (
+      <Navigate to="/login" replace />
+    )
+  }
+/>
 
         <Route
           path="/"

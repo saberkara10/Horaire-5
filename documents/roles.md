@@ -4,12 +4,6 @@ Ce document décrit l'implémentation de la gestion des rôles utilisateurs
 réalisée lors du Sprint 1 dans le projet **Gestion des horaires**.
 
 Les fonctionnalités mises en place correspondent aux tickets suivants :
-- GDH5-54
-- GDH5-55
-- GDH5-56
-- GDH5-57
-- GDH5-58
-- GDH5-59
 
 ---
 

@@ -55,6 +55,16 @@ function IconImport() {
   );
 }
 
+function IconAffectations() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none">
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M8 9H16" />
+      <path d="M8 13H13" />
+    </svg>
+  );
+}
+
 function IconLogout() {
   return (
     <svg viewBox="0 0 24 24" fill="none">
@@ -93,7 +103,6 @@ export function AppShell({
           <div className="app-shell__brand-icon">
             <IconBrand />
           </div>
-
           <div className="app-shell__brand-text">
             <div className="app-shell__brand-title">Gestion Horaires</div>
             <div className="app-shell__brand-subtitle">v5</div>
@@ -107,9 +116,7 @@ export function AppShell({
               `app-shell__nav-item ${isActive ? "app-shell__nav-item--active" : ""}`
             }
           >
-            <span className="app-shell__nav-icon">
-              <IconDashboard />
-            </span>
+            <span className="app-shell__nav-icon"><IconDashboard /></span>
             <span>Dashboard</span>
           </NavLink>
 
@@ -119,9 +126,7 @@ export function AppShell({
               `app-shell__nav-item ${isActive ? "app-shell__nav-item--active" : ""}`
             }
           >
-            <span className="app-shell__nav-icon">
-              <IconCours />
-            </span>
+            <span className="app-shell__nav-icon"><IconCours /></span>
             <span>Cours</span>
           </NavLink>
 
@@ -131,9 +136,7 @@ export function AppShell({
               `app-shell__nav-item ${isActive ? "app-shell__nav-item--active" : ""}`
             }
           >
-            <span className="app-shell__nav-icon">
-              <IconProfesseurs />
-            </span>
+            <span className="app-shell__nav-icon"><IconProfesseurs /></span>
             <span>Professeurs</span>
           </NavLink>
 
@@ -143,9 +146,7 @@ export function AppShell({
               `app-shell__nav-item ${isActive ? "app-shell__nav-item--active" : ""}`
             }
           >
-            <span className="app-shell__nav-icon">
-              <IconSalles />
-            </span>
+            <span className="app-shell__nav-icon"><IconSalles /></span>
             <span>Salles</span>
           </NavLink>
 
@@ -155,17 +156,23 @@ export function AppShell({
               `app-shell__nav-item ${isActive ? "app-shell__nav-item--active" : ""}`
             }
           >
-            <span className="app-shell__nav-icon">
-              <IconImport />
-            </span>
+            <span className="app-shell__nav-icon"><IconImport /></span>
             <span>Import étudiants</span>
+          </NavLink>
+
+          <NavLink
+            to="/affectations"
+            className={({ isActive }) =>
+              `app-shell__nav-item ${isActive ? "app-shell__nav-item--active" : ""}`
+            }
+          >
+            <span className="app-shell__nav-icon"><IconAffectations /></span>
+            <span>Affectations</span>
           </NavLink>
         </nav>
 
         <button className="app-shell__logout" type="button" onClick={onLogout}>
-          <span className="app-shell__nav-icon">
-            <IconLogout />
-          </span>
+          <span className="app-shell__nav-icon"><IconLogout /></span>
           <span>Déconnexion</span>
         </button>
       </aside>
@@ -183,7 +190,6 @@ export function AppShell({
             <div className="app-shell__user-avatar">
               {nomAffiche.charAt(0).toUpperCase()}
             </div>
-
             <div className="app-shell__user-text">
               <div className="app-shell__user-name">{nomAffiche}</div>
               <div className="app-shell__user-role">

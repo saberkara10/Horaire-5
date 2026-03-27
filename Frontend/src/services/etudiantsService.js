@@ -9,9 +9,12 @@ export async function recupererEtudiants() {
 export async function importerEtudiants(fichier) {
   const formData = new FormData();
   formData.append("fichier", fichier);
-
   return apiRequest(`${BASE_URL}/import`, {
     method: "POST",
     body: formData,
   });
+}
+
+export async function recupererPlanningEtudiant(id) {
+  return apiRequest(`${BASE_URL}/${id}/planning`);
 }

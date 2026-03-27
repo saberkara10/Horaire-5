@@ -1,0 +1,21 @@
+sequenceDiagram
+    actor Utilisateur
+    participant Frontend
+    participant ModuleHoraire as Module horaire etudiant
+    participant ImportEtudiants as Donnees importees
+    participant MySQL
+
+    Utilisateur->>Frontend: Recherche un etudiant
+    Frontend->>ModuleHoraire: Consulter l'horaire
+    ModuleHoraire->>ImportEtudiants: Retrouver l'etudiant par matricule ou selection
+    ImportEtudiants-->>ModuleHoraire: etudiant avec groupe
+    ModuleHoraire->>MySQL: Rechercher le groupe dans groupes_etudiants
+    MySQL-->>ModuleHoraire: groupe reconnu ou absent
+
+    alt groupe absent
+        ModuleHoraire-->>Frontend: Aucun horaire disponible
+    else groupe reconnu
+        ModuleHoraire->>MySQL: Lire affectation_groupes puis affectation_cours
+        MySQL-->>ModuleHoraire: horaire du groupe
+        ModuleHoraire-->>Frontend: Afficher cours, salle, professeur, date et heures
+    end

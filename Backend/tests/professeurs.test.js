@@ -1,5 +1,5 @@
 import request from "supertest";
-import { jest } from "@jest/globals";
+import { jest, describe, test, expect, beforeEach } from "@jest/globals";
 
 const professeursModelMock = {
   recupererTousLesProfesseurs: jest.fn(),
@@ -272,6 +272,7 @@ describe("Tests routes Professeurs", () => {
       prenom: "Ali",
       specialite: "Informatique",
     });
+    professeursModelMock.recupererProfesseurParMatricule.mockResolvedValue(null);
     professeursModelMock.modifierProfesseur.mockResolvedValue({
       id_professeur: 1,
       matricule: "MAT001",

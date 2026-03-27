@@ -20,6 +20,8 @@ import coursRoutes from "../routes/cours.routes.js";
 import horaireRoutes from "../routes/horaire.routes.js";
 import professeursRoutes from "../routes/professeurs.routes.js";
 import etudiantsRoutes from "../routes/etudiants.routes.js";
+import affectationsRoutes from "../routes/affectations.routes.js";
+import pool from "../db.js";
 
 dotenv.config();
 
@@ -78,6 +80,7 @@ coursRoutes(app);
 professeursRoutes(app);
 horaireRoutes(app);
 etudiantsRoutes(app);
+affectationsRoutes(app);
 
 app.get("/admin-only", userAuth, userAdmin, (request, response) => {
   response.status(200).json({

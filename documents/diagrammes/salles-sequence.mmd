@@ -1,0 +1,29 @@
+sequenceDiagram
+    actor Responsable
+    participant Frontend
+    participant ModuleSalles as Module salles
+    participant Validation
+    participant MySQL
+
+    Responsable->>Frontend: Demande la suppression d'une salle
+    Frontend->>ModuleSalles: DELETE /api/salles/:id
+    ModuleSalles->>Validation: Verifier id et existence
+    Validation->>MySQL: SELECT salle par id
+    MySQL-->>Validation: salle ou aucune ligne
+
+    alt salle introuvable
+        Validation-->>ModuleSalles: erreur 404
+        ModuleSalles-->>Frontend: Salle introuvable
+    else salle trouvee
+        Validation->>MySQL: SELECT 1 FROM affectation_cours WHERE id_salle = ? LIMIT 1
+        MySQL-->>Validation: affectee ou libre
+
+        alt salle deja affectee
+            Validation-->>ModuleSalles: erreur 400
+            ModuleSalles-->>Frontend: Suppression impossible : salle deja affectee
+        else salle libre
+            ModuleSalles->>MySQL: DELETE FROM salles WHERE id_salle = ? LIMIT 1
+            MySQL-->>ModuleSalles: suppression
+            ModuleSalles-->>Frontend: 200 Salle supprimee
+        end
+    end

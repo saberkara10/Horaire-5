@@ -163,13 +163,14 @@ export function EtudiantsImportPage({ utilisateur, onLogout }) {
                   <th>Groupe</th>
                   <th>Programme</th>
                   <th>Étape</th>
+                  <th>Action</th>
                 </tr>
               </thead>
 
               <tbody>
                 {etudiantsFiltres.length === 0 ? (
                   <tr>
-                    <td colSpan="6" className="crud-page__empty">
+                    <td colSpan="7" className="crud-page__empty">
                       Aucun étudiant trouvé.
                     </td>
                   </tr>
@@ -182,7 +183,20 @@ export function EtudiantsImportPage({ utilisateur, onLogout }) {
                       <td>{etudiant.groupe}</td>
                       <td>{etudiant.programme}</td>
                       <td>{etudiant.etape}</td>
+
+                                {/* BOUTON */}
+          <td>
+            <button
+              className="crud-page__action-button"
+              onClick={() =>
+                (window.location.href = `/planning-etudiant/${etudiant.id_etudiant}`)
+              }
+            >
+              Voir l’horaire
+            </button>
+          </td>
                     </tr>
+                    
                   ))
                 )}
               </tbody>
