@@ -4,6 +4,7 @@ import { LoginPage } from "./pages/LoginPage.jsx";
 import { DashboardPage } from "./pages/DashboardPage.jsx";
 import { CoursPage } from "./pages/CoursPage.jsx";
 import { ProfesseursPage } from "./pages/ProfesseursPage.jsx";
+import { DisponibilitesProfesseursPage } from "./pages/DisponibilitesProfesseursPage.jsx";
 import { SallesPage } from "./pages/SallesPage.jsx";
 import { EtudiantsImportPage } from "./pages/EtudiantsImportPage.jsx";
 import {
@@ -12,6 +13,7 @@ import {
 } from "./services/auth.api.js";
 import { PlanningEtudiantPage } from "./pages/PlanningEtudiantPage.jsx";
 import { AffectationsPage } from "./pages/AffectationsPage.jsx";
+import { HorairesProfesseursPage } from "./pages/HorairesProfesseursPage.jsx";
 
 
 export default function App() {
@@ -109,6 +111,20 @@ export default function App() {
         />
 
         <Route
+          path="/disponibilites-professeurs"
+          element={
+            utilisateur ? (
+              <DisponibilitesProfesseursPage
+                utilisateur={utilisateur}
+                onLogout={handleLogout}
+              />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        <Route
           path="/salles"
           element={
             utilisateur ? (
@@ -133,29 +149,45 @@ export default function App() {
           }
         />
         <Route
-  path="/affectations"
-  element={
-    utilisateur ? (
-      <AffectationsPage
-        utilisateur={utilisateur}
-        onLogout={handleLogout}
-      />
-    ) : (
-      <Navigate to="/login" replace />
-    )
-  }
-/>
+          path="/generer"
+          element={
+            utilisateur ? (
+              <AffectationsPage
+                utilisateur={utilisateur}
+                onLogout={handleLogout}
+              />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        <Route path="/affectations" element={<Navigate to="/generer" replace />} />
 
         <Route
-  path="/planning-etudiant/:id"
-  element={
-    utilisateur ? (
-      <PlanningEtudiantPage />
-    ) : (
-      <Navigate to="/login" replace />
-    )
-  }
-/>
+          path="/horaires-professeurs"
+          element={
+            utilisateur ? (
+              <HorairesProfesseursPage
+                utilisateur={utilisateur}
+                onLogout={handleLogout}
+              />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        <Route
+          path="/planning-etudiant/:id"
+          element={
+            utilisateur ? (
+              <PlanningEtudiantPage />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
 
         <Route
           path="/"

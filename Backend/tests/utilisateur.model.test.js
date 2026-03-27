@@ -100,4 +100,73 @@ describe("model utilisateur", () => {
 
     expect(result).toEqual([]);
   });
+  test("findByEmail utilise le fallback legacy si le schema moderne manque", async () => {
+    queryMock
+      .mockRejectedValueOnce({ code: "ER_BAD_FIELD_ERROR" })
+      .mockResolvedValueOnce([
+        [
+          {
+            id: 1,
+            email: "admin@ecole.ca",
+            mot_de_passe_hash: "Admin123!",
+            nom: "Admin",
+            prenom: "Systeme",
+            actif: 1,
+            role: "ADMIN",
+          },
+        ],
+      ]);
+
+    const result = await utilisateurModel.findByEmail("admin@ecole.ca");
+
+    expect(result).toEqual({
+      id: 1,
+      email: "admin@ecole.ca",
+      mot_de_passe_hash: "Admin123!",
+      nom: "Admin",
+      prenom: "Systeme",
+      actif: 1,
+      role: "ADMIN",
+    });
+  });
+
+  test("findById utilise le fallback legacy si le schema moderne manque", async () => {
+    queryMock
+      .mockRejectedValueOnce({ code: "ER_BAD_FIELD_ERROR" })
+      .mockResolvedValueOnce([
+        [
+          {
+            id: 1,
+            email: "admin@ecole.ca",
+            nom: "Admin",
+            prenom: "Systeme",
+            actif: 1,
+            role: "ADMIN",
+          },
+        ],
+      ]);
+
+    const result = await utilisateurModel.findById(1);
+
+    expect(result).toEqual({
+      id: 1,
+      email: "admin@ecole.ca",
+      nom: "Admin",
+      prenom: "Systeme",
+      actif: 1,
+      role: "ADMIN",
+    });
+  });
+
+  test("findRolesByUserId utilise le fallback legacy si les tables roles manquent", async () => {
+    queryMock
+      .mockRejectedValueOnce({ code: "ER_NO_SUCH_TABLE" })
+      .mockResolvedValueOnce([
+        [{ role: "ADMIN" }],
+      ]);
+
+    const result = await utilisateurModel.findRolesByUserId(1);
+
+    expect(result).toEqual(["ADMIN"]);
+  });
 });

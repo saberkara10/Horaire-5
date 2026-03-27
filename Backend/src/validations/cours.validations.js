@@ -1,27 +1,18 @@
 /**
- * VALIDATIONS — Module Cours
- *
- * Rôle :
- * - Vérifier les données avant d'appeler le modèle.
- * - Retourner des messages simples en cas d'erreur.
+ * VALIDATIONS - Module Cours
  */
 
-import { recupererCoursParId, recupererCoursParCode, coursEstDejaAffecte, typeSalleExiste, } from "../model/cours.model.js";
+import {
+  recupererCoursParId,
+  recupererCoursParCode,
+  coursEstDejaAffecte,
+  salleExisteParId,
+} from "../model/cours.model.js";
 
-/**
- * Envoyer une erreur JSON standard.
- *
- * @param {import("express").Response} response
- * @param {number} status
- * @param {string} message
- */
 function envoyerErreur(response, status, message) {
   response.status(status).json({ message });
 }
 
-/**
- * Vérifier que l'id est un entier positif.
- */
 export function validerIdCours(request, response, next) {
   const id = Number(request.params.id);
 
@@ -32,9 +23,6 @@ export function validerIdCours(request, response, next) {
   next();
 }
 
-/**
- * Vérifier que le cours existe.
- */
 export async function verifierCoursExiste(request, response, next) {
   const idCours = Number(request.params.id);
   const cours = await recupererCoursParId(idCours);
@@ -47,152 +35,128 @@ export async function verifierCoursExiste(request, response, next) {
   next();
 }
 
-/**
- * Validation CREATE
- */
 export async function validerCreateCours(request, response, next) {
-  const { code, nom, duree, programme, etape_etude, type_salle } = request.body;
+  const { code, nom, duree, programme, etape_etude, id_salle_reference } =
+    request.body;
 
-  // Champs obligatoires
-  if (!code || code.trim() === "") {
+  if (!code || String(code).trim() === "") {
     return envoyerErreur(response, 400, "Code obligatoire.");
   }
 
-  if (!nom || nom.trim() === "" || /^\d+$/.test(nom)) {
+  if (!nom || String(nom).trim() === "" || /^\d+$/.test(String(nom).trim())) {
     return envoyerErreur(response, 400, "Nom invalide.");
   }
 
-  if (!programme || programme.trim() === "") {
+  if (!programme || String(programme).trim() === "") {
     return envoyerErreur(response, 400, "Programme obligatoire.");
   }
 
-  if (!type_salle || type_salle.trim() === "") {
-    return envoyerErreur(response, 400, "Type de salle obligatoire.");
+  if (!Number.isInteger(Number(id_salle_reference)) || Number(id_salle_reference) <= 0) {
+    return envoyerErreur(response, 400, "Salle de reference obligatoire.");
   }
 
-  // Durée > 0
   const dureeInt = Number(duree);
   if (!Number.isInteger(dureeInt) || dureeInt <= 0) {
-    return envoyerErreur(response, 400, "Durée invalide (> 0).");
+    return envoyerErreur(response, 400, "Duree invalide (> 0).");
   }
 
-  // Étape 1 à 8
   const etapeInt = Number(etape_etude);
   if (!Number.isInteger(etapeInt) || etapeInt < 1 || etapeInt > 8) {
-    return envoyerErreur(response, 400, "Étape invalide (1 à 8).");
+    return envoyerErreur(response, 400, "Etape invalide (1 a 8).");
   }
 
-  // Code unique
-  const dejaExiste = await recupererCoursParCode(code.trim());
+  const dejaExiste = await recupererCoursParCode(String(code).trim());
   if (dejaExiste) {
-    return envoyerErreur(response, 409, "Code déjà utilisé.");
+    return envoyerErreur(response, 409, "Code deja utilise.");
   }
 
-  // Type salle existant
-  const typeExiste = await typeSalleExiste(type_salle.trim());
-  if (!typeExiste) {
-    return envoyerErreur(response, 400, "Type de salle inexistant.");
+  const salleExiste = await salleExisteParId(Number(id_salle_reference));
+  if (!salleExiste) {
+    return envoyerErreur(response, 400, "Salle de reference inexistante.");
   }
 
   next();
 }
 
-/**
- * Validation UPDATE
- */
 export async function validerUpdateCours(request, response, next) {
-  const { code, nom, duree, programme, etape_etude, type_salle, archive } =
+  const { code, nom, duree, programme, etape_etude, id_salle_reference, archive } =
     request.body;
 
-  // Archive interdit (annulé dans ton projet)
   if (archive !== undefined) {
-    return envoyerErreur(response, 400, "Champ archive non autorisé.");
+    return envoyerErreur(response, 400, "Champ archive non autorise.");
   }
 
-  // Au moins un champ
   if (
     code === undefined &&
     nom === undefined &&
     duree === undefined &&
     programme === undefined &&
     etape_etude === undefined &&
-    type_salle === undefined
+    id_salle_reference === undefined
   ) {
-    return envoyerErreur(response, 400, "Aucun champ à modifier.");
+    return envoyerErreur(response, 400, "Aucun champ a modifier.");
   }
 
-  // Code
   if (code !== undefined) {
-    if (!code || code.trim() === "") {
+    if (!code || String(code).trim() === "") {
       return envoyerErreur(response, 400, "Code invalide.");
     }
 
     const idCours = Number(request.params.id);
-    const dejaExiste = await recupererCoursParCode(code.trim());
+    const dejaExiste = await recupererCoursParCode(String(code).trim());
 
     if (dejaExiste && dejaExiste.id_cours !== idCours) {
-      return envoyerErreur(response, 409, "Code déjà utilisé.");
+      return envoyerErreur(response, 409, "Code deja utilise.");
     }
   }
 
-  // Nom
   if (nom !== undefined) {
-    if (!nom || nom.trim() === "" || /^\d+$/.test(nom)) {
+    if (!nom || String(nom).trim() === "" || /^\d+$/.test(String(nom).trim())) {
       return envoyerErreur(response, 400, "Nom invalide.");
     }
   }
 
-  // Durée
   if (duree !== undefined) {
     const dureeInt = Number(duree);
     if (!Number.isInteger(dureeInt) || dureeInt <= 0) {
-      return envoyerErreur(response, 400, "Durée invalide (> 0).");
+      return envoyerErreur(response, 400, "Duree invalide (> 0).");
     }
   }
 
-  // Programme
-  if (programme !== undefined) {
-    if (!programme || programme.trim() === "") {
-      return envoyerErreur(response, 400, "Programme invalide.");
-    }
+  if (programme !== undefined && String(programme).trim() === "") {
+    return envoyerErreur(response, 400, "Programme invalide.");
   }
 
-  // Étape
   if (etape_etude !== undefined) {
     const etapeInt = Number(etape_etude);
     if (!Number.isInteger(etapeInt) || etapeInt < 1 || etapeInt > 8) {
-      return envoyerErreur(response, 400, "Étape invalide (1 à 8).");
+      return envoyerErreur(response, 400, "Etape invalide (1 a 8).");
     }
   }
 
-  // Type salle
-  if (type_salle !== undefined) {
-    if (!type_salle || type_salle.trim() === "") {
-      return envoyerErreur(response, 400, "Type de salle invalide.");
+  if (id_salle_reference !== undefined) {
+    if (!Number.isInteger(Number(id_salle_reference)) || Number(id_salle_reference) <= 0) {
+      return envoyerErreur(response, 400, "Salle de reference invalide.");
     }
 
-    const typeExiste = await typeSalleExiste(type_salle.trim());
-    if (!typeExiste) {
-      return envoyerErreur(response, 400, "Type de salle inexistant.");
+    const salleExiste = await salleExisteParId(Number(id_salle_reference));
+    if (!salleExiste) {
+      return envoyerErreur(response, 400, "Salle de reference inexistante.");
     }
   }
 
   next();
 }
 
-/**
- * Validation DELETE
- * Refuse si le cours est déjà affecté.
- */
 export async function validerDeleteCours(request, response, next) {
   const idCours = Number(request.params.id);
-
   const estAffecte = await coursEstDejaAffecte(idCours);
+
   if (estAffecte) {
     return envoyerErreur(
       response,
       400,
-      "Suppression impossible : cours déjà affecté."
+      "Suppression impossible : cours deja affecte."
     );
   }
 

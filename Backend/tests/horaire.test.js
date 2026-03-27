@@ -5,6 +5,7 @@ const horaireModelMock = {
   getAllAffectations: jest.fn(),
   getAffectationById: jest.fn(),
   creerAffectationValidee: jest.fn(),
+  updateAffectationValidee: jest.fn(),
   genererHoraireAutomatiquement: jest.fn(),
   deleteAffectation: jest.fn(),
   deleteAllAffectations: jest.fn(),
@@ -105,11 +106,54 @@ describe("Tests routes Horaires", () => {
       non_planifies: [],
     });
 
-    const response = await request(app).post("/api/horaires/generer");
+    const response = await request(app).post("/api/horaires/generer").send({
+      programme: "Informatique",
+      etape: "1",
+      mode_groupe: "all",
+      date_debut: "2026-03-23",
+    });
 
     expect(response.statusCode).toBe(201);
     expect(response.body).toHaveProperty("message");
-    expect(horaireModelMock.genererHoraireAutomatiquement).toHaveBeenCalledTimes(1);
+    expect(horaireModelMock.genererHoraireAutomatiquement).toHaveBeenCalledWith({
+      programme: "Informatique",
+      etape: "1",
+      idGroupe: null,
+      dateDebut: "2026-03-23",
+    });
+  });
+
+  test("PUT /api/horaires/:id retourne 200 quand la modification est valide", async () => {
+    horaireModelMock.updateAffectationValidee.mockResolvedValue({
+      id_affectation_cours: 7,
+      id_cours: 1,
+      id_professeur: 4,
+      id_salle: 2,
+      date: "2026-03-24",
+      heure_debut: "10:00:00",
+      heure_fin: "12:00:00",
+    });
+
+    const response = await request(app)
+      .put("/api/horaires/7")
+      .send({
+        id_cours: 1,
+        id_professeur: 4,
+        id_salle: 2,
+        date: "2026-03-24",
+        heure_debut: "10:00",
+        heure_fin: "12:00",
+      });
+
+    expect(response.statusCode).toBe(200);
+    expect(horaireModelMock.updateAffectationValidee).toHaveBeenCalledWith(7, {
+      idCours: 1,
+      idProfesseur: 4,
+      idSalle: 2,
+      date: "2026-03-24",
+      heureDebut: "10:00",
+      heureFin: "12:00",
+    });
   });
 
   test("POST /api/horaires/generer retourne 400 si les donnees sont insuffisantes", async () => {

@@ -6,12 +6,35 @@ import {
   modifierCours,
   supprimerCours,
 } from "../services/cours.api.js";
+import { recupererProgrammes } from "../services/programmes.api.js";
+import { recupererSalles } from "../services/salles.api.js";
 import "../styles/CrudPages.css";
 
-const ETAPES_DISPONIBLES = ["1", "2", "3", "4"];
+const ETAPES_DISPONIBLES = ["1", "2", "3", "4", "5", "6", "7", "8"];
+const DUREES_DISPONIBLES = ["1", "2", "3", "4"];
+
+function formaterDureeHeures(duree) {
+  const valeur = Number(duree);
+
+  if (!Number.isFinite(valeur) || valeur <= 0) {
+    return "--:--";
+  }
+
+  return `${String(valeur).padStart(2, "0")}:00`;
+}
+
+function formaterSalle(salle) {
+  if (!salle) {
+    return "Aucune salle";
+  }
+
+  return `${salle.code} - ${salle.type}`;
+}
 
 export function CoursPage({ utilisateur, onLogout }) {
   const [cours, setCours] = useState([]);
+  const [programmes, setProgrammes] = useState([]);
+  const [salles, setSalles] = useState([]);
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState("");
   const [message, setMessage] = useState("");
@@ -25,7 +48,7 @@ export function CoursPage({ utilisateur, onLogout }) {
     duree: "1",
     programme: "",
     etape_etude: "1",
-    type_salle: "",
+    id_salle_reference: "",
   });
 
   async function chargerCours() {
@@ -36,14 +59,34 @@ export function CoursPage({ utilisateur, onLogout }) {
       const data = await recupererCours();
       setCours(data || []);
     } catch (error) {
-      setErreur(error.message || "Impossible de récupérer les cours.");
+      setErreur(error.message || "Impossible de recuperer les cours.");
     } finally {
       setChargement(false);
     }
   }
 
+  async function chargerProgrammes() {
+    try {
+      const data = await recupererProgrammes();
+      setProgrammes(Array.isArray(data) ? data : []);
+    } catch {
+      setProgrammes([]);
+    }
+  }
+
+  async function chargerSalles() {
+    try {
+      const data = await recupererSalles();
+      setSalles(Array.isArray(data) ? data : []);
+    } catch {
+      setSalles([]);
+    }
+  }
+
   useEffect(() => {
     chargerCours();
+    chargerProgrammes();
+    chargerSalles();
   }, []);
 
   const coursFiltres = useMemo(() => {
@@ -58,11 +101,24 @@ export function CoursPage({ utilisateur, onLogout }) {
         String(element.code || "").toLowerCase().includes(terme) ||
         String(element.nom || "").toLowerCase().includes(terme) ||
         String(element.programme || "").toLowerCase().includes(terme) ||
-        String(element.type_salle || "").toLowerCase().includes(terme) ||
+        String(element.salle_code || "").toLowerCase().includes(terme) ||
+        String(element.salle_type || "").toLowerCase().includes(terme) ||
         String(element.etape_etude || "").toLowerCase().includes(terme)
       );
     });
   }, [cours, recherche]);
+
+  const programmesDisponibles = useMemo(() => {
+    return [...new Set([...programmes, formulaire.programme].filter(Boolean))].sort(
+      (programmeA, programmeB) => programmeA.localeCompare(programmeB, "fr")
+    );
+  }, [programmes, formulaire.programme]);
+
+  const sallesDisponibles = useMemo(() => {
+    return [...salles].sort((salleA, salleB) =>
+      String(salleA.code || "").localeCompare(String(salleB.code || ""), "fr")
+    );
+  }, [salles]);
 
   function ouvrirModal(coursAEditer = null) {
     setEdition(coursAEditer);
@@ -74,7 +130,7 @@ export function CoursPage({ utilisateur, onLogout }) {
         duree: String(coursAEditer.duree || "1"),
         programme: coursAEditer.programme || "",
         etape_etude: String(coursAEditer.etape_etude || "1"),
-        type_salle: coursAEditer.type_salle || "",
+        id_salle_reference: String(coursAEditer.id_salle_reference || ""),
       });
     } else {
       setFormulaire({
@@ -83,7 +139,7 @@ export function CoursPage({ utilisateur, onLogout }) {
         duree: "1",
         programme: "",
         etape_etude: "1",
-        type_salle: "",
+        id_salle_reference: "",
       });
     }
 
@@ -101,7 +157,7 @@ export function CoursPage({ utilisateur, onLogout }) {
       duree: "1",
       programme: "",
       etape_etude: "1",
-      type_salle: "",
+      id_salle_reference: "",
     });
   }
 
@@ -115,18 +171,19 @@ export function CoursPage({ utilisateur, onLogout }) {
         ...formulaire,
         duree: Number(formulaire.duree),
         etape_etude: String(formulaire.etape_etude),
+        id_salle_reference: Number(formulaire.id_salle_reference),
       };
 
       if (edition) {
         await modifierCours(edition.id_cours, payload);
-        setMessage("Cours modifié avec succès.");
+        setMessage("Cours modifie avec succes.");
       } else {
         await creerCours(payload);
-        setMessage("Cours créé avec succès.");
+        setMessage("Cours cree avec succes.");
       }
 
       fermerModal();
-      await chargerCours();
+      await Promise.all([chargerCours(), chargerProgrammes(), chargerSalles()]);
     } catch (error) {
       setErreur(error.message || "Erreur lors de la sauvegarde.");
     }
@@ -146,8 +203,8 @@ export function CoursPage({ utilisateur, onLogout }) {
 
     try {
       await supprimerCours(idCours);
-      setMessage("Cours supprimé avec succès.");
-      await chargerCours();
+      setMessage("Cours supprime avec succes.");
+      await Promise.all([chargerCours(), chargerProgrammes(), chargerSalles()]);
     } catch (error) {
       setErreur(error.message || "Erreur lors de la suppression.");
     }
@@ -158,7 +215,7 @@ export function CoursPage({ utilisateur, onLogout }) {
       utilisateur={utilisateur}
       onLogout={onLogout}
       title="Cours"
-      subtitle="Gérez les cours, programmes, étapes et types de salles."
+      subtitle="Gerez les cours, les etapes et la salle de reference par code."
     >
       <div className="crud-page">
         <div className="crud-page__header">
@@ -175,14 +232,18 @@ export function CoursPage({ utilisateur, onLogout }) {
           <input
             type="text"
             className="crud-page__search"
-            placeholder="Rechercher un cours..."
+            placeholder="Rechercher un cours, une salle ou un programme..."
             value={recherche}
             onChange={(event) => setRecherche(event.target.value)}
           />
         </div>
 
-        {erreur ? <div className="crud-page__alert crud-page__alert--error">{erreur}</div> : null}
-        {message ? <div className="crud-page__alert crud-page__alert--success">{message}</div> : null}
+        {erreur ? (
+          <div className="crud-page__alert crud-page__alert--error">{erreur}</div>
+        ) : null}
+        {message ? (
+          <div className="crud-page__alert crud-page__alert--success">{message}</div>
+        ) : null}
 
         <section className="crud-page__table-card">
           {chargement ? (
@@ -193,10 +254,10 @@ export function CoursPage({ utilisateur, onLogout }) {
                 <tr>
                   <th>Code</th>
                   <th>Nom</th>
-                  <th>Durée</th>
+                  <th>Duree</th>
                   <th>Programme</th>
-                  <th>Étape</th>
-                  <th>Type salle</th>
+                  <th>Etape</th>
+                  <th>Salle de reference</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -205,7 +266,7 @@ export function CoursPage({ utilisateur, onLogout }) {
                 {coursFiltres.length === 0 ? (
                   <tr>
                     <td colSpan="7" className="crud-page__empty">
-                      Aucun cours trouvé.
+                      Aucun cours trouve.
                     </td>
                   </tr>
                 ) : (
@@ -213,10 +274,20 @@ export function CoursPage({ utilisateur, onLogout }) {
                     <tr key={element.id_cours}>
                       <td>{element.code}</td>
                       <td>{element.nom}</td>
-                      <td>{element.duree}</td>
+                      <td>{formaterDureeHeures(element.duree)}</td>
                       <td>{element.programme}</td>
                       <td>{element.etape_etude}</td>
-                      <td>{element.type_salle}</td>
+                      <td>
+                        {element.salle_code ? (
+                          <>
+                            <strong>{element.salle_code}</strong>
+                            <br />
+                            <small>{element.salle_type || element.type_salle || "-"}</small>
+                          </>
+                        ) : (
+                          element.type_salle || "-"
+                        )}
+                      </td>
                       <td>
                         <div className="crud-page__actions">
                           <button
@@ -257,7 +328,7 @@ export function CoursPage({ utilisateur, onLogout }) {
                   className="crud-page__close"
                   onClick={fermerModal}
                 >
-                  ×
+                  x
                 </button>
               </div>
 
@@ -282,7 +353,7 @@ export function CoursPage({ utilisateur, onLogout }) {
                   <span>Nom</span>
                   <input
                     type="text"
-                    placeholder="ex: Développement Web"
+                    placeholder="ex: Developpement Web"
                     value={formulaire.nom}
                     onChange={(event) =>
                       setFormulaire({
@@ -295,10 +366,8 @@ export function CoursPage({ utilisateur, onLogout }) {
                 </label>
 
                 <label className="crud-page__field">
-                  <span>Durée</span>
-                  <input
-                    type="number"
-                    min="1"
+                  <span>Duree</span>
+                  <select
                     value={formulaire.duree}
                     onChange={(event) =>
                       setFormulaire({
@@ -306,15 +375,18 @@ export function CoursPage({ utilisateur, onLogout }) {
                         duree: event.target.value,
                       })
                     }
-                    required
-                  />
+                  >
+                    {DUREES_DISPONIBLES.map((duree) => (
+                      <option key={duree} value={duree}>
+                        {formaterDureeHeures(duree)}
+                      </option>
+                    ))}
+                  </select>
                 </label>
 
                 <label className="crud-page__field">
                   <span>Programme</span>
-                  <input
-                    type="text"
-                    placeholder="ex: Informatique"
+                  <select
                     value={formulaire.programme}
                     onChange={(event) =>
                       setFormulaire({
@@ -323,11 +395,18 @@ export function CoursPage({ utilisateur, onLogout }) {
                       })
                     }
                     required
-                  />
+                  >
+                    <option value="">Choisir un programme</option>
+                    {programmesDisponibles.map((programme) => (
+                      <option key={programme} value={programme}>
+                        {programme}
+                      </option>
+                    ))}
+                  </select>
                 </label>
 
                 <label className="crud-page__field">
-                  <span>Étape</span>
+                  <span>Etape</span>
                   <select
                     value={formulaire.etape_etude}
                     onChange={(event) =>
@@ -339,26 +418,36 @@ export function CoursPage({ utilisateur, onLogout }) {
                   >
                     {ETAPES_DISPONIBLES.map((etape) => (
                       <option key={etape} value={etape}>
-                        {etape}
+                        Etape {etape}
                       </option>
                     ))}
                   </select>
                 </label>
 
                 <label className="crud-page__field">
-                  <span>Type de salle</span>
-                  <input
-                    type="text"
-                    placeholder="ex: Laboratoire"
-                    value={formulaire.type_salle}
+                  <span>Salle de reference</span>
+                  <select
+                    value={formulaire.id_salle_reference}
                     onChange={(event) =>
                       setFormulaire({
                         ...formulaire,
-                        type_salle: event.target.value,
+                        id_salle_reference: event.target.value,
                       })
                     }
                     required
-                  />
+                    disabled={sallesDisponibles.length === 0}
+                  >
+                    <option value="">
+                      {sallesDisponibles.length === 0
+                        ? "Ajoutez d'abord une salle"
+                        : "Choisir une salle"}
+                    </option>
+                    {sallesDisponibles.map((salle) => (
+                      <option key={salle.id_salle} value={salle.id_salle}>
+                        {formaterSalle(salle)}
+                      </option>
+                    ))}
+                  </select>
                 </label>
 
                 <div className="crud-page__modal-actions">

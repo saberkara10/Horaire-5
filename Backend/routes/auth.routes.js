@@ -27,20 +27,20 @@ export default function authRoutes(app) {
     (request, response, next) => {
       passport.authenticate("local", (error, user, info) => {
         if (error) {
-          next(error);
+          return next(error);
         }
-        else if (!user) {
-          response.status(401).json(info);
-        }
-        else {
-          request.logIn(user, (erreur) => {
-            if (erreur) {
-              next(erreur);
-            }
 
-            response.sendStatus(200);
-          });
+        if (!user) {
+          return response.status(401).json(info);
         }
+
+        request.logIn(user, (erreur) => {
+          if (erreur) {
+            return next(erreur);
+          }
+
+          return response.sendStatus(200);
+        });
       })(request, response, next);
     }
   );
@@ -55,11 +55,10 @@ export default function authRoutes(app) {
     (request, response, next) => {
       request.logOut((erreur) => {
         if (erreur) {
-          next(erreur);
+          return next(erreur);
         }
-        else {
-          response.status(200).end();
-        }
+
+        return response.status(200).end();
       });
     }
   );

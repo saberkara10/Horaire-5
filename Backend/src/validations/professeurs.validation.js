@@ -1,28 +1,30 @@
 /**
  * VALIDATIONS - Module Professeurs
- *
- * Role :
- * - Verifier les donnees avant d'appeler le modele.
- * - Retourner des messages simples en cas d'erreur.
  */
 
 import {
-  recupererProfesseurParId,recupererProfesseurParMatricule,professeurEstDejaAffecte,} from "../model/professeurs.model.js";
+  recupererProfesseurParId,
+  recupererProfesseurParMatricule,
+  professeurEstDejaAffecte,
+} from "../model/professeurs.model.js";
 
-/**
- * Envoyer une erreur JSON standard.
- *
- * @param {import("express").Response} response
- * @param {number} status
- * @param {string} message
- */
 function envoyerErreur(response, status, message) {
   response.status(status).json({ message });
 }
 
-/**
- * Verifier que l'id est un entier positif.
- */
+function coursIdsValides(coursIds) {
+  if (!Array.isArray(coursIds)) {
+    return false;
+  }
+
+  const ids = coursIds.map((idCours) => Number(idCours));
+  const idsValides = ids.filter(
+    (idCours) => Number.isInteger(idCours) && idCours > 0
+  );
+
+  return ids.length === idsValides.length && new Set(idsValides).size === idsValides.length;
+}
+
 export function validerIdProfesseur(request, response, next) {
   const id = Number(request.params.id);
 
@@ -33,9 +35,6 @@ export function validerIdProfesseur(request, response, next) {
   next();
 }
 
-/**
- * Verifier que le professeur existe.
- */
 export async function verifierProfesseurExiste(request, response, next) {
   const idProfesseur = Number(request.params.id);
   const professeur = await recupererProfesseurParId(idProfesseur);
@@ -48,13 +47,9 @@ export async function verifierProfesseurExiste(request, response, next) {
   next();
 }
 
-/**
- * Validation CREATE
- */
 export async function validerCreateProfesseur(request, response, next) {
-  const { matricule, nom, prenom, specialite } = request.body;
+  const { matricule, nom, prenom, specialite, cours_ids } = request.body;
 
-  // Champs obligatoires
   if (!matricule || String(matricule).trim() === "") {
     return envoyerErreur(response, 400, "Matricule obligatoire.");
   }
@@ -71,13 +66,12 @@ export async function validerCreateProfesseur(request, response, next) {
     return envoyerErreur(response, 400, "Prenom invalide.");
   }
 
-  // Longueurs max (table SQL)
+  if (!specialite || String(specialite).trim() === "") {
+    return envoyerErreur(response, 400, "Programme obligatoire.");
+  }
+
   if (String(matricule).trim().length > 50) {
-    return envoyerErreur(
-      response,
-      400,
-      "Matricule trop long (max 50)."
-    );
+    return envoyerErreur(response, 400, "Matricule trop long (max 50).");
   }
 
   if (String(nom).trim().length > 100) {
@@ -88,19 +82,14 @@ export async function validerCreateProfesseur(request, response, next) {
     return envoyerErreur(response, 400, "Prenom trop long (max 100).");
   }
 
-  if (
-    specialite !== undefined &&
-    specialite !== null &&
-    String(specialite).trim().length > 100
-  ) {
-    return envoyerErreur(
-      response,
-      400,
-      "Specialite trop longue (max 100)."
-    );
+  if (String(specialite).trim().length > 150) {
+    return envoyerErreur(response, 400, "Programme trop long (max 150).");
   }
 
-  // Matricule unique
+  if (cours_ids !== undefined && !coursIdsValides(cours_ids)) {
+    return envoyerErreur(response, 400, "La liste des cours est invalide.");
+  }
+
   const dejaExiste = await recupererProfesseurParMatricule(String(matricule).trim());
   if (dejaExiste) {
     return envoyerErreur(response, 409, "Matricule deja utilise.");
@@ -109,34 +98,26 @@ export async function validerCreateProfesseur(request, response, next) {
   next();
 }
 
-/**
- * Validation UPDATE
- */
 export async function validerUpdateProfesseur(request, response, next) {
-  const { matricule, nom, prenom, specialite } = request.body;
+  const { matricule, nom, prenom, specialite, cours_ids } = request.body;
 
-  // Au moins un champ
   if (
     matricule === undefined &&
     nom === undefined &&
     prenom === undefined &&
-    specialite === undefined
+    specialite === undefined &&
+    cours_ids === undefined
   ) {
     return envoyerErreur(response, 400, "Aucun champ a modifier.");
   }
 
-  // Matricule
   if (matricule !== undefined) {
     if (!matricule || String(matricule).trim() === "") {
       return envoyerErreur(response, 400, "Matricule invalide.");
     }
 
     if (String(matricule).trim().length > 50) {
-      return envoyerErreur(
-        response,
-        400,
-        "Matricule trop long (max 50)."
-      );
+      return envoyerErreur(response, 400, "Matricule trop long (max 50).");
     }
 
     const idProfesseur = Number(request.params.id);
@@ -149,7 +130,6 @@ export async function validerUpdateProfesseur(request, response, next) {
     }
   }
 
-  // Nom
   if (nom !== undefined) {
     if (!nom || String(nom).trim() === "" || /^\d+$/.test(String(nom).trim())) {
       return envoyerErreur(response, 400, "Nom invalide.");
@@ -160,7 +140,6 @@ export async function validerUpdateProfesseur(request, response, next) {
     }
   }
 
-  // Prenom
   if (prenom !== undefined) {
     if (
       !prenom ||
@@ -171,36 +150,31 @@ export async function validerUpdateProfesseur(request, response, next) {
     }
 
     if (String(prenom).trim().length > 100) {
-      return envoyerErreur(
-        response,
-        400,
-        "Prenom trop long (max 100)."
-      );
+      return envoyerErreur(response, 400, "Prenom trop long (max 100).");
     }
   }
 
-  // Specialite (optionnelle, null autorise)
-  if (specialite !== undefined && specialite !== null) {
-    if (String(specialite).trim().length > 100) {
-      return envoyerErreur(
-        response,
-        400,
-        "Specialite trop longue (max 100)."
-      );
+  if (specialite !== undefined) {
+    if (!specialite || String(specialite).trim() === "") {
+      return envoyerErreur(response, 400, "Programme invalide.");
     }
+
+    if (String(specialite).trim().length > 150) {
+      return envoyerErreur(response, 400, "Programme trop long (max 150).");
+    }
+  }
+
+  if (cours_ids !== undefined && !coursIdsValides(cours_ids)) {
+    return envoyerErreur(response, 400, "La liste des cours est invalide.");
   }
 
   next();
 }
 
-/**
- * Validation DELETE
- * Refuse si le professeur est deja affecte.
- */
 export async function validerDeleteProfesseur(request, response, next) {
   const idProfesseur = Number(request.params.id);
-
   const estAffecte = await professeurEstDejaAffecte(idProfesseur);
+
   if (estAffecte) {
     return envoyerErreur(
       response,

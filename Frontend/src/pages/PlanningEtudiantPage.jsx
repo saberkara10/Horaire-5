@@ -4,7 +4,14 @@ import { recupererPlanningEtudiant } from "../services/etudiantsService.js";
 import "../styles/PlanningEtudiantPage.css";
 
 const JOURS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi"];
-const HEURES = ["08:00","09:00","10:00","11:00","12:00","13:00","14:00","15:00","16:00","17:00","18:00"];
+const HEURES = Array.from({ length: 15 }, (_, index) =>
+  `${String(index + 8).padStart(2, "0")}:00`
+);
+
+function creerDateLocale(dateStr) {
+  const [annee, mois, jour] = String(dateStr || "").split("-").map(Number);
+  return new Date(annee || 1970, (mois || 1) - 1, jour || 1);
+}
 
 function getDebutSemaine(date) {
   const d = new Date(date);
@@ -20,8 +27,13 @@ function formaterDateCourte(date) {
 }
 
 function formaterDate(dateStr) {
-  const d = new Date(dateStr);
-  return d.toLocaleDateString("fr-CA", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+  const d = creerDateLocale(dateStr);
+  return d.toLocaleDateString("fr-CA", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
 }
 
 function formaterHeure(heureStr) {
@@ -35,24 +47,36 @@ function heureEnMinutes(heure) {
 
 function getSeancesParJourEtHeure(seances, lundiSemaine) {
   const map = {};
+
   seances.forEach((seance) => {
-    const dateSeance = new Date(seance.date);
-    dateSeance.setHours(12);
+    const dateSeance = creerDateLocale(seance.date);
     const jourIndex = dateSeance.getDay() - 1;
-    if (jourIndex < 0 || jourIndex > 4) return;
+
+    if (jourIndex < 0 || jourIndex > 4) {
+      return;
+    }
+
     const lundiSeance = getDebutSemaine(dateSeance);
-    if (lundiSeance.getTime() !== lundiSemaine.getTime()) return;
+    if (lundiSeance.getTime() !== lundiSemaine.getTime()) {
+      return;
+    }
+
     const debut = seance.heure_debut.slice(0, 5);
     const key = `${jourIndex}-${debut}`;
-    if (!map[key]) map[key] = [];
+
+    if (!map[key]) {
+      map[key] = [];
+    }
+
     map[key].push(seance);
   });
+
   return map;
 }
 
-function getHauteur(heure_debut, heure_fin) {
-  const debut = heureEnMinutes(heure_debut.slice(0, 5));
-  const fin = heureEnMinutes(heure_fin.slice(0, 5));
+function getHauteur(heureDebut, heureFin) {
+  const debut = heureEnMinutes(heureDebut.slice(0, 5));
+  const fin = heureEnMinutes(heureFin.slice(0, 5));
   return ((fin - debut) / 60) * 60;
 }
 
@@ -63,7 +87,9 @@ export function PlanningEtudiantPage() {
   const [horaire, setHoraire] = useState([]);
   const [loading, setLoading] = useState(true);
   const [erreur, setErreur] = useState(null);
-  const [lundiCourant, setLundiCourant] = useState(() => getDebutSemaine(new Date()));
+  const [lundiCourant, setLundiCourant] = useState(() =>
+    getDebutSemaine(new Date())
+  );
 
   useEffect(() => {
     async function charger() {
@@ -77,20 +103,29 @@ export function PlanningEtudiantPage() {
         setLoading(false);
       }
     }
+
     charger();
   }, [id]);
 
-  if (loading) return <p className="planning-message">Chargement...</p>;
-  if (erreur) return <p className="planning-message planning-erreur">{erreur}</p>;
-  if (!etudiant) return <p className="planning-message">Etudiant introuvable</p>;
+  if (loading) {
+    return <p className="planning-message">Chargement...</p>;
+  }
+
+  if (erreur) {
+    return <p className="planning-message planning-erreur">{erreur}</p>;
+  }
+
+  if (!etudiant) {
+    return <p className="planning-message">Etudiant introuvable</p>;
+  }
 
   const vendredi = new Date(lundiCourant);
   vendredi.setDate(vendredi.getDate() + 4);
 
-  const joursAvecDates = JOURS.map((nom, i) => {
-    const d = new Date(lundiCourant);
-    d.setDate(d.getDate() + i);
-    return { nom, date: d };
+  const joursAvecDates = JOURS.map((nom, index) => {
+    const date = new Date(lundiCourant);
+    date.setDate(date.getDate() + index);
+    return { nom, date };
   });
 
   const seancesMap = getSeancesParJourEtHeure(horaire, lundiCourant);
@@ -103,7 +138,6 @@ export function PlanningEtudiantPage() {
 
       <h1 className="planning-titre">Planning etudiant</h1>
 
-      {/* Infos etudiant */}
       <div className="planning-infos">
         <div className="planning-info-item">
           <span className="planning-label">Matricule</span>
@@ -111,7 +145,9 @@ export function PlanningEtudiantPage() {
         </div>
         <div className="planning-info-item">
           <span className="planning-label">Nom</span>
-          <span className="planning-valeur">{etudiant.nom} {etudiant.prenom}</span>
+          <span className="planning-valeur">
+            {etudiant.nom} {etudiant.prenom}
+          </span>
         </div>
         <div className="planning-info-item">
           <span className="planning-label">Groupe</span>
@@ -127,7 +163,6 @@ export function PlanningEtudiantPage() {
         </div>
       </div>
 
-      {/* Tableau liste */}
       <h2 className="planning-sous-titre">Cours planifies</h2>
       {horaire.length === 0 ? (
         <p className="planning-vide">Aucun cours planifie pour ce groupe.</p>
@@ -154,7 +189,9 @@ export function PlanningEtudiantPage() {
                     <span className="planning-code">{seance.code_cours}</span>
                     <span className="planning-nom-cours">{seance.nom_cours}</span>
                   </td>
-                  <td>{seance.nom_professeur} {seance.prenom_professeur}</td>
+                  <td>
+                    {seance.nom_professeur} {seance.prenom_professeur}
+                  </td>
                   <td>
                     <span className="planning-salle">{seance.code_salle}</span>
                     <span className="planning-type-salle">{seance.type_salle}</span>
@@ -166,24 +203,38 @@ export function PlanningEtudiantPage() {
         </div>
       )}
 
-      {/* Calendrier semaine */}
-      <h2 className="planning-sous-titre" style={{ marginTop: "40px" }}>Calendrier</h2>
+      <h2 className="planning-sous-titre" style={{ marginTop: "40px" }}>
+        Calendrier
+      </h2>
 
       <div className="cal-nav">
-        <button className="cal-nav-btn" onClick={() => {
-          const d = new Date(lundiCourant);
-          d.setDate(d.getDate() - 7);
-          setLundiCourant(d);
-        }}>&larr;</button>
+        <button
+          className="cal-nav-btn"
+          onClick={() => {
+            const date = new Date(lundiCourant);
+            date.setDate(date.getDate() - 7);
+            setLundiCourant(date);
+          }}
+        >
+          &larr;
+        </button>
         <span className="cal-nav-titre">
-          {formaterDateCourte(lundiCourant)} — {formaterDateCourte(vendredi)}
+          {formaterDateCourte(lundiCourant)} - {formaterDateCourte(vendredi)}
         </span>
-        <button className="cal-nav-btn" onClick={() => {
-          const d = new Date(lundiCourant);
-          d.setDate(d.getDate() + 7);
-          setLundiCourant(d);
-        }}>&rarr;</button>
-        <button className="cal-nav-aujourd-hui" onClick={() => setLundiCourant(getDebutSemaine(new Date()))}>
+        <button
+          className="cal-nav-btn"
+          onClick={() => {
+            const date = new Date(lundiCourant);
+            date.setDate(date.getDate() + 7);
+            setLundiCourant(date);
+          }}
+        >
+          &rarr;
+        </button>
+        <button
+          className="cal-nav-aujourd-hui"
+          onClick={() => setLundiCourant(getDebutSemaine(new Date()))}
+        >
           Aujourd'hui
         </button>
       </div>
@@ -192,8 +243,10 @@ export function PlanningEtudiantPage() {
         <div className="cal-grille">
           <div className="cal-col-heures">
             <div className="cal-entete-vide"></div>
-            {HEURES.map((h) => (
-              <div key={h} className="cal-heure-cell">{h}</div>
+            {HEURES.map((heure) => (
+              <div key={heure} className="cal-heure-cell">
+                {heure}
+              </div>
             ))}
           </div>
 
@@ -204,17 +257,22 @@ export function PlanningEtudiantPage() {
                 <span className="cal-jour-date">{formaterDateCourte(date)}</span>
               </div>
               <div className="cal-col-body">
-                {HEURES.map((h) => (
-                  <div key={h} className="cal-slot"></div>
+                {HEURES.map((heure) => (
+                  <div key={heure} className="cal-slot"></div>
                 ))}
-                {HEURES.map((h) => {
-                  const key = `${jourIndex}-${h}`;
+                {HEURES.map((heure) => {
+                  const key = `${jourIndex}-${heure}`;
                   const seances = seancesMap[key] || [];
+
                   return seances.map((seance) => {
-                    const hauteur = getHauteur(seance.heure_debut, seance.heure_fin);
+                    const hauteur = getHauteur(
+                      seance.heure_debut,
+                      seance.heure_fin
+                    );
                     const debut = heureEnMinutes(seance.heure_debut.slice(0, 5));
                     const heureRef = heureEnMinutes(HEURES[0]);
                     const top = ((debut - heureRef) / 60) * 60;
+
                     return (
                       <div
                         key={seance.id_affectation_cours}

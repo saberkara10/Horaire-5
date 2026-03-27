@@ -145,12 +145,13 @@
 
 .crud-page__modal {
   width: 100%;
-  max-width: 560px;
+  max-width: min(640px, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
   border: 1px solid var(--line);
   border-radius: 24px;
   background: #0b1732;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
-  overflow: hidden;
+  overflow: auto;
 }
 
 .crud-page__modal-header {
@@ -183,6 +184,7 @@
 .crud-page__field {
   display: grid;
   gap: 0.5rem;
+  min-width: 0;
 }
 
 .crud-page__field span {
@@ -192,6 +194,7 @@
 
 .crud-page__field input,
 .crud-page__field select {
+  width: 100%;
   min-height: 54px;
   padding: 0 1rem;
   border: 1px solid rgba(148, 163, 184, 0.16);
@@ -201,10 +204,35 @@
   outline: none;
 }
 
+.crud-page__field input[type="date"],
+.crud-page__field input[type="time"],
+.crud-page__field select {
+  color-scheme: dark;
+}
+
+.crud-page__field select {
+  appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, rgba(226, 232, 240, 0.7) 50%),
+    linear-gradient(135deg, rgba(226, 232, 240, 0.7) 50%, transparent 50%);
+  background-position:
+    calc(100% - 20px) calc(50% - 2px),
+    calc(100% - 14px) calc(50% - 2px);
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+  padding-right: 2.7rem;
+}
+
+.crud-page__field select option {
+  background: #16213a;
+  color: #f8fafc;
+}
+
 .crud-page__modal-actions {
   display: flex;
   justify-content: flex-end;
   gap: 0.85rem;
+  flex-wrap: wrap;
   margin-top: 0.3rem;
 }
 

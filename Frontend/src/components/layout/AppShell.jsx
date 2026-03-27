@@ -65,6 +65,31 @@ function IconAffectations() {
   );
 }
 
+function IconDisponibilites() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none">
+      <rect x="4" y="5" width="16" height="15" rx="2" />
+      <path d="M8 3V7" />
+      <path d="M16 3V7" />
+      <path d="M4 10H20" />
+      <path d="M9 14H12" />
+      <path d="M9 17H15" />
+    </svg>
+  );
+}
+
+function IconHorairesProfesseurs() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none">
+      <circle cx="8" cy="8" r="3" />
+      <path d="M3.5 18C3.5 15.79 5.52 14 8 14C10.48 14 12.5 15.79 12.5 18" />
+      <rect x="14" y="5" width="7" height="12" rx="2" />
+      <path d="M16.5 9H18.5" />
+      <path d="M16.5 12H18.5" />
+    </svg>
+  );
+}
+
 function IconLogout() {
   return (
     <svg viewBox="0 0 24 24" fill="none">
@@ -78,8 +103,12 @@ function IconLogout() {
 function IconBrand() {
   return (
     <svg viewBox="0 0 24 24" fill="none">
-      <circle cx="12" cy="12" r="8" />
-      <path d="M12 7V12L15.5 14" />
+      <path d="M3 9L12 4L21 9" />
+      <path d="M5 10V18" />
+      <path d="M9 10V18" />
+      <path d="M15 10V18" />
+      <path d="M19 10V18" />
+      <path d="M3 20H21" />
     </svg>
   );
 }
@@ -94,7 +123,7 @@ export function AppShell({
   const nomAffiche =
     `${utilisateur?.prenom || ""} ${utilisateur?.nom || ""}`.trim() ||
     utilisateur?.email ||
-    "Utilisateur connecté";
+    "Utilisateur connecte";
 
   return (
     <div className="app-shell">
@@ -104,11 +133,18 @@ export function AppShell({
             <IconBrand />
           </div>
           <div className="app-shell__brand-text">
-            <div className="app-shell__brand-title">Gestion Horaires</div>
-            <div className="app-shell__brand-subtitle">v5</div>
+            <div className="app-shell__brand-title">College Horaires</div>
+            <div className="app-shell__brand-subtitle">Coordination academique</div>
           </div>
         </div>
 
+        <div className="app-shell__sidebar-note">
+          <span className="app-shell__sidebar-note-label">Session active</span>
+          <strong>Portail campus</strong>
+          <p>Organisation pedagogique, affectations et suivi des cohortes.</p>
+        </div>
+
+        <div className="app-shell__nav-label">Navigation campus</div>
         <nav className="app-shell__nav" aria-label="Navigation principale">
           <NavLink
             to="/dashboard"
@@ -151,29 +187,49 @@ export function AppShell({
           </NavLink>
 
           <NavLink
+            to="/disponibilites-professeurs"
+            className={({ isActive }) =>
+              `app-shell__nav-item ${isActive ? "app-shell__nav-item--active" : ""}`
+            }
+          >
+            <span className="app-shell__nav-icon"><IconDisponibilites /></span>
+            <span>Disponibilites</span>
+          </NavLink>
+
+          <NavLink
             to="/import-etudiants"
             className={({ isActive }) =>
               `app-shell__nav-item ${isActive ? "app-shell__nav-item--active" : ""}`
             }
           >
             <span className="app-shell__nav-icon"><IconImport /></span>
-            <span>Import étudiants</span>
+            <span>Import etudiants</span>
           </NavLink>
 
           <NavLink
-            to="/affectations"
+            to="/generer"
             className={({ isActive }) =>
               `app-shell__nav-item ${isActive ? "app-shell__nav-item--active" : ""}`
             }
           >
             <span className="app-shell__nav-icon"><IconAffectations /></span>
-            <span>Affectations</span>
+            <span>Generer</span>
+          </NavLink>
+
+          <NavLink
+            to="/horaires-professeurs"
+            className={({ isActive }) =>
+              `app-shell__nav-item ${isActive ? "app-shell__nav-item--active" : ""}`
+            }
+          >
+            <span className="app-shell__nav-icon"><IconHorairesProfesseurs /></span>
+            <span>Horaires professeurs</span>
           </NavLink>
         </nav>
 
         <button className="app-shell__logout" type="button" onClick={onLogout}>
           <span className="app-shell__nav-icon"><IconLogout /></span>
-          <span>Déconnexion</span>
+          <span>Deconnexion</span>
         </button>
       </aside>
 

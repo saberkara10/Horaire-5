@@ -16,6 +16,7 @@ import {
   genererHoraireAutomatiquement,
   getAffectationById,
   getAllAffectations,
+  updateAffectationValidee,
 } from "../src/model/horaire.js";
 
 /**
@@ -26,6 +27,21 @@ import {
 export default function horaireRoutes(app) {
   const accesLectureHoraires = [userAuth, userAdminOrResponsable];
   const accesGestionHoraires = [userAuth, userAdmin];
+
+  function payloadAffectationValide(body = {}) {
+    return (
+      body.id_cours &&
+      body.id_professeur &&
+      body.id_salle &&
+      body.date &&
+      body.heure_debut &&
+      body.heure_fin
+    );
+  }
+
+  function dateGenerationValide(date) {
+    return /^\d{4}-\d{2}-\d{2}$/.test(String(date || ""));
+  }
 
   /**
    * GET /api/horaires
@@ -110,6 +126,40 @@ export default function horaireRoutes(app) {
     }
   });
 
+  app.put(
+    "/api/horaires/:id",
+    ...accesGestionHoraires,
+    async (request, response) => {
+      try {
+        const idAffectation = Number(request.params.id);
+
+        if (!Number.isInteger(idAffectation) || idAffectation <= 0) {
+          return response.status(400).json({ message: "Identifiant invalide." });
+        }
+
+        if (!payloadAffectationValide(request.body)) {
+          return response.status(400).json({ message: "Champs manquants." });
+        }
+
+        const resultat = await updateAffectationValidee(idAffectation, {
+          idCours: Number(request.body.id_cours),
+          idProfesseur: Number(request.body.id_professeur),
+          idSalle: Number(request.body.id_salle),
+          date: request.body.date,
+          heureDebut: request.body.heure_debut,
+          heureFin: request.body.heure_fin,
+        });
+
+        return response.status(200).json(resultat);
+      } catch (error) {
+        console.error("Erreur modification horaire :", error);
+        return response
+          .status(error.statusCode || 500)
+          .json({ message: error.message || "Erreur serveur." });
+      }
+    }
+  );
+
   /**
    * POST /api/horaires/generer
    * Generer automatiquement l'horaire pour tous les cours.
@@ -119,7 +169,32 @@ export default function horaireRoutes(app) {
     ...accesGestionHoraires,
     async (request, response) => {
       try {
-        const resultat = await genererHoraireAutomatiquement();
+        const { programme, etape, mode_groupe, id_groupe, date_debut } = request.body || {};
+
+        if ((programme || etape) && (!programme || !etape)) {
+          return response.status(400).json({
+            message: "Le programme et l'etape doivent etre renseignes ensemble.",
+          });
+        }
+
+        if (date_debut && !dateGenerationValide(date_debut)) {
+          return response.status(400).json({
+            message: "La date de debut est invalide.",
+          });
+        }
+
+        if (mode_groupe === "single" && !Number.isInteger(Number(id_groupe))) {
+          return response.status(400).json({
+            message: "Un groupe valide doit etre selectionne.",
+          });
+        }
+
+        const resultat = await genererHoraireAutomatiquement({
+          programme,
+          etape,
+          idGroupe: mode_groupe === "single" ? Number(id_groupe) : null,
+          dateDebut: date_debut || null,
+        });
         response.status(201).json(resultat);
       } catch (error) {
         console.error("Erreur generation horaire :", error);

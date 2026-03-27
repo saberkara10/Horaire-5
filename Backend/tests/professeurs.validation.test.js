@@ -83,7 +83,14 @@ describe("validations professeurs", () => {
 
   it("validerCreateProfesseur refuse matricule déjà utilisé", async () => {
     recupererProfesseurParMatricule.mockResolvedValue({ id_professeur: 3 });
-    const req = { body: { matricule: "P001", nom: "Ali", prenom: "Test" } };
+    const req = {
+      body: {
+        matricule: "P001",
+        nom: "Ali",
+        prenom: "Test",
+        specialite: "Programmation informatique",
+      },
+    };
     const res = createResponse();
     const next = jest.fn();
 

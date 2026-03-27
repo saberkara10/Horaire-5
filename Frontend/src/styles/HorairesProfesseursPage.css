@@ -1,0 +1,80 @@
+.horaires-professeurs-page {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.horaires-professeurs-page__workspace {
+  display: grid;
+  grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
+  gap: 1.25rem;
+}
+
+.horaires-professeurs-page__sidebar,
+.horaires-professeurs-page__content {
+  min-width: 0;
+}
+
+.horaires-professeurs-page__sidebar {
+  display: grid;
+  gap: 1rem;
+  align-content: start;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: var(--panel);
+  padding: 1.2rem;
+}
+
+.horaires-professeurs-page__sidebar-header h2 {
+  margin: 0;
+  color: #ffffff;
+}
+
+.horaires-professeurs-page__sidebar-header p {
+  margin: 0.35rem 0 0;
+  color: var(--muted);
+}
+
+.horaires-professeurs-page__list {
+  display: grid;
+  gap: 0.8rem;
+  max-height: calc(100vh - 320px);
+  overflow: auto;
+  padding-right: 0.1rem;
+}
+
+.horaires-professeurs-page__teacher-card {
+  display: grid;
+  gap: 0.2rem;
+  width: 100%;
+  padding: 0.95rem 1rem;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #e2e8f0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.horaires-professeurs-page__teacher-card strong {
+  color: #ffffff;
+}
+
+.horaires-professeurs-page__teacher-card small {
+  color: var(--muted);
+}
+
+.horaires-professeurs-page__teacher-card--active {
+  border-color: rgba(168, 85, 247, 0.45);
+  background: linear-gradient(135deg, rgba(109, 92, 255, 0.22), rgba(17, 24, 39, 0.82));
+  box-shadow: 0 18px 38px rgba(76, 29, 149, 0.16);
+}
+
+@media (max-width: 1180px) {
+  .horaires-professeurs-page__workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .horaires-professeurs-page__list {
+    max-height: none;
+  }
+}
