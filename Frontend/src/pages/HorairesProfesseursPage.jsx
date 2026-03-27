@@ -345,6 +345,7 @@ export function HorairesProfesseursPage({ utilisateur, onLogout }) {
                                       >
                                         <strong>{seance.code_cours}</strong>
                                         <span>{seance.nom_cours}</span>
+                                        <small>{seance.groupes || "Aucun groupe"}</small>
                                         <small>{seance.code_salle}</small>
                                         <small>
                                           {normaliserHeure(seance.heure_debut)} -{" "}

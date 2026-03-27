@@ -10,6 +10,7 @@ import { recupererProgrammes } from "../services/programmes.api.js";
 import { recupererCours } from "../services/cours.api.js";
 import "../styles/CrudPages.css";
 import "../styles/ProfesseursPage.css";
+import { programmesCorrespondent } from "../utils/programmes.js";
 
 function extraireCoursIds(valeur) {
   if (Array.isArray(valeur)) {
@@ -110,7 +111,9 @@ export function ProfesseursPage({ utilisateur, onLogout }) {
     }
 
     return [...cours]
-      .filter((coursItem) => coursItem.programme === formulaire.specialite)
+      .filter((coursItem) =>
+        programmesCorrespondent(coursItem.programme, formulaire.specialite)
+      )
       .sort((coursA, coursB) =>
         String(coursA.code || "").localeCompare(String(coursB.code || ""), "fr")
       );
@@ -160,7 +163,9 @@ export function ProfesseursPage({ utilisateur, onLogout }) {
     setFormulaire((valeurActuelle) => {
       if (name === "specialite") {
         const coursCompatiblesProgramme = cours
-          .filter((coursItem) => coursItem.programme === value)
+          .filter((coursItem) =>
+            programmesCorrespondent(coursItem.programme, value)
+          )
           .map((coursItem) => Number(coursItem.id_cours));
 
         return {

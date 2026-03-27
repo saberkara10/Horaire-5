@@ -3,6 +3,10 @@ import {
   recupererDisponibilitesProfesseurs,
   recupererIndexCoursProfesseurs,
 } from "./professeurs.model.js";
+import {
+  normaliserNomProgramme,
+  programmesCorrespondent,
+} from "../utils/programmes.js";
 
 const CRENEAUX_DEBUT = ["08:00:00", "10:00:00", "13:00:00", "15:00:00"];
 const NOMBRE_JOURS_GENERATION = 10;
@@ -67,10 +71,7 @@ function calculerScoreProfesseur(professeur, cours, coursParProfesseur = null) {
     return 0;
   }
 
-  const specialite = normaliserTexte(professeur.specialite);
-  const programme = normaliserTexte(cours.programme);
-
-  if (specialite && programme && specialite === programme) {
+  if (programmesCorrespondent(professeur.specialite, cours.programme)) {
     return 2;
   }
 
@@ -159,11 +160,9 @@ function etapesCorrespondent(etapeCours, etapeGroupe) {
 }
 
 function trouverGroupesCompatibles(cours, groupes) {
-  const programmeCours = normaliserTexte(cours.programme);
-
   return groupes.filter(
     (groupe) =>
-      normaliserTexte(groupe.programme) === programmeCours &&
+      programmesCorrespondent(groupe.programme, cours.programme) &&
       etapesCorrespondent(cours.etape_etude, groupe.etape)
   );
 }
@@ -924,7 +923,7 @@ export async function genererHoraireAutomatiquement(options = {}) {
   try {
     await connection.beginTransaction();
 
-    const programmeCible = normaliserTexte(options.programme);
+    const programmeCible = normaliserNomProgramme(options.programme);
     const etapeCible = normaliserEtape(options.etape);
     const idGroupeCible =
       Number.isInteger(Number(options.idGroupe)) && Number(options.idGroupe) > 0
@@ -979,10 +978,7 @@ export async function genererHoraireAutomatiquement(options = {}) {
       await recupererDisponibilitesProfesseurs(connection);
     const coursParProfesseur = await recupererIndexCoursProfesseurs(connection);
     const groupesSelectionnes = groupes.filter((groupe) => {
-      if (
-        programmeCible &&
-        normaliserTexte(groupe.programme) !== programmeCible
-      ) {
+      if (programmeCible && !programmesCorrespondent(groupe.programme, programmeCible)) {
         return false;
       }
 
@@ -1005,10 +1001,7 @@ export async function genererHoraireAutomatiquement(options = {}) {
     }
 
     const coursSelectionnes = cours.filter((coursActuel) => {
-      if (
-        programmeCible &&
-        normaliserTexte(coursActuel.programme) !== programmeCible
-      ) {
+      if (programmeCible && !programmesCorrespondent(coursActuel.programme, programmeCible)) {
         return false;
       }
 

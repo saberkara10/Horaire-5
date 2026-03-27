@@ -62,6 +62,24 @@ describe("Tests modele Horaire", () => {
     ).toBe(true);
   });
 
+  test("professeurEstCompatibleAvecCours rapproche les variantes de programme", () => {
+    const map = new Map([[1, new Set([10])]]);
+
+    expect(
+      professeurEstCompatibleAvecCours(
+        {
+          id_professeur: 1,
+          specialite: "Informatique",
+        },
+        {
+          id_cours: 10,
+          programme: "Programmation informatique",
+        },
+        map
+      )
+    ).toBe(true);
+  });
+
   test("professeurEstCompatibleAvecCours retourne false quand le cours n'est pas assigne", () => {
     const map = new Map([[1, new Set([99])]]);
 

@@ -36,6 +36,15 @@ describe("Tests route Programmes", () => {
     expect(response.body.length).toBeGreaterThanOrEqual(20);
   });
 
+  test("GET /api/programmes conserve aussi les libelles importes", async () => {
+    queryMock.mockResolvedValue([[{ programme: "Developpement Web" }]]);
+
+    const response = await request(app).get("/api/programmes");
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toContain("Developpement Web");
+  });
+
   test("GET /api/programmes retourne 500 si la base echoue", async () => {
     queryMock.mockRejectedValue(new Error("DB error"));
 

@@ -14,6 +14,7 @@ import {
   supprimerAffectation,
 } from "../services/horaire.api.js";
 import "../styles/AffectationsPage.css";
+import { programmesCorrespondent } from "../utils/programmes.js";
 
 const ETAPES_REFERENCE = ["1", "2", "3", "4", "5", "6", "7", "8"];
 
@@ -150,14 +151,14 @@ export function AffectationsPage({ utilisateur, onLogout }) {
 
     const programmeNormalise = normaliserTexte(filtresGeneration.programme);
     const etapesCours = cours
-      .filter(
-        (element) => normaliserTexte(element.programme) === programmeNormalise
+      .filter((element) =>
+        programmesCorrespondent(element.programme, programmeNormalise)
       )
       .map((element) => String(element.etape_etude || "").trim());
 
     const etapesGroupes = groupes
-      .filter(
-        (groupe) => normaliserTexte(groupe.programme) === programmeNormalise
+      .filter((groupe) =>
+        programmesCorrespondent(groupe.programme, programmeNormalise)
       )
       .map((groupe) => String(groupe.etape || "").trim());
 
@@ -174,8 +175,7 @@ export function AffectationsPage({ utilisateur, onLogout }) {
     return groupes.filter((groupe) => {
       if (
         filtresGeneration.programme &&
-        normaliserTexte(groupe.programme) !==
-          normaliserTexte(filtresGeneration.programme)
+        !programmesCorrespondent(groupe.programme, filtresGeneration.programme)
       ) {
         return false;
       }
@@ -195,8 +195,7 @@ export function AffectationsPage({ utilisateur, onLogout }) {
     return cours.filter((element) => {
       if (
         filtresGeneration.programme &&
-        normaliserTexte(element.programme) !==
-          normaliserTexte(filtresGeneration.programme)
+        !programmesCorrespondent(element.programme, filtresGeneration.programme)
       ) {
         return false;
       }
