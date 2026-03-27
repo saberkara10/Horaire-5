@@ -8,13 +8,12 @@ import pool from "../../db.js";
 export async function findByEmail(email) {
   const [rows] = await pool.query(
     `SELECT 
-        id_utilisateur AS id,
+        id,
         email,
-        motdepasse AS mot_de_passe_hash,
+        mot_de_passe_hash,
         nom,
         prenom,
-        1 AS actif,
-        role
+        actif
      FROM utilisateurs
      WHERE email = ?
      LIMIT 1`,
@@ -32,14 +31,13 @@ export async function findByEmail(email) {
 export async function findById(id) {
   const [rows] = await pool.query(
     `SELECT
-        id_utilisateur AS id,
+        id,
         email,
         nom,
         prenom,
-        1 AS actif,
-        role
+        actif
      FROM utilisateurs
-     WHERE id_utilisateur = ?
+     WHERE id = ?
      LIMIT 1`,
     [id]
   );
@@ -54,16 +52,19 @@ export async function findById(id) {
  */
 export async function findRolesByUserId(userId) {
   const [rows] = await pool.query(
-    `SELECT role
-     FROM utilisateurs
-     WHERE id_utilisateur = ?
-     LIMIT 1`,
+    `SELECT r.code
+     FROM utilisateur_roles ur
+     INNER JOIN roles r ON r.id = ur.role_id
+     WHERE ur.utilisateur_id = ?
+     ORDER BY r.code ASC`,
     [userId]
   );
 
-  if (!rows.length || !rows[0].role) {
+  if (!rows.length) {
     return [];
   }
 
-  return [rows[0].role];
+  return rows
+    .map((row) => row.code)
+    .filter((code) => typeof code === "string" && code.trim() !== "");
 }

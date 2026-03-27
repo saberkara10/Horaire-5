@@ -6,9 +6,76 @@
  */
 
 import {
-  recupererTousLesProfesseurs,ajouterProfesseur,modifierProfesseur,supprimerProfesseur,} from "../src/model/professeurs.model.js";
+  ajouterProfesseur,
+  modifierProfesseur,
+  recupererDisponibilitesProfesseur,
+  recupererHoraireProfesseur,
+  recupererProfesseurParId,
+  recupererTousLesProfesseurs,
+  remplacerDisponibilitesProfesseur,
+  supprimerProfesseur,
+} from "../src/model/professeurs.model.js";
+import {
+  validerCreateProfesseur,
+  validerDeleteProfesseur,
+  validerIdProfesseur,
+  validerUpdateProfesseur,
+  verifierProfesseurExiste,
+} from "../src/validations/professeurs.validation.js";
+import {
+  userAdmin,
+  userAuth,
+  userAdminOrResponsable,
+} from "../middlewares/auth.js";
 
-import {validerIdProfesseur,verifierProfesseurExiste, validerCreateProfesseur, validerUpdateProfesseur, validerDeleteProfesseur,} from "../src/validations/professeurs.validation.js";
+function normaliserHeure(heure) {
+  const valeur = String(heure || "").trim();
+
+  if (!valeur) {
+    return "";
+  }
+
+  if (valeur.length === 5) {
+    return `${valeur}:00`;
+  }
+
+  return valeur.slice(0, 8);
+}
+
+function validerDisponibilitesPayload(disponibilites) {
+  if (!Array.isArray(disponibilites)) {
+    return "Le champ disponibilites doit etre un tableau.";
+  }
+
+  const clesVues = new Set();
+
+  for (const disponibilite of disponibilites) {
+    const jourSemaine = Number(disponibilite?.jour_semaine);
+    const heureDebut = normaliserHeure(disponibilite?.heure_debut);
+    const heureFin = normaliserHeure(disponibilite?.heure_fin);
+
+    if (!Number.isInteger(jourSemaine) || jourSemaine < 1 || jourSemaine > 5) {
+      return "Chaque disponibilite doit avoir un jour_semaine entre 1 et 5.";
+    }
+
+    if (!heureDebut || !heureFin) {
+      return "Chaque disponibilite doit inclure heure_debut et heure_fin.";
+    }
+
+    if (heureDebut >= heureFin) {
+      return "Chaque disponibilite doit avoir une heure de fin apres l'heure de debut.";
+    }
+
+    const cle = `${jourSemaine}-${heureDebut}-${heureFin}`;
+    if (clesVues.has(cle)) {
+      return "Les disponibilites dupliquees ne sont pas autorisees.";
+    }
+
+    clesVues.add(cle);
+  }
+
+  return "";
+}
 
 /**
  * Initialiser les routes des professeurs.
@@ -16,11 +83,10 @@ import {validerIdProfesseur,verifierProfesseurExiste, validerCreateProfesseur, v
  * @param {import("express").Express} app Application Express.
  */
 export default function professeursRoutes(app) {
-  /**
-   * GET /api/professeurs
-   * Recuperer tous les professeurs.
-   */
-  app.get("/api/professeurs", async (request, response) => {
+  const accesLectureProfesseurs = [userAuth, userAdminOrResponsable];
+  const accesGestionProfesseurs = [userAuth, userAdmin];
+
+  app.get("/api/professeurs", ...accesLectureProfesseurs, async (request, response) => {
     try {
       const professeurs = await recupererTousLesProfesseurs();
       response.status(200).json(professeurs);
@@ -29,12 +95,9 @@ export default function professeursRoutes(app) {
     }
   });
 
-  /**
-   * GET /api/professeurs/:id
-   * Recuperer un professeur par son identifiant.
-   */
   app.get(
     "/api/professeurs/:id",
+    ...accesLectureProfesseurs,
     validerIdProfesseur,
     verifierProfesseurExiste,
     async (request, response) => {
@@ -46,12 +109,54 @@ export default function professeursRoutes(app) {
     }
   );
 
-  /**
-   * POST /api/professeurs
-   * Ajouter un nouveau professeur.
-   */
+  app.get(
+    "/api/professeurs/:id/disponibilites",
+    ...accesLectureProfesseurs,
+    validerIdProfesseur,
+    verifierProfesseurExiste,
+    async (request, response) => {
+      try {
+        const disponibilites = await recupererDisponibilitesProfesseur(
+          Number(request.params.id)
+        );
+
+        response.status(200).json(disponibilites);
+      } catch (error) {
+        response.status(500).json({ message: "Erreur serveur." });
+      }
+    }
+  );
+
+  app.put(
+    "/api/professeurs/:id/disponibilites",
+    ...accesGestionProfesseurs,
+    validerIdProfesseur,
+    verifierProfesseurExiste,
+    async (request, response) => {
+      try {
+        const messageErreur = validerDisponibilitesPayload(
+          request.body?.disponibilites
+        );
+
+        if (messageErreur) {
+          return response.status(400).json({ message: messageErreur });
+        }
+
+        const disponibilites = await remplacerDisponibilitesProfesseur(
+          Number(request.params.id),
+          request.body.disponibilites
+        );
+
+        return response.status(200).json(disponibilites);
+      } catch (error) {
+        return response.status(500).json({ message: "Erreur serveur." });
+      }
+    }
+  );
+
   app.post(
     "/api/professeurs",
+    ...accesGestionProfesseurs,
     validerCreateProfesseur,
     async (request, response) => {
       try {
@@ -63,12 +168,9 @@ export default function professeursRoutes(app) {
     }
   );
 
-  /**
-   * PUT /api/professeurs/:id
-   * Modifier un professeur existant.
-   */
   app.put(
     "/api/professeurs/:id",
+    ...accesGestionProfesseurs,
     validerIdProfesseur,
     verifierProfesseurExiste,
     validerUpdateProfesseur,
@@ -86,12 +188,9 @@ export default function professeursRoutes(app) {
     }
   );
 
-  /**
-   * DELETE /api/professeurs/:id
-   * Supprimer un professeur (DELETE reel).
-   */
   app.delete(
     "/api/professeurs/:id",
+    ...accesGestionProfesseurs,
     validerIdProfesseur,
     verifierProfesseurExiste,
     validerDeleteProfesseur,
@@ -101,6 +200,33 @@ export default function professeursRoutes(app) {
         response.status(200).json({ message: "Professeur supprime." });
       } catch (error) {
         response.status(500).json({ message: "Erreur serveur." });
+      }
+    }
+  );
+
+  app.get(
+    "/api/professeurs/:id/horaire",
+    ...accesLectureProfesseurs,
+    async (request, response) => {
+      try {
+        const idProfesseur = Number(request.params.id);
+
+        if (Number.isNaN(idProfesseur)) {
+          return response.status(400).json({ message: "Identifiant invalide." });
+        }
+
+        const professeur = await recupererProfesseurParId(idProfesseur);
+
+        if (!professeur) {
+          return response.status(404).json({ message: "Professeur introuvable." });
+        }
+
+        const horaire = await recupererHoraireProfesseur(idProfesseur);
+
+        return response.status(200).json(horaire);
+      } catch (error) {
+        console.error("ERREUR GET /api/professeurs/:id/horaire :", error);
+        return response.status(500).json({ message: "Erreur serveur." });
       }
     }
   );

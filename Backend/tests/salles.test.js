@@ -1,135 +1,219 @@
 import express from "express";
 import request from "supertest";
-import { jest, describe, it, expect, beforeEach } from "@jest/globals";
+import { jest } from "@jest/globals";
 
-const getAllSalles = jest.fn();
-const getSalleById = jest.fn();
-const addSalle = jest.fn();
-const modifySalle = jest.fn();
-const deleteSalle = jest.fn();
+const sallesModelMock = {
+  getAllSalles: jest.fn(),
+  getSalleById: jest.fn(),
+  getSalleByCode: jest.fn(),
+  addSalle: jest.fn(),
+  modifySalle: jest.fn(),
+  deleteSalle: jest.fn(),
+  salleEstDejaAffectee: jest.fn(),
+};
 
-jest.unstable_mockModule("../src/model/salle.js", () => ({
-  getAllSalles,
-  getSalleById,
-  addSalle,
-  modifySalle,
-  deleteSalle,
+await jest.unstable_mockModule("../src/model/salle.js", () => sallesModelMock);
+
+await jest.unstable_mockModule("../middlewares/auth.js", () => ({
+  userAuth(request, response, next) {
+    request.user = {
+      id: 1,
+      email: "admin@ecole.ca",
+      roles: ["ADMIN"],
+    };
+    next();
+  },
+  userNotAuth(request, response, next) {
+    next();
+  },
+  userAdmin(request, response, next) {
+    next();
+  },
+  userResponsable(request, response, next) {
+    next();
+  },
+  userAdminOrResponsable(request, response, next) {
+    next();
+  },
 }));
 
-const { default: sallesRoutes } = await import("../routes/salles.routes.js");
+const { default: app } = await import("../src/app.js");
 
-function createApp() {
-  const app = express();
-  app.use(express.json());
-  sallesRoutes(app);
-  return app;
-}
-
-describe("routes salles", () => {
+describe("Tests routes Salles", () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  it("GET /api/salles retourne 200", async () => {
-    getAllSalles.mockResolvedValue([{ id_salle: 1 }]);
-    const app = createApp();
+  test("GET /api/salles retourne 200 avec la liste", async () => {
+    sallesModelMock.getAllSalles.mockResolvedValue([
+      {
+        id_salle: 1,
+        code: "B201",
+        type: "Classe",
+        capacite: 30,
+      },
+    ]);
 
     const response = await request(app).get("/api/salles");
 
     expect(response.statusCode).toBe(200);
-    expect(response.body[0].id_salle).toBe(1);
+    expect(response.body).toHaveLength(1);
+    expect(sallesModelMock.getAllSalles).toHaveBeenCalledTimes(1);
   });
 
-  it("GET /api/salles/:id retourne 404 si salle absente", async () => {
-    getSalleById.mockResolvedValue(undefined);
-    const app = createApp();
-
-    const response = await request(app).get("/api/salles/1");
-
-    expect(response.statusCode).toBe(404);
-  });
-
-  it("GET /api/salles/:id retourne 200 si salle trouvée", async () => {
-    getSalleById.mockResolvedValue({ id_salle: 1, code: "A101" });
-    const app = createApp();
-
-    const response = await request(app).get("/api/salles/1");
-
-    expect(response.statusCode).toBe(200);
-    expect(response.body.code).toBe("A101");
-  });
-
-  it("POST /api/salles retourne 400 si code invalide", async () => {
-    const app = createApp();
-
-    const response = await request(app)
-      .post("/api/salles")
-      .send({ code: "", type: "LAB", capacite: 20 });
+  test("GET /api/salles/abc retourne 400 si l'identifiant est invalide", async () => {
+    const response = await request(app).get("/api/salles/abc");
 
     expect(response.statusCode).toBe(400);
+    expect(response.body).toEqual({ message: "Identifiant invalide." });
   });
 
-  it("POST /api/salles retourne 201 si succès", async () => {
-    addSalle.mockResolvedValue({});
-    const app = createApp();
+  test("GET /api/salles/1 retourne 200 si la salle existe", async () => {
+    const salle = {
+      id_salle: 1,
+      code: "B201",
+      type: "Classe",
+      capacite: 30,
+    };
 
-    const response = await request(app)
-      .post("/api/salles")
-      .send({ code: "A101", type: "LAB", capacite: 20 });
+    sallesModelMock.getSalleById.mockResolvedValue(salle);
+
+    const response = await request(app).get("/api/salles/1");
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toEqual(salle);
+  });
+
+  test("GET /api/salles/999 retourne 404 si la salle est introuvable", async () => {
+    sallesModelMock.getSalleById.mockResolvedValue(null);
+
+    const response = await request(app).get("/api/salles/999");
+
+    expect(response.statusCode).toBe(404);
+    expect(response.body).toEqual({ message: "Salle introuvable." });
+  });
+
+  test("POST /api/salles retourne 201 quand les donnees sont valides", async () => {
+    const salleAjoutee = {
+      id_salle: 3,
+      code: "LAB-01",
+      type: "Laboratoire",
+      capacite: 24,
+    };
+
+    sallesModelMock.getSalleByCode
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(salleAjoutee);
+    sallesModelMock.addSalle.mockResolvedValue({ insertId: 3 });
+
+    const response = await request(app).post("/api/salles").send({
+      code: "LAB-01",
+      type: "Laboratoire",
+      capacite: 24,
+    });
 
     expect(response.statusCode).toBe(201);
+    expect(response.body).toEqual(salleAjoutee);
+    expect(sallesModelMock.addSalle).toHaveBeenCalledWith(
+      "LAB-01",
+      "Laboratoire",
+      24
+    );
   });
 
-  it("POST /api/salles retourne 409 si doublon", async () => {
-    addSalle.mockRejectedValue({ code: "ER_DUP_ENTRY" });
-    const app = createApp();
+  test("POST /api/salles retourne 409 si le code existe deja", async () => {
+    sallesModelMock.getSalleByCode.mockResolvedValue({
+      id_salle: 1,
+      code: "B201",
+      type: "Classe",
+      capacite: 30,
+    });
 
-    const response = await request(app)
-      .post("/api/salles")
-      .send({ code: "A101", type: "LAB", capacite: 20 });
+    const response = await request(app).post("/api/salles").send({
+      code: "B201",
+      type: "Classe",
+      capacite: 40,
+    });
 
     expect(response.statusCode).toBe(409);
+    expect(response.body).toEqual({ message: "Code deja utilise." });
   });
 
-  it("PUT /api/salles/:id retourne 404 si salle absente", async () => {
-    getSalleById.mockResolvedValue(undefined);
-    const app = createApp();
+  test("PUT /api/salles/1 retourne 200 quand la modification est valide", async () => {
+    sallesModelMock.getSalleById
+      .mockResolvedValueOnce({
+        id_salle: 1,
+        code: "B201",
+        type: "Classe",
+        capacite: 30,
+      })
+      .mockResolvedValueOnce({
+        id_salle: 1,
+        code: "B201",
+        type: "Laboratoire",
+        capacite: 32,
+      });
+    sallesModelMock.modifySalle.mockResolvedValue(true);
 
-    const response = await request(app)
-      .put("/api/salles/1")
-      .send({ type: "LAB", capacite: 30 });
-
-    expect(response.statusCode).toBe(404);
-  });
-
-  it("PUT /api/salles/:id retourne 200 si succès", async () => {
-    getSalleById.mockResolvedValue({ id_salle: 1 });
-    modifySalle.mockResolvedValue({});
-    const app = createApp();
-
-    const response = await request(app)
-      .put("/api/salles/1")
-      .send({ type: "LAB", capacite: 30 });
+    const response = await request(app).put("/api/salles/1").send({
+      type: "Laboratoire",
+      capacite: 32,
+    });
 
     expect(response.statusCode).toBe(200);
+    expect(response.body).toEqual({
+      id_salle: 1,
+      code: "B201",
+      type: "Laboratoire",
+      capacite: 32,
+    });
   });
 
-  it("DELETE /api/salles/:id retourne 404 si salle absente", async () => {
-    getSalleById.mockResolvedValue(undefined);
-    const app = createApp();
+  test("PUT /api/salles/1 retourne 400 si aucun champ n'est fourni", async () => {
+    sallesModelMock.getSalleById.mockResolvedValue({
+      id_salle: 1,
+      code: "B201",
+      type: "Classe",
+      capacite: 30,
+    });
+
+    const response = await request(app).put("/api/salles/1").send({});
+
+    expect(response.statusCode).toBe(400);
+    expect(response.body).toEqual({ message: "Aucun champ a modifier." });
+  });
+
+  test("DELETE /api/salles/1 retourne 400 si la salle est deja affectee", async () => {
+    sallesModelMock.getSalleById.mockResolvedValue({
+      id_salle: 1,
+      code: "B201",
+      type: "Classe",
+      capacite: 30,
+    });
+    sallesModelMock.salleEstDejaAffectee.mockResolvedValue(true);
 
     const response = await request(app).delete("/api/salles/1");
 
-    expect(response.statusCode).toBe(404);
+    expect(response.statusCode).toBe(400);
+    expect(response.body).toEqual({
+      message: "Suppression impossible : salle deja affectee.",
+    });
   });
 
-  it("DELETE /api/salles/:id retourne 200 si succès", async () => {
-    getSalleById.mockResolvedValue({ id_salle: 1 });
-    deleteSalle.mockResolvedValue({});
-    const app = createApp();
+  test("DELETE /api/salles/1 retourne 200 quand la suppression est autorisee", async () => {
+    sallesModelMock.getSalleById.mockResolvedValue({
+      id_salle: 1,
+      code: "B201",
+      type: "Classe",
+      capacite: 30,
+    });
+    sallesModelMock.salleEstDejaAffectee.mockResolvedValue(false);
+    sallesModelMock.deleteSalle.mockResolvedValue(true);
 
     const response = await request(app).delete("/api/salles/1");
 
     expect(response.statusCode).toBe(200);
+    expect(response.body).toEqual({ message: "Salle supprimee." });
+    expect(sallesModelMock.deleteSalle).toHaveBeenCalledWith(1);
   });
 });
