@@ -1,3 +1,9 @@
+/**
+ * UTILS - Programmes
+ *
+ * Ce module fournit des helpers de normalisation
+ * et de comparaison des noms de programme.
+ */
 export const PROGRAMMES_OFFICIELS = {
   administration: "Techniques en administration des affaires",
   comptabilite: "Comptabilite et gestion",
@@ -21,29 +27,6 @@ export const PROGRAMMES_OFFICIELS = {
   design: "Design graphique",
   multimedia: "Production multimedia",
 };
-
-export const PROGRAMMES_REFERENCE = [
-  PROGRAMMES_OFFICIELS.administration,
-  PROGRAMMES_OFFICIELS.comptabilite,
-  PROGRAMMES_OFFICIELS.chaine,
-  PROGRAMMES_OFFICIELS.marketing,
-  PROGRAMMES_OFFICIELS.hotelier,
-  PROGRAMMES_OFFICIELS.restauration,
-  PROGRAMMES_OFFICIELS.juridique,
-  PROGRAMMES_OFFICIELS.enfance,
-  PROGRAMMES_OFFICIELS.social,
-  PROGRAMMES_OFFICIELS.soins,
-  PROGRAMMES_OFFICIELS.laboratoire,
-  PROGRAMMES_OFFICIELS.informatique,
-  PROGRAMMES_OFFICIELS.web,
-  PROGRAMMES_OFFICIELS.mobile,
-  PROGRAMMES_OFFICIELS.ia,
-  PROGRAMMES_OFFICIELS.donnees,
-  PROGRAMMES_OFFICIELS.reseautique,
-  PROGRAMMES_OFFICIELS.soutien,
-  PROGRAMMES_OFFICIELS.design,
-  PROGRAMMES_OFFICIELS.multimedia,
-];
 
 export function normaliserTexte(texte) {
   return String(texte || "")

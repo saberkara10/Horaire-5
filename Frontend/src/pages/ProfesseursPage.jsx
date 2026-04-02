@@ -1,5 +1,12 @@
+/**
+ * PAGE - Professeurs
+ *
+ * Cette page gere la consultation
+ * et la maintenance des professeurs.
+ */
 import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "../components/layout/AppShell.jsx";
+import { usePopup } from "../components/feedback/PopupProvider.jsx";
 import {
   recupererProfesseurs,
   creerProfesseur,
@@ -30,11 +37,11 @@ export function ProfesseursPage({ utilisateur, onLogout }) {
   const [programmes, setProgrammes] = useState([]);
   const [cours, setCours] = useState([]);
   const [chargement, setChargement] = useState(true);
-  const [erreur, setErreur] = useState("");
-  const [message, setMessage] = useState("");
+  const [erreurFormulaire, setErreurFormulaire] = useState("");
   const [recherche, setRecherche] = useState("");
   const [modalOuvert, setModalOuvert] = useState(false);
   const [edition, setEdition] = useState(null);
+  const { confirm, showError, showSuccess } = usePopup();
   const [formulaire, setFormulaire] = useState({
     matricule: "",
     prenom: "",
@@ -45,13 +52,12 @@ export function ProfesseursPage({ utilisateur, onLogout }) {
 
   async function chargerProfesseurs() {
     setChargement(true);
-    setErreur("");
 
     try {
       const data = await recupererProfesseurs();
       setProfesseurs(data || []);
     } catch (error) {
-      setErreur(error.message || "Impossible de charger les professeurs.");
+      showError(error.message || "Impossible de charger les professeurs.");
     } finally {
       setChargement(false);
     }
@@ -121,6 +127,7 @@ export function ProfesseursPage({ utilisateur, onLogout }) {
 
   function ouvrirModal(professeur = null) {
     setEdition(professeur);
+    setErreurFormulaire("");
 
     if (professeur) {
       setFormulaire({
@@ -140,14 +147,13 @@ export function ProfesseursPage({ utilisateur, onLogout }) {
       });
     }
 
-    setErreur("");
-    setMessage("");
     setModalOuvert(true);
   }
 
   function fermerModal() {
     setModalOuvert(false);
     setEdition(null);
+    setErreurFormulaire("");
     setFormulaire({
       matricule: "",
       prenom: "",
@@ -200,43 +206,42 @@ export function ProfesseursPage({ utilisateur, onLogout }) {
 
   async function handleSoumettre(event) {
     event.preventDefault();
-    setErreur("");
-    setMessage("");
+    setErreurFormulaire("");
 
     try {
       if (edition) {
         await modifierProfesseur(edition.id_professeur, formulaire);
-        setMessage("Professeur modifie avec succes.");
+        showSuccess("Professeur modifie avec succes.");
       } else {
         await creerProfesseur(formulaire);
-        setMessage("Professeur ajoute avec succes.");
+        showSuccess("Professeur ajoute avec succes.");
       }
 
       fermerModal();
       await Promise.all([chargerProfesseurs(), chargerProgrammes(), chargerCours()]);
     } catch (error) {
-      setErreur(error.message || "Erreur lors de la sauvegarde.");
+      setErreurFormulaire(error.message || "Erreur lors de la sauvegarde.");
     }
   }
 
   async function handleSupprimer(idProfesseur) {
-    const confirmation = window.confirm(
-      "Voulez-vous vraiment supprimer ce professeur ?"
-    );
+    const confirmation = await confirm({
+      title: "Supprimer le professeur",
+      message: "Voulez-vous vraiment supprimer ce professeur ?",
+      confirmLabel: "Supprimer",
+      tone: "danger",
+    });
 
     if (!confirmation) {
       return;
     }
 
-    setErreur("");
-    setMessage("");
-
     try {
       await supprimerProfesseur(idProfesseur);
-      setMessage("Professeur supprime avec succes.");
+      showSuccess("Professeur supprime avec succes.");
       await Promise.all([chargerProfesseurs(), chargerProgrammes(), chargerCours()]);
     } catch (error) {
-      setErreur(error.message || "Erreur lors de la suppression.");
+      showError(error.message || "Erreur lors de la suppression.");
     }
   }
 
@@ -267,13 +272,6 @@ export function ProfesseursPage({ utilisateur, onLogout }) {
             onChange={(event) => setRecherche(event.target.value)}
           />
         </div>
-
-        {erreur ? (
-          <div className="crud-page__alert crud-page__alert--error">{erreur}</div>
-        ) : null}
-        {message ? (
-          <div className="crud-page__alert crud-page__alert--success">{message}</div>
-        ) : null}
 
         <section className="crud-page__table-card">
           {chargement ? (
@@ -463,6 +461,12 @@ export function ProfesseursPage({ utilisateur, onLogout }) {
                     )}
                   </div>
                 </div>
+
+                {erreurFormulaire ? (
+                  <div className="crud-page__alert crud-page__alert--error crud-page__form-feedback">
+                    {erreurFormulaire}
+                  </div>
+                ) : null}
 
                 <div className="crud-page__modal-actions">
                   <button

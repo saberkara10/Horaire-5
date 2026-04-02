@@ -1,3 +1,9 @@
+/**
+ * TESTS - Modele Disponibilites Professeurs
+ *
+ * Ce fichier couvre la lecture et la mise a jour
+ * des disponibilites des professeurs.
+ */
 import { jest, describe, test, expect, beforeEach } from "@jest/globals";
 
 const queryMock = jest.fn();
@@ -34,6 +40,8 @@ describe("Model professeurs disponibilites", () => {
   test("recupererDisponibilitesProfesseur retourne les disponibilites du professeur", async () => {
     queryMock
       .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[]])
       .mockResolvedValueOnce([[
         {
           id_disponibilite_professeur: 1,
@@ -55,6 +63,8 @@ describe("Model professeurs disponibilites", () => {
 
   test("recupererDisponibilitesProfesseurs groupe les disponibilites par professeur", async () => {
     queryMock
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[]])
       .mockResolvedValueOnce([[]])
       .mockResolvedValueOnce([[
         {
@@ -86,10 +96,14 @@ describe("Model professeurs disponibilites", () => {
   test("remplacerDisponibilitesProfesseur remplace et normalise les heures", async () => {
     connectionMock.query
       .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[]])
       .mockResolvedValueOnce([{}])
       .mockResolvedValueOnce([{}]);
 
     queryMock
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[]])
       .mockResolvedValueOnce([[]])
       .mockResolvedValueOnce([[
         {
@@ -122,6 +136,8 @@ describe("Model professeurs disponibilites", () => {
   test("remplacerDisponibilitesProfesseur rollback si une insertion echoue", async () => {
     connectionMock.query
       .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[]])
       .mockResolvedValueOnce([{}])
       .mockRejectedValueOnce(new Error("DB error"));
 
@@ -138,4 +154,47 @@ describe("Model professeurs disponibilites", () => {
     expect(connectionMock.rollback).toHaveBeenCalledTimes(1);
     expect(connectionMock.release).toHaveBeenCalledTimes(1);
   });
+
+  test("remplacerDisponibilitesProfesseur conserve aussi les disponibilites du week-end", async () => {
+    connectionMock.query
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([{}])
+      .mockResolvedValueOnce([{}]);
+
+    queryMock
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[
+        {
+          id_disponibilite_professeur: 10,
+          id_professeur: 3,
+          jour_semaine: 7,
+          heure_debut: "13:00:00",
+          heure_fin: "15:00:00",
+        },
+      ]]);
+
+    const resultat = await remplacerDisponibilitesProfesseur(3, [
+      {
+        jour_semaine: 7,
+        heure_debut: "13:00",
+        heure_fin: "15:00",
+      },
+    ]);
+
+    expect(connectionMock.query).toHaveBeenCalledWith(
+      expect.stringContaining("INSERT INTO disponibilites_professeurs"),
+      [3, 7, "13:00:00", "15:00:00"]
+    );
+    expect(resultat[0].jour_semaine).toBe(7);
+  });
 });
+/**
+ * TESTS - Modele Disponibilites Professeurs
+ *
+ * Ce fichier couvre la lecture et la mise a jour
+ * des disponibilites des professeurs.
+ */

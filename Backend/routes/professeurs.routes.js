@@ -53,8 +53,8 @@ function validerDisponibilitesPayload(disponibilites) {
     const heureDebut = normaliserHeure(disponibilite?.heure_debut);
     const heureFin = normaliserHeure(disponibilite?.heure_fin);
 
-    if (!Number.isInteger(jourSemaine) || jourSemaine < 1 || jourSemaine > 5) {
-      return "Chaque disponibilite doit avoir un jour_semaine entre 1 et 5.";
+    if (!Number.isInteger(jourSemaine) || jourSemaine < 1 || jourSemaine > 7) {
+      return "Chaque disponibilite doit avoir un jour_semaine entre 1 et 7.";
     }
 
     if (!heureDebut || !heureFin) {

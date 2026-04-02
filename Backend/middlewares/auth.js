@@ -34,6 +34,11 @@ export function userNotAuth(request, response, next) {
     response.status(401).end();
 }
 
+function utilisateurPossedeUnRole(request, rolesAutorises) {
+    const roles = Array.isArray(request.user?.roles) ? request.user.roles : [];
+    return rolesAutorises.some((role) => roles.includes(role));
+}
+
 /**
  * Middleware qui valide que l'utilisateur possède le rôle ADMIN.
  * @param {import("express").Request} request Objet de requête HTTP.
@@ -41,7 +46,7 @@ export function userNotAuth(request, response, next) {
  * @param {import("express").NextFunction} next Fonction pour passer au prochain middleware.
  */
 export function userAdmin(request, response, next) {
-    if (request.user && request.user.roles.includes('ADMIN')) {
+    if (request.user && utilisateurPossedeUnRole(request, ['ADMIN', 'RESPONSABLE'])) {
         return next();
     }
 
@@ -55,7 +60,7 @@ export function userAdmin(request, response, next) {
  * @param {import("express").NextFunction} next Fonction pour passer au prochain middleware.
  */
 export function userResponsable(request, response, next) {
-    if (request.user && request.user.roles.includes('RESPONSABLE')) {
+    if (request.user && utilisateurPossedeUnRole(request, ['RESPONSABLE'])) {
         return next();
     }
 
@@ -69,9 +74,7 @@ export function userResponsable(request, response, next) {
  * @param {import("express").NextFunction} next Fonction pour passer au prochain middleware.
  */
 export function userAdminOrResponsable(request, response, next) {
-    const roles = Array.isArray(request.user?.roles) ? request.user.roles : [];
-
-    if (roles.includes("ADMIN") || roles.includes("RESPONSABLE")) {
+    if (utilisateurPossedeUnRole(request, ["ADMIN", "RESPONSABLE"])) {
         return next();
     }
 

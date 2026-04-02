@@ -1,3 +1,9 @@
+/**
+ * SERVICE - Dashboard API
+ *
+ * Ce service centralise les appels HTTP
+ * utilises par le dashboard.
+ */
 const API_BASE = "http://localhost:3000/api";
 
 export async function recupererStatistiques() {
@@ -25,3 +31,9 @@ export async function recupererStatistiques() {
     etudiants: 0,
   };
 }
+/**
+ * SERVICE - Dashboard API
+ *
+ * Ce service centralise les appels HTTP
+ * utilises par le dashboard.
+ */

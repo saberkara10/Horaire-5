@@ -1,3 +1,9 @@
+/**
+ * TESTS - Routes Professeurs
+ *
+ * Ce fichier couvre les principaux cas
+ * des routes de gestion des professeurs.
+ */
 import request from "supertest";
 import { jest, describe, test, expect, beforeEach } from "@jest/globals";
 
@@ -173,3 +179,9 @@ describe("Tests routes Professeurs", () => {
     expect(response.body.matricule).toBe("MAT999");
   });
 });
+/**
+ * TESTS - Routes Professeurs
+ *
+ * Ce fichier couvre les principaux cas
+ * des routes de gestion des professeurs.
+ */

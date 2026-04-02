@@ -1,3 +1,9 @@
+/**
+ * TESTS - Validations Cours
+ *
+ * Ce fichier couvre les validations
+ * appliquees aux donnees de cours.
+ */
 import { jest, describe, it, expect, beforeEach } from "@jest/globals";
 
 const recupererCoursParId = jest.fn();
@@ -258,3 +264,9 @@ describe("validations cours", () => {
     expect(next).toHaveBeenCalled();
   });
 });
+/**
+ * TESTS - Validations Cours
+ *
+ * Ce fichier couvre les validations
+ * appliquees aux donnees de cours.
+ */

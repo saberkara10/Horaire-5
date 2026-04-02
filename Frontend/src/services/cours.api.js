@@ -1,3 +1,9 @@
+/**
+ * SERVICE - Cours API
+ *
+ * Ce service centralise les appels HTTP
+ * lies aux cours.
+ */
 import { apiRequest } from "./api.js";
 
 const BASE_URL = "/api/cours";
@@ -27,3 +33,9 @@ export async function supprimerCours(id) {
     method: "DELETE",
   });
 }
+/**
+ * SERVICE - Cours API
+ *
+ * Ce service centralise les appels HTTP
+ * lies aux cours.
+ */

@@ -1,5 +1,5 @@
 /**
- * ROUTES - Module Étudiants
+ * ROUTES - Module Etudiants
  */
 
 import multer from "multer";
@@ -8,7 +8,7 @@ import {
   recupererTousLesEtudiants,
   recupererEtudiantParId,
   importerEtudiants,
-  recupererHoraireCompletEtudiant,
+  supprimerTousLesEtudiants,
 } from "../src/model/etudiants.model.js";
 
 const upload = multer({
@@ -36,7 +36,9 @@ function parserCsv(buffer) {
   return lignes.slice(1).map((ligne) => {
     const valeurs = ligne.split(",").map((v) => v.trim());
     const objet = {};
-    enTetes.forEach((entete, index) => { objet[entete] = valeurs[index] ?? ""; });
+    enTetes.forEach((entete, index) => {
+      objet[entete] = valeurs[index] ?? "";
+    });
     return objet;
   });
 }
@@ -50,7 +52,15 @@ function parserExcel(buffer) {
 }
 
 function verifierColonnesObligatoires(lignes) {
-  const colonnesObligatoires = ["matricule", "nom", "prenom", "groupe", "programme", "etape"];
+  const colonnesObligatoires = [
+    "matricule",
+    "nom",
+    "prenom",
+    "programme",
+    "etape",
+    "session",
+    "annee",
+  ];
   if (!lignes.length) return colonnesObligatoires;
   const colonnesDisponibles = Object.keys(lignes[0]).map((c) => c.trim().toLowerCase());
   return colonnesObligatoires.filter((c) => !colonnesDisponibles.includes(c));
@@ -61,15 +71,14 @@ function normaliserEtudiants(lignes) {
     matricule: String(ligne.matricule ?? "").trim(),
     nom: String(ligne.nom ?? "").trim(),
     prenom: String(ligne.prenom ?? "").trim(),
-    groupe: String(ligne.groupe ?? "").trim(),
     programme: String(ligne.programme ?? "").trim(),
     etape: Number(ligne.etape),
+    session: String(ligne.session ?? "").trim(),
+    annee: Number(ligne.annee),
   }));
 }
 
 export default function etudiantsRoutes(app) {
-
-  // GET /api/etudiants
   app.get("/api/etudiants", async (request, response) => {
     try {
       const etudiants = await recupererTousLesEtudiants();
@@ -79,24 +88,6 @@ export default function etudiantsRoutes(app) {
     }
   });
 
-  // GET /api/etudiants/:id/planning  <- DOIT ETRE AVANT /:id
-  app.get("/api/etudiants/:id/planning", async (request, response) => {
-    try {
-      const id = parseInt(request.params.id);
-      if (isNaN(id)) {
-        return response.status(400).json({ message: "ID invalide." });
-      }
-      const resultat = await recupererHoraireCompletEtudiant(id);
-      if (!resultat) {
-        return response.status(404).json({ message: "Etudiant introuvable." });
-      }
-      response.status(200).json(resultat);
-    } catch (error) {
-      response.status(500).json({ message: "Erreur lors de la recuperation du planning." });
-    }
-  });
-
-  // GET /api/etudiants/:id
   app.get("/api/etudiants/:id", async (request, response) => {
     try {
       const etudiant = await recupererEtudiantParId(Number(request.params.id));
@@ -109,7 +100,6 @@ export default function etudiantsRoutes(app) {
     }
   });
 
-  // POST /api/etudiants/import
   app.post("/api/etudiants/import", upload.single("fichier"), async (request, response) => {
     try {
       if (!request.file) {
@@ -139,6 +129,17 @@ export default function etudiantsRoutes(app) {
       response.status(200).json(resultat);
     } catch (error) {
       response.status(500).json({ message: error.message || "Erreur lors de l'import des etudiants." });
+    }
+  });
+
+  app.delete("/api/etudiants", async (request, response) => {
+    try {
+      await supprimerTousLesEtudiants();
+      response
+        .status(200)
+        .json({ message: "Tous les etudiants et groupes generes ont ete supprimes." });
+    } catch (error) {
+      response.status(500).json({ message: "Erreur lors de la suppression des etudiants." });
     }
   });
 }

@@ -1,3 +1,9 @@
+/**
+ * PAGE - Login
+ *
+ * Cette page gere l'authentification
+ * des utilisateurs de l'application.
+ */
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { loginUtilisateur } from "../services/auth.api.js";
@@ -96,6 +102,8 @@ export function LoginPage({ onLogin }) {
   return (
     <main className="login-page">
       <div className="login-page__background" />
+      <div className="login-page__glow login-page__glow--left" />
+      <div className="login-page__glow login-page__glow--right" />
 
       <section className="login-page__content">
         <section className="login-page__hero">
@@ -125,11 +133,24 @@ export function LoginPage({ onLogin }) {
               <span>Coordination des enseignants</span>
               <span>Suivi des groupes</span>
             </div>
+
+            <div className="login-page__hero-motion" aria-hidden="true">
+              <div className="login-page__hero-motion-surface" />
+              <div className="login-page__hero-motion-orbit login-page__hero-motion-orbit--one" />
+              <div className="login-page__hero-motion-orbit login-page__hero-motion-orbit--two" />
+              <div className="login-page__hero-motion-card login-page__hero-motion-card--top">
+                Session active
+              </div>
+              <div className="login-page__hero-motion-card login-page__hero-motion-card--bottom">
+                Cohortes organisees
+              </div>
+            </div>
           </div>
         </section>
 
         <div className="login-card">
           <div className="login-card__header">
+            <span className="login-card__eyebrow">Connexion securisee</span>
             <h2>Espace de connexion</h2>
             <p>Identifiez-vous pour acceder au tableau de bord.</p>
           </div>
@@ -218,6 +239,11 @@ export function LoginPage({ onLogin }) {
             </button>
 
             {error ? <p className="login-form__error">{error}</p> : null}
+
+            <p className="login-form__hint">
+              Utilisez votre compte administrateur ou responsable pour acceder
+              au portail.
+            </p>
           </form>
         </div>
       </section>

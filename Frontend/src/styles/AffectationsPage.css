@@ -16,23 +16,23 @@
 .affectations-page__stat-card {
   border: 1px solid var(--line);
   border-radius: 24px;
-  background: var(--panel);
-  backdrop-filter: blur(12px);
+  background: var(--panel-strong);
+  box-shadow: var(--shadow-card);
 }
 
 .affectations-page__hero-card {
   padding: 1.35rem;
   background:
-    radial-gradient(circle at top right, rgba(59, 130, 246, 0.16), transparent 28%),
-    linear-gradient(135deg, rgba(15, 23, 42, 0.92), rgba(24, 24, 82, 0.9));
+    radial-gradient(circle at top right, rgba(56, 189, 248, 0.16), transparent 28%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(243, 249, 255, 0.94));
 }
 
 .affectations-page__eyebrow {
   display: inline-flex;
   padding: 0.35rem 0.7rem;
   border-radius: 999px;
-  background: rgba(109, 92, 255, 0.16);
-  color: #c4b5fd;
+  background: rgba(107, 108, 246, 0.1);
+  color: #6159da;
   font-size: 0.78rem;
   font-weight: 800;
   letter-spacing: 0.06em;
@@ -42,7 +42,7 @@
 .affectations-page__hero-card h2 {
   margin: 0.9rem 0 0.5rem;
   font-size: clamp(1.6rem, 2.8vw, 2.2rem);
-  color: #ffffff;
+  color: var(--text);
 }
 
 .affectations-page__hero-card p {
@@ -60,13 +60,12 @@
 
 .affectations-page__stat-card {
   padding: 1.1rem;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
 }
 
 .affectations-page__stat-card strong {
   display: block;
   font-size: 2rem;
-  color: #ffffff;
+  color: var(--text);
 }
 
 .affectations-page__stat-card span {
@@ -95,7 +94,7 @@
 
 .affectations-page__panel-header h2 {
   margin: 0;
-  color: #ffffff;
+  color: var(--text);
 }
 
 .affectations-page__panel-header p {
@@ -104,7 +103,7 @@
 }
 
 .affectations-page__count {
-  color: #c4b5fd;
+  color: #6159da;
   font-weight: 800;
 }
 
@@ -123,6 +122,24 @@
   min-width: 0;
 }
 
+.affectations-page__cohort-preview {
+  display: grid;
+  gap: 0.35rem;
+  align-content: center;
+  padding: 0.95rem 1rem;
+  border-radius: 18px;
+  border: 1px solid rgba(178, 197, 217, 0.44);
+  background: rgba(248, 251, 255, 0.96);
+}
+
+.affectations-page__cohort-preview strong {
+  color: var(--text);
+}
+
+.affectations-page__cohort-preview small {
+  color: var(--muted);
+}
+
 .affectations-page__group-mode {
   display: grid;
   gap: 0.65rem;
@@ -131,18 +148,18 @@
 
 .affectations-page__group-mode > span {
   font-weight: 700;
-  color: #e2e8f0;
+  color: #355574;
 }
 
 .affectations-page__radio {
   display: inline-flex;
   align-items: center;
   gap: 0.6rem;
-  color: #e2e8f0;
+  color: #355574;
 }
 
 .affectations-page__radio input {
-  accent-color: #8b5cf6;
+  accent-color: #6b6cf6;
 }
 
 .affectations-page__actions {
@@ -164,12 +181,12 @@
   gap: 1rem;
   padding: 0.95rem 1rem;
   border-radius: 18px;
-  border: 1px solid rgba(148, 163, 184, 0.12);
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(178, 197, 217, 0.42);
+  background: rgba(248, 251, 255, 0.96);
 }
 
 .affectations-page__group-chip strong {
-  color: #ffffff;
+  color: var(--text);
 }
 
 .affectations-page__group-chip span {
@@ -177,21 +194,21 @@
 }
 
 .affectations-page__group-chip--active {
-  border-color: rgba(168, 85, 247, 0.45);
-  background: rgba(109, 92, 255, 0.14);
+  border-color: rgba(107, 108, 246, 0.42);
+  background: rgba(240, 241, 255, 0.92);
 }
 
 .affectations-page__issues {
   margin-top: 1rem;
   padding: 1rem;
   border-radius: 18px;
-  border: 1px solid rgba(248, 113, 113, 0.22);
-  background: rgba(127, 29, 29, 0.16);
+  border: 1px solid rgba(239, 68, 68, 0.18);
+  background: rgba(254, 242, 242, 0.96);
 }
 
 .affectations-page__issues h3 {
   margin: 0 0 0.8rem;
-  color: #fecaca;
+  color: #b42318;
 }
 
 .affectations-page__issues ul {
@@ -208,11 +225,11 @@
 }
 
 .affectations-page__issues strong {
-  color: #ffffff;
+  color: var(--text);
 }
 
 .affectations-page__issues span {
-  color: #fecaca;
+  color: #b42318;
 }
 
 .affectations-page__filters {

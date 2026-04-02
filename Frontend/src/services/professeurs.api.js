@@ -1,3 +1,9 @@
+/**
+ * SERVICE - Professeurs API
+ *
+ * Ce service centralise les appels HTTP
+ * lies aux professeurs.
+ */
 import { apiRequest } from "./api.js";
 
 const BASE_URL = "/api/professeurs";
@@ -55,3 +61,9 @@ export async function supprimerProfesseur(id) {
     method: "DELETE",
   });
 }
+/**
+ * SERVICE - Professeurs API
+ *
+ * Ce service centralise les appels HTTP
+ * lies aux professeurs.
+ */

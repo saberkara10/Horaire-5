@@ -20,8 +20,9 @@ import coursRoutes from "../routes/cours.routes.js";
 import horaireRoutes from "../routes/horaire.routes.js";
 import professeursRoutes from "../routes/professeurs.routes.js";
 import etudiantsRoutes from "../routes/etudiants.routes.js";
+import groupesRoutes from "../routes/groupes.routes.js";
+import adminsRoutes from "../routes/admins.routes.js";
 import pool from "../db.js";
-import { PROGRAMMES_REFERENCE } from "./utils/programmes.js";
 
 dotenv.config();
 
@@ -74,39 +75,15 @@ app.get("/api/test", (request, response) => {
   });
 });
 
-app.get("/api/groupes", async (request, response) => {
-  try {
-    const detailsDemandes = request.query.details === "1";
-    const [groupes] = detailsDemandes
-      ? await pool.query(
-          `SELECT ge.id_groupes_etudiants,
-                  ge.nom_groupe,
-                  e.programme,
-                  e.etape,
-                  COUNT(e.id_etudiant) AS effectif
-           FROM groupes_etudiants ge
-           LEFT JOIN etudiants e
-             ON e.id_groupes_etudiants = ge.id_groupes_etudiants
-           GROUP BY ge.id_groupes_etudiants, ge.nom_groupe, e.programme, e.etape
-           ORDER BY ge.nom_groupe ASC`
-        )
-      : await pool.query(
-          "SELECT id_groupes_etudiants, nom_groupe FROM groupes_etudiants ORDER BY nom_groupe ASC"
-        );
-
-    response.status(200).json(groupes);
-  } catch (error) {
-    response
-      .status(500)
-      .json({ message: "Erreur lors de la recuperation des groupes." });
-  }
-});
-
 app.get("/api/programmes", async (request, response) => {
   try {
     const [programmes] = await pool.query(
       `SELECT DISTINCT programme
        FROM (
+         SELECT nom_programme AS programme
+         FROM programmes_reference
+         WHERE nom_programme IS NOT NULL AND TRIM(nom_programme) <> ''
+         UNION
          SELECT programme
          FROM cours
          WHERE programme IS NOT NULL AND TRIM(programme) <> ''
@@ -122,14 +99,10 @@ app.get("/api/programmes", async (request, response) => {
        ORDER BY programme ASC`
     );
 
-    const programmesDisponibles = [
-      ...new Set([
-        ...PROGRAMMES_REFERENCE,
-        ...programmes
-          .map((programme) => String(programme.programme || "").trim())
-          .filter(Boolean),
-      ]),
-    ].sort((programmeA, programmeB) => programmeA.localeCompare(programmeB, "fr"));
+    const programmesDisponibles = programmes
+      .map((programme) => String(programme.programme || "").trim())
+      .filter(Boolean)
+      .sort((programmeA, programmeB) => programmeA.localeCompare(programmeB, "fr"));
 
     response.status(200).json(programmesDisponibles);
   } catch (error) {
@@ -145,6 +118,8 @@ coursRoutes(app);
 professeursRoutes(app);
 horaireRoutes(app);
 etudiantsRoutes(app);
+groupesRoutes(app);
+adminsRoutes(app);
 
 app.get("/admin-only", userAuth, userAdmin, (request, response) => {
   response.status(200).json({

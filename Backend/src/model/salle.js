@@ -1,3 +1,9 @@
+/**
+ * MODEL - Gestion des salles
+ *
+ * Ce module regroupe les operations de lecture,
+ * creation, modification et suppression des salles.
+ */
 import pool from "../../db.js";
 
 /**
@@ -109,3 +115,9 @@ export async function salleEstDejaAffectee(idSalle) {
 
     return lignes.length > 0;
 }
+/**
+ * MODEL - Gestion des salles
+ *
+ * Ce module regroupe les operations de lecture,
+ * creation, modification et suppression des salles.
+ */

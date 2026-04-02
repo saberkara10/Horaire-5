@@ -1,3 +1,9 @@
+/**
+ * TESTS - Modele Horaire
+ *
+ * Ce fichier couvre la generation,
+ * la compatibilite et les validations horaires.
+ */
 import { jest } from "@jest/globals";
 
 const queryMock = jest.fn();
@@ -141,6 +147,33 @@ describe("Tests modele Horaire", () => {
     expect(disponible).toBe(false);
   });
 
+  test("verifierDisponibiliteProfesseur retourne true pour une disponibilite du dimanche", async () => {
+    recupererDisponibilitesProfesseursMock.mockResolvedValue(
+      new Map([
+        [
+          2,
+          [
+            {
+              id_professeur: 2,
+              jour_semaine: 7,
+              heure_debut: "08:00:00",
+              heure_fin: "12:00:00",
+            },
+          ],
+        ],
+      ])
+    );
+
+    const disponible = await verifierDisponibiliteProfesseur(
+      2,
+      "2026-03-29",
+      "09:00",
+      "11:00"
+    );
+
+    expect(disponible).toBe(true);
+  });
+
   test("creerAffectationValidee rejette un professeur non compatible", async () => {
     queryMock
       .mockResolvedValueOnce([[
@@ -241,97 +274,230 @@ describe("Tests modele Horaire", () => {
     });
   });
 
-  test("genererHoraireAutomatiquement lie les groupes compatibles a l'affectation creee", async () => {
-    connectionMock.query
-      .mockResolvedValueOnce([[
-        {
-          id_cours: 1,
-          code: "INF101",
-          nom: "Programmation",
-          duree: 2,
-          programme: "Programmation informatique",
-          etape_etude: "1",
-          type_salle: "Laboratoire",
-          id_salle_reference: 3,
-        },
-      ]])
-      .mockResolvedValueOnce([[
-        {
-          id_professeur: 2,
-          matricule: "P-001",
-          nom: "Martin",
-          prenom: "Lea",
-          specialite: "Programmation informatique",
-        },
-      ]])
-      .mockResolvedValueOnce([[
-        {
-          id_salle: 3,
-          code: "LAB-01",
-          type: "Laboratoire",
-          capacite: 30,
-        },
-      ]])
-      .mockResolvedValueOnce([[
-        {
-          id_groupes_etudiants: 4,
-          nom_groupe: "A1",
-          programme: "Programmation informatique",
-          etape: 1,
-          effectif: 22,
-        },
-      ]])
-      .mockResolvedValueOnce([{}])
-      .mockResolvedValueOnce([{}])
-      .mockResolvedValueOnce([[]])
-      .mockResolvedValueOnce([[{ conflits: 0 }]])
-      .mockResolvedValueOnce([[{ conflits: 0 }]])
-      .mockResolvedValueOnce([[
-        {
-          id_cours: 1,
-          code: "INF101",
-          nom: "Programmation",
-          programme: "Programmation informatique",
-          type_salle: "Laboratoire",
-          id_salle_reference: 3,
-        },
-      ]])
-      .mockResolvedValueOnce([[
-        {
-          id_professeur: 2,
-          matricule: "P-001",
-          nom: "Martin",
-          prenom: "Lea",
-          specialite: "Programmation informatique",
-        },
-      ]])
-      .mockResolvedValueOnce([[
-        {
-          id_salle: 3,
-          code: "LAB-01",
-          type: "Laboratoire",
-          capacite: 30,
-        },
-      ]])
-      .mockResolvedValueOnce([[{ conflits: 0 }]])
-      .mockResolvedValueOnce([[{ conflits: 0 }]])
-      .mockResolvedValueOnce([{ insertId: 11 }])
-      .mockResolvedValueOnce([{ insertId: 22 }])
-      .mockResolvedValueOnce([{ insertId: 33 }]);
+  test("genererHoraireAutomatiquement cree un horaire groupe par groupe", async () => {
+    connectionMock.query.mockImplementation(async (sql) => {
+      if (sql.includes("FROM cours")) {
+        return [[
+          {
+            id_cours: 1,
+            code: "INF101",
+            nom: "Programmation",
+            duree: 2,
+            programme: "Programmation informatique",
+            etape_etude: "1",
+            type_salle: "Laboratoire",
+            id_salle_reference: 3,
+          },
+        ]];
+      }
+
+      if (sql.includes("FROM professeurs")) {
+        return [[
+          {
+            id_professeur: 2,
+            matricule: "P-001",
+            nom: "Martin",
+            prenom: "Lea",
+            specialite: "Programmation informatique",
+          },
+        ]];
+      }
+
+      if (sql.includes("FROM salles")) {
+        return [[
+          {
+            id_salle: 3,
+            code: "LAB-01",
+            type: "Laboratoire",
+            capacite: 30,
+          },
+        ]];
+      }
+
+      if (
+        sql.includes(
+          "SELECT id_etudiant, id_groupes_etudiants, programme, etape, session, annee"
+        )
+      ) {
+        return [[
+          {
+            id_etudiant: 10,
+            id_groupes_etudiants: null,
+            programme: "Programmation informatique",
+            etape: 1,
+            session: "Automne",
+            annee: 2026,
+          },
+        ]];
+      }
+
+      if (sql.includes("INSERT INTO groupes_etudiants")) {
+        return [{ insertId: 4 }];
+      }
+
+      if (sql.includes("UPDATE etudiants")) {
+        return [{ affectedRows: 1 }];
+      }
+
+      if (sql.includes("FROM affectation_groupes ag")) {
+        return [[{ conflits: 0 }]];
+      }
+
+      if (sql.includes("WHERE ac.id_professeur = ?")) {
+        return [[{ conflits: 0 }]];
+      }
+
+      if (sql.includes("WHERE ac.id_salle = ?")) {
+        return [[{ conflits: 0 }]];
+      }
+
+      if (sql.includes("INSERT INTO plages_horaires")) {
+        return [{ insertId: 11 }];
+      }
+
+      if (sql.includes("INSERT INTO affectation_cours")) {
+        return [{ insertId: 22 }];
+      }
+
+      if (sql.includes("INSERT INTO affectation_groupes")) {
+        return [{ insertId: 33 }];
+      }
+
+      return [[]];
+    });
 
     recupererDisponibilitesProfesseursMock.mockResolvedValue(new Map());
     recupererIndexCoursProfesseursMock.mockResolvedValue(
       new Map([[2, new Set([1])]])
     );
 
-    const resultat = await genererHoraireAutomatiquement();
+    const resultat = await genererHoraireAutomatiquement({
+      programme: "Programmation informatique",
+      etape: "1",
+      session: "Automne",
+      annee: 2026,
+    });
 
     expect(resultat.affectations).toHaveLength(1);
     expect(resultat.affectations[0]).toMatchObject({
       id_affectation_cours: 22,
-      groupes: "A1",
-      effectif: 22,
+      groupes: "Programmation informatique - E1 - Automne 2026 - G1",
+      effectif: 1,
     });
     expect(connectionMock.commit).toHaveBeenCalledTimes(1);
   });
+
+  test("genererHoraireAutomatiquement peut generer a partir d'un samedi", async () => {
+    connectionMock.query.mockImplementation(async (sql) => {
+      if (sql.includes("FROM cours")) {
+        return [[
+          {
+            id_cours: 1,
+            code: "INF101",
+            nom: "Programmation",
+            duree: 2,
+            programme: "Programmation informatique",
+            etape_etude: "1",
+            type_salle: "Laboratoire",
+            id_salle_reference: 3,
+          },
+        ]];
+      }
+
+      if (sql.includes("FROM professeurs")) {
+        return [[
+          {
+            id_professeur: 2,
+            matricule: "P-001",
+            nom: "Martin",
+            prenom: "Lea",
+            specialite: "Programmation informatique",
+          },
+        ]];
+      }
+
+      if (sql.includes("FROM salles")) {
+        return [[
+          {
+            id_salle: 3,
+            code: "LAB-01",
+            type: "Laboratoire",
+            capacite: 30,
+          },
+        ]];
+      }
+
+      if (
+        sql.includes(
+          "SELECT id_etudiant, id_groupes_etudiants, programme, etape, session, annee"
+        )
+      ) {
+        return [[
+          {
+            id_etudiant: 10,
+            id_groupes_etudiants: null,
+            programme: "Programmation informatique",
+            etape: 1,
+            session: "Automne",
+            annee: 2026,
+          },
+        ]];
+      }
+
+      if (sql.includes("INSERT INTO groupes_etudiants")) {
+        return [{ insertId: 4 }];
+      }
+
+      if (sql.includes("UPDATE etudiants")) {
+        return [{ affectedRows: 1 }];
+      }
+
+      if (sql.includes("FROM affectation_groupes ag")) {
+        return [[{ conflits: 0 }]];
+      }
+
+      if (sql.includes("WHERE ac.id_professeur = ?")) {
+        return [[{ conflits: 0 }]];
+      }
+
+      if (sql.includes("WHERE ac.id_salle = ?")) {
+        return [[{ conflits: 0 }]];
+      }
+
+      if (sql.includes("INSERT INTO plages_horaires")) {
+        return [{ insertId: 11 }];
+      }
+
+      if (sql.includes("INSERT INTO affectation_cours")) {
+        return [{ insertId: 22 }];
+      }
+
+      if (sql.includes("INSERT INTO affectation_groupes")) {
+        return [{ insertId: 33 }];
+      }
+
+      return [[]];
+    });
+
+    recupererDisponibilitesProfesseursMock.mockResolvedValue(new Map());
+    recupererIndexCoursProfesseursMock.mockResolvedValue(
+      new Map([[2, new Set([1])]])
+    );
+
+    const resultat = await genererHoraireAutomatiquement({
+      programme: "Programmation informatique",
+      etape: "1",
+      session: "Automne",
+      annee: 2026,
+      dateDebut: "2026-03-28",
+    });
+
+    expect(resultat.affectations[0].date).toBe("2026-03-28");
+  });
 });
+/**
+ * TESTS - Modele Horaire
+ *
+ * Ce fichier couvre la generation,
+ * la compatibilite et les validations horaires.
+ */

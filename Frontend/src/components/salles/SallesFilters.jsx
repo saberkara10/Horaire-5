@@ -1,3 +1,9 @@
+/**
+ * COMPONENT - Salles Filters
+ *
+ * Ce composant gere les filtres
+ * appliques a la liste des salles.
+ */
 import { RefreshCw, Search } from "lucide-react";
 
 
@@ -49,3 +55,9 @@ export function SallesFilters({
     </div>
   );
 }
+/**
+ * COMPONENT - Salles Filters
+ *
+ * Ce composant gere les filtres
+ * appliques a la liste des salles.
+ */

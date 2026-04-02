@@ -1,3 +1,9 @@
+/**
+ * TESTS - Routes Cours
+ *
+ * Ce fichier couvre les principaux cas
+ * des routes de gestion des cours.
+ */
 import request from "supertest";
 import { jest, describe, test, expect, beforeEach, afterEach } from "@jest/globals";
 
@@ -150,3 +156,9 @@ describe("Tests routes Cours", () => {
     expect(response.body.message).toBe("Cours supprimé.");
   });
 });
+/**
+ * TESTS - Routes Cours
+ *
+ * Ce fichier couvre les principaux cas
+ * des routes de gestion des cours.
+ */

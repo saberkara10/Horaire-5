@@ -1,3 +1,9 @@
+/**
+ * COMPONENT - Salles Hero
+ *
+ * Ce composant affiche l'en-tete visuel
+ * de la page des salles.
+ */
 import { Plus } from "lucide-react";
 
 export function SallesHero({ statistiques, onAjouter, surChargement }) {
@@ -31,3 +37,9 @@ export function SallesHero({ statistiques, onAjouter, surChargement }) {
     </div>
   );
 }
+/**
+ * COMPONENT - Salles Hero
+ *
+ * Ce composant affiche l'en-tete visuel
+ * de la page des salles.
+ */

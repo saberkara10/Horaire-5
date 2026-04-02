@@ -1,3 +1,9 @@
+/**
+ * COMPONENT - Salle Form Modal
+ *
+ * Ce composant affiche le formulaire modal
+ * de creation et modification des salles.
+ */
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 
@@ -119,3 +125,9 @@ export function SalleFormModal({
     </div>
   );
 }
+/**
+ * COMPONENT - Salle Form Modal
+ *
+ * Ce composant affiche le formulaire modal
+ * de creation et modification des salles.
+ */

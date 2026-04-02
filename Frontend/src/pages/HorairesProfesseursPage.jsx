@@ -1,19 +1,26 @@
+/**
+ * PAGE - Horaires Professeurs
+ *
+ * Cette page affiche le planning
+ * detaille des professeurs.
+ */
 import { useEffect, useMemo, useState } from "react";
+import { motion } from "framer-motion";
 import { AppShell } from "../components/layout/AppShell.jsx";
 import {
   recupererProfesseurs,
   recupererHoraireProfesseur,
 } from "../services/professeurs.api.js";
+import {
+  JOURS_SEMAINE_COMPLETS,
+  creerDateLocale,
+  formaterDateCourte,
+  getDebutSemaine,
+  getIndexJourCalendrier,
+} from "../utils/calendar.js";
+import { usePopup } from "../components/feedback/PopupProvider.jsx";
 import "../styles/ProfesseursPage.css";
 import "../styles/HorairesProfesseursPage.css";
-
-const JOURS_SEMAINE = [
-  { value: 1, label: "Lundi" },
-  { value: 2, label: "Mardi" },
-  { value: 3, label: "Mercredi" },
-  { value: 4, label: "Jeudi" },
-  { value: 5, label: "Vendredi" },
-];
 
 const HEURES = Array.from({ length: 15 }, (_, index) =>
   `${String(index + 8).padStart(2, "0")}:00`
@@ -26,24 +33,6 @@ function normaliserHeure(heure) {
 function heureEnMinutes(heure) {
   const [heures = "0", minutes = "0"] = normaliserHeure(heure).split(":");
   return Number(heures) * 60 + Number(minutes);
-}
-
-function creerDateLocale(dateString) {
-  const [annee, mois, jour] = String(dateString || "").split("-").map(Number);
-  return new Date(annee || 1970, (mois || 1) - 1, jour || 1);
-}
-
-function getDebutSemaine(date) {
-  const dateReference = new Date(date);
-  const jour = dateReference.getDay();
-  const diff = jour === 0 ? -6 : 1 - jour;
-  dateReference.setDate(dateReference.getDate() + diff);
-  dateReference.setHours(0, 0, 0, 0);
-  return dateReference;
-}
-
-function formaterDateCourte(date) {
-  return date.toLocaleDateString("fr-CA", { day: "numeric", month: "short" });
 }
 
 function formaterDateLongue(dateString) {
@@ -60,11 +49,7 @@ function getSeancesParJourEtHeure(seances, lundiSemaine) {
 
   seances.forEach((seance) => {
     const dateSeance = creerDateLocale(seance.date);
-    const jourIndex = dateSeance.getDay() - 1;
-
-    if (jourIndex < 0 || jourIndex > 4) {
-      return;
-    }
+    const jourIndex = getIndexJourCalendrier(dateSeance);
 
     const lundiSeance = getDebutSemaine(dateSeance);
     if (lundiSeance.getTime() !== lundiSemaine.getTime()) {
@@ -95,7 +80,7 @@ export function HorairesProfesseursPage({ utilisateur, onLogout }) {
   const [horaireProfesseur, setHoraireProfesseur] = useState([]);
   const [chargement, setChargement] = useState(true);
   const [chargementHoraire, setChargementHoraire] = useState(false);
-  const [erreur, setErreur] = useState("");
+  const { showError } = usePopup();
   const [recherche, setRecherche] = useState("");
   const [idProfesseurActif, setIdProfesseurActif] = useState(null);
   const [lundiCourant, setLundiCourant] = useState(() =>
@@ -105,7 +90,6 @@ export function HorairesProfesseursPage({ utilisateur, onLogout }) {
   useEffect(() => {
     async function chargerProfesseurs() {
       setChargement(true);
-      setErreur("");
 
       try {
         const data = await recupererProfesseurs();
@@ -113,7 +97,7 @@ export function HorairesProfesseursPage({ utilisateur, onLogout }) {
         setProfesseurs(liste);
         setIdProfesseurActif(liste[0]?.id_professeur || null);
       } catch (error) {
-        setErreur(error.message || "Impossible de charger les professeurs.");
+        showError(error.message || "Impossible de charger les professeurs.");
       } finally {
         setChargement(false);
       }
@@ -130,13 +114,12 @@ export function HorairesProfesseursPage({ utilisateur, onLogout }) {
       }
 
       setChargementHoraire(true);
-      setErreur("");
 
       try {
         const data = await recupererHoraireProfesseur(idProfesseurActif);
         setHoraireProfesseur(Array.isArray(data) ? data : []);
       } catch (error) {
-        setErreur(error.message || "Impossible de charger l'horaire du professeur.");
+        showError(error.message || "Impossible de charger l'horaire du professeur.");
       } finally {
         setChargementHoraire(false);
       }
@@ -173,15 +156,15 @@ export function HorairesProfesseursPage({ utilisateur, onLogout }) {
     [professeurs, idProfesseurActif]
   );
 
-  const vendrediCourant = useMemo(() => {
+  const finSemaineCourante = useMemo(() => {
     const date = new Date(lundiCourant);
-    date.setDate(date.getDate() + 4);
+    date.setDate(date.getDate() + 6);
     return date;
   }, [lundiCourant]);
 
   const joursAvecDates = useMemo(
     () =>
-      JOURS_SEMAINE.map((jour, index) => {
+      JOURS_SEMAINE_COMPLETS.map((jour, index) => {
         const date = new Date(lundiCourant);
         date.setDate(date.getDate() + index);
         return { ...jour, date };
@@ -201,13 +184,19 @@ export function HorairesProfesseursPage({ utilisateur, onLogout }) {
       title="Horaires professeurs"
       subtitle="Recherchez un enseignant puis consultez son planning de travail."
     >
-      <div className="horaires-professeurs-page">
-        {erreur ? (
-          <div className="crud-page__alert crud-page__alert--error">{erreur}</div>
-        ) : null}
-
+      <motion.div
+        className="horaires-professeurs-page"
+        initial={{ opacity: 0, y: 18 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35, ease: "easeOut" }}
+      >
         <section className="horaires-professeurs-page__workspace">
-          <aside className="horaires-professeurs-page__sidebar">
+          <motion.aside
+            className="horaires-professeurs-page__sidebar"
+            initial={{ opacity: 0, x: -18 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.35, delay: 0.05, ease: "easeOut" }}
+          >
             <div className="horaires-professeurs-page__sidebar-header">
               <h2>Recherche professeur</h2>
               <p>Filtrez par nom, matricule ou programme.</p>
@@ -228,7 +217,7 @@ export function HorairesProfesseursPage({ utilisateur, onLogout }) {
                 <p className="crud-page__state">Aucun professeur trouve.</p>
               ) : (
                 professeursFiltres.map((professeur) => (
-                  <button
+                  <motion.button
                     key={professeur.id_professeur}
                     type="button"
                     className={`horaires-professeurs-page__teacher-card ${
@@ -237,20 +226,31 @@ export function HorairesProfesseursPage({ utilisateur, onLogout }) {
                         : ""
                     }`}
                     onClick={() => setIdProfesseurActif(professeur.id_professeur)}
+                    whileHover={{ y: -3, scale: 1.01 }}
+                    whileTap={{ scale: 0.985 }}
                   >
                     <strong>
                       {professeur.prenom} {professeur.nom}
                     </strong>
                     <span>{professeur.matricule}</span>
                     <small>{professeur.specialite || "Sans programme"}</small>
-                  </button>
+                  </motion.button>
                 ))
               )}
             </div>
-          </aside>
+          </motion.aside>
 
-          <section className="horaires-professeurs-page__content">
-            <div className="professeurs-page__panel">
+          <motion.section
+            className="horaires-professeurs-page__content"
+            initial={{ opacity: 0, x: 18 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.35, delay: 0.08, ease: "easeOut" }}
+          >
+            <motion.div
+              className="professeurs-page__panel"
+              whileHover={{ y: -2 }}
+              transition={{ duration: 0.2 }}
+            >
               <div className="professeurs-page__panel-header">
                 <div>
                   <h2>Planning enseignant</h2>
@@ -265,7 +265,7 @@ export function HorairesProfesseursPage({ utilisateur, onLogout }) {
               {professeurActif ? (
                 <>
                   <div className="professeurs-page__calendar-nav">
-                    <button
+                    <motion.button
                       type="button"
                       className="professeurs-page__calendar-btn"
                       onClick={() => {
@@ -273,13 +273,15 @@ export function HorairesProfesseursPage({ utilisateur, onLogout }) {
                         date.setDate(date.getDate() - 7);
                         setLundiCourant(date);
                       }}
+                      whileHover={{ y: -2 }}
+                      whileTap={{ scale: 0.96 }}
                     >
                       &larr;
-                    </button>
+                    </motion.button>
                     <span className="professeurs-page__calendar-title">
-                      {formaterDateCourte(lundiCourant)} - {formaterDateCourte(vendrediCourant)}
+                      {formaterDateCourte(lundiCourant)} - {formaterDateCourte(finSemaineCourante)}
                     </span>
-                    <button
+                    <motion.button
                       type="button"
                       className="professeurs-page__calendar-btn"
                       onClick={() => {
@@ -287,16 +289,20 @@ export function HorairesProfesseursPage({ utilisateur, onLogout }) {
                         date.setDate(date.getDate() + 7);
                         setLundiCourant(date);
                       }}
+                      whileHover={{ y: -2 }}
+                      whileTap={{ scale: 0.96 }}
                     >
                       &rarr;
-                    </button>
-                    <button
+                    </motion.button>
+                    <motion.button
                       type="button"
                       className="professeurs-page__calendar-today"
                       onClick={() => setLundiCourant(getDebutSemaine(new Date()))}
+                      whileHover={{ y: -2 }}
+                      whileTap={{ scale: 0.97 }}
                     >
                       Semaine actuelle
-                    </button>
+                    </motion.button>
                   </div>
 
                   {chargementHoraire ? (
@@ -338,10 +344,12 @@ export function HorairesProfesseursPage({ utilisateur, onLogout }) {
                                     const top = ((debut - heureRef) / 60) * 60;
 
                                     return (
-                                      <div
+                                      <motion.div
                                         key={seance.id_affectation_cours}
                                         className="professeurs-page__session"
                                         style={{ top: `${top}px`, height: `${hauteur}px` }}
+                                        whileHover={{ scale: 1.015 }}
+                                        transition={{ duration: 0.15 }}
                                       >
                                         <strong>{seance.code_cours}</strong>
                                         <span>{seance.nom_cours}</span>
@@ -351,7 +359,7 @@ export function HorairesProfesseursPage({ utilisateur, onLogout }) {
                                           {normaliserHeure(seance.heure_debut)} -{" "}
                                           {normaliserHeure(seance.heure_fin)}
                                         </small>
-                                      </div>
+                                      </motion.div>
                                     );
                                   });
                                 })}
@@ -407,10 +415,10 @@ export function HorairesProfesseursPage({ utilisateur, onLogout }) {
                   Selectionnez un professeur depuis la colonne de gauche.
                 </p>
               )}
-            </div>
-          </section>
+            </motion.div>
+          </motion.section>
         </section>
-      </div>
+      </motion.div>
     </AppShell>
   );
 }

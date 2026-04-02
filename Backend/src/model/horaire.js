@@ -1,3 +1,9 @@
+/**
+ * MODEL - Gestion des horaires
+ *
+ * Ce module centralise la generation,
+ * la validation et la gestion des affectations.
+ */
 import pool from "../../db.js";
 import {
   recupererDisponibilitesProfesseurs,
@@ -7,9 +13,15 @@ import {
   normaliserNomProgramme,
   programmesCorrespondent,
 } from "../utils/programmes.js";
+import {
+  anneeSessionValide,
+  normaliserNomSession,
+  sessionsCorrespondent,
+} from "../utils/sessions.js";
 
 const CRENEAUX_DEBUT = ["08:00:00", "10:00:00", "13:00:00", "15:00:00"];
 const NOMBRE_JOURS_GENERATION = 10;
+const CAPACITE_MAX_GROUPE = 25;
 
 function normaliserHeure(heure) {
   const valeur = String(heure || "").trim();
@@ -174,6 +186,29 @@ function totaliserEffectifGroupes(groupes) {
   );
 }
 
+function repartirEffectifEquitablement(effectifTotal, capaciteMaximale = CAPACITE_MAX_GROUPE) {
+  if (effectifTotal <= 0) {
+    return [];
+  }
+
+  const nombreGroupes = Math.max(1, Math.ceil(effectifTotal / capaciteMaximale));
+  const base = Math.floor(effectifTotal / nombreGroupes);
+  const reste = effectifTotal % nombreGroupes;
+
+  return Array.from({ length: nombreGroupes }, (_, index) =>
+    base + (index < reste ? 1 : 0)
+  );
+}
+
+function construireNomGroupeAutomatique(programme, etape, session, annee, index) {
+  const programmeNettoye = String(programme || "Programme")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 70);
+
+  return `${programmeNettoye} - E${etape} - ${session} ${annee} - G${index}`;
+}
+
 function trierSallesCompatibles(cours, salles, capaciteMinimale = 0) {
   const idSalleReference = Number(cours.id_salle_reference);
   const typeSalleCours = normaliserTexte(cours.type_salle);
@@ -211,22 +246,15 @@ function trierSallesCompatibles(cours, salles, capaciteMinimale = 0) {
     });
 }
 
-function genererJoursOuvrables(nombreJours, dateDebut = null) {
+function genererJoursCalendaires(nombreJours, dateDebut = null) {
   const jours = [];
   const dateCourante = dateDebut
     ? new Date(`${dateDebut}T00:00:00`)
     : new Date();
   dateCourante.setHours(0, 0, 0, 0);
 
-  while (dateCourante.getDay() === 0 || dateCourante.getDay() === 6) {
-    dateCourante.setDate(dateCourante.getDate() + 1);
-  }
-
   while (jours.length < nombreJours) {
-    if (dateCourante.getDay() !== 0 && dateCourante.getDay() !== 6) {
-      jours.push(dateCourante.toISOString().slice(0, 10));
-    }
-
+    jours.push(dateCourante.toISOString().slice(0, 10));
     dateCourante.setDate(dateCourante.getDate() + 1);
   }
 
@@ -237,11 +265,7 @@ function convertirDateEnJourSemaine(date) {
   const dateReference = new Date(`${date}T00:00:00`);
   const jour = dateReference.getDay();
 
-  if (jour === 0 || jour === 6) {
-    return 0;
-  }
-
-  return jour;
+  return jour === 0 ? 7 : jour;
 }
 
 function professeurEstDisponible(
@@ -589,6 +613,134 @@ async function deleteAffectationsPourGroupes(idsGroupes, executor = pool) {
   );
 }
 
+async function supprimerGroupesCohorte(
+  programmeCible,
+  etapeCible,
+  sessionCible,
+  anneeCible,
+  executor = pool
+) {
+  const [etudiantsCohorte] = await executor.query(
+    `SELECT id_etudiant, id_groupes_etudiants, programme, etape, session, annee
+     FROM etudiants
+     ORDER BY matricule ASC`
+  );
+
+  const etudiantsSelectionnes = etudiantsCohorte.filter(
+    (etudiant) =>
+      programmesCorrespondent(etudiant.programme, programmeCible) &&
+      etapesCorrespondent(etudiant.etape, etapeCible) &&
+      sessionsCorrespondent(etudiant.session, sessionCible) &&
+      Number(etudiant.annee) === Number(anneeCible)
+  );
+
+  const idsGroupes = [
+    ...new Set(
+      etudiantsSelectionnes
+        .map((etudiant) => Number(etudiant.id_groupes_etudiants))
+        .filter((idGroupe) => Number.isInteger(idGroupe) && idGroupe > 0)
+    ),
+  ];
+
+  if (idsGroupes.length > 0) {
+    await deleteAffectationsPourGroupes(idsGroupes, executor);
+
+    const placeholders = idsGroupes.map(() => "?").join(", ");
+
+    await executor.query(
+      `UPDATE etudiants
+       SET id_groupes_etudiants = NULL
+       WHERE id_groupes_etudiants IN (${placeholders})`,
+      idsGroupes
+    );
+
+    await executor.query(
+      `DELETE FROM groupes_etudiants
+       WHERE id_groupes_etudiants IN (${placeholders})`,
+      idsGroupes
+    );
+  }
+
+  return etudiantsSelectionnes.map((etudiant) => ({
+    ...etudiant,
+    id_groupes_etudiants: null,
+  }));
+}
+
+async function creerGroupesAutomatiquesPourCohorte(
+  programmeCible,
+  etapeCible,
+  sessionCible,
+  anneeCible,
+  programmeAffichage,
+  sessionAffichage,
+  executor = pool
+) {
+  const etudiantsSelectionnes = await supprimerGroupesCohorte(
+    programmeCible,
+    etapeCible,
+    sessionCible,
+    anneeCible,
+    executor
+  );
+
+  if (etudiantsSelectionnes.length === 0) {
+    throw creerErreurHoraire(
+      "Aucun etudiant ne correspond a ce programme, cette etape, cette session et cette annee.",
+      400
+    );
+  }
+
+  const taillesGroupes = repartirEffectifEquitablement(etudiantsSelectionnes.length);
+  const groupes = [];
+  let positionCourante = 0;
+
+  for (let index = 0; index < taillesGroupes.length; index += 1) {
+    const tailleGroupe = taillesGroupes[index];
+    const nomGroupe = construireNomGroupeAutomatique(
+      programmeAffichage,
+      etapeCible,
+      sessionAffichage,
+      anneeCible,
+      index + 1
+    );
+    const [resultatGroupe] = await executor.query(
+      `INSERT INTO groupes_etudiants (nom_groupe)
+       VALUES (?)`,
+      [nomGroupe]
+    );
+    const etudiantsDuGroupe = etudiantsSelectionnes.slice(
+      positionCourante,
+      positionCourante + tailleGroupe
+    );
+    positionCourante += tailleGroupe;
+
+    if (etudiantsDuGroupe.length > 0) {
+      const idsEtudiants = etudiantsDuGroupe.map((etudiant) => etudiant.id_etudiant);
+      const placeholders = idsEtudiants.map(() => "?").join(", ");
+
+      await executor.query(
+        `UPDATE etudiants
+         SET id_groupes_etudiants = ?
+         WHERE id_etudiant IN (${placeholders})`,
+        [resultatGroupe.insertId, ...idsEtudiants]
+      );
+    }
+
+    groupes.push({
+      id_groupes_etudiants: resultatGroupe.insertId,
+      nom_groupe: nomGroupe,
+      programme: programmeAffichage,
+      etape: etapeCible,
+      session: sessionAffichage,
+      annee: anneeCible,
+      effectif: etudiantsDuGroupe.length,
+    });
+  }
+
+  return groupes;
+}
+
 /**
  * Assigne un groupe d'etudiants a une affectation de cours.
  * @param {number} idGroupeEtudiants L'identifiant du groupe.
@@ -608,6 +760,48 @@ export async function addAffectationGroupe(
   );
 
   return result;
+}
+
+/**
+ * Verifie les conflits de groupe pour un creneau.
+ * @param {number} idGroupeEtudiants L'identifiant du groupe.
+ * @param {string} date La date du creneau.
+ * @param {string} heureDebut L'heure de debut.
+ * @param {string} heureFin L'heure de fin.
+ * @param {number|null} idAffectationExclue Affectation a ignorer.
+ * @param {import("mysql2/promise").Pool | import("mysql2/promise").PoolConnection} executor
+ * @returns {Promise<number>} Le nombre de conflits.
+ */
+export async function verifierConflitGroupe(
+  idGroupeEtudiants,
+  date,
+  heureDebut,
+  heureFin,
+  idAffectationExclue = null,
+  executor = pool
+) {
+  const filtreExclusion = construireFiltreAffectationExclue(idAffectationExclue);
+  const [rows] = await executor.query(
+    `SELECT COUNT(*) AS conflits
+     FROM affectation_groupes ag
+     JOIN affectation_cours ac
+       ON ac.id_affectation_cours = ag.id_affectation_cours
+     JOIN plages_horaires ph
+       ON ph.id_plage_horaires = ac.id_plage_horaires
+     WHERE ag.id_groupes_etudiants = ?
+       AND ph.date = ?
+       AND ph.heure_debut < ?
+       AND ph.heure_fin > ?${filtreExclusion.clause};`,
+    [
+      idGroupeEtudiants,
+      date,
+      normaliserHeure(heureFin),
+      normaliserHeure(heureDebut),
+      ...filtreExclusion.valeurs,
+    ]
+  );
+
+  return rows[0].conflits;
 }
 
 /**
@@ -890,6 +1084,28 @@ export async function updateAffectationValidee(
     throw creerErreurHoraire("Professeur deja assigne sur ce creneau.", 409);
   }
 
+  const [groupesAssocies] = await executor.query(
+    `SELECT id_groupes_etudiants
+     FROM affectation_groupes
+     WHERE id_affectation_cours = ?`,
+    [idAffectationNumerique]
+  );
+
+  for (const groupe of groupesAssocies) {
+    const conflitGroupe = await verifierConflitGroupe(
+      groupe.id_groupes_etudiants,
+      date,
+      heureDebut,
+      heureFin,
+      idAffectationNumerique,
+      executor
+    );
+
+    if (conflitGroupe > 0) {
+      throw creerErreurHoraire("Un groupe lie a cette affectation est deja occupe.", 409);
+    }
+  }
+
   await executor.query(
     `UPDATE plages_horaires
      SET date = ?, heure_debut = ?, heure_fin = ?
@@ -925,11 +1141,18 @@ export async function genererHoraireAutomatiquement(options = {}) {
 
     const programmeCible = normaliserNomProgramme(options.programme);
     const etapeCible = normaliserEtape(options.etape);
-    const idGroupeCible =
-      Number.isInteger(Number(options.idGroupe)) && Number(options.idGroupe) > 0
-        ? Number(options.idGroupe)
-        : null;
+    const sessionCible = normaliserNomSession(options.session);
+    const anneeCible = Number(options.annee);
+    const programmeAffichage = String(options.programme || "").trim();
+    const sessionAffichage = normaliserNomSession(options.session);
     const dateDebut = String(options.dateDebut || "").trim() || null;
+
+    if (!programmeCible || !etapeCible || !sessionCible || !anneeSessionValide(anneeCible)) {
+      throw creerErreurHoraire(
+        "Le programme, l'etape, la session et l'annee sont obligatoires pour generer l'horaire.",
+        400
+      );
+    }
 
     const [cours] = await connection.query(
       `SELECT id_cours,
@@ -954,18 +1177,6 @@ export async function genererHoraireAutomatiquement(options = {}) {
        FROM salles
        ORDER BY code ASC;`
     );
-    const [groupes] = await connection.query(
-      `SELECT ge.id_groupes_etudiants,
-              ge.nom_groupe,
-              e.programme,
-              e.etape,
-              COUNT(e.id_etudiant) AS effectif
-       FROM groupes_etudiants ge
-       JOIN etudiants e
-         ON e.id_groupes_etudiants = ge.id_groupes_etudiants
-       GROUP BY ge.id_groupes_etudiants, ge.nom_groupe, e.programme, e.etape
-       ORDER BY ge.nom_groupe ASC;`
-    );
 
     if (cours.length === 0 || professeurs.length === 0 || salles.length === 0) {
       throw creerErreurHoraire(
@@ -977,60 +1188,36 @@ export async function genererHoraireAutomatiquement(options = {}) {
     const disponibilitesParProfesseur =
       await recupererDisponibilitesProfesseurs(connection);
     const coursParProfesseur = await recupererIndexCoursProfesseurs(connection);
-    const groupesSelectionnes = groupes.filter((groupe) => {
-      if (programmeCible && !programmesCorrespondent(groupe.programme, programmeCible)) {
-        return false;
-      }
-
-      if (etapeCible && !etapesCorrespondent(etapeCible, groupe.etape)) {
-        return false;
-      }
-
-      if (idGroupeCible && Number(groupe.id_groupes_etudiants) !== idGroupeCible) {
-        return false;
-      }
-
-      return true;
-    });
-
-    if (programmeCible && etapeCible && groupesSelectionnes.length === 0) {
-      throw creerErreurHoraire(
-        "Aucun groupe ne correspond a ce programme et cette etape.",
-        400
-      );
-    }
+    const groupesSelectionnes = await creerGroupesAutomatiquesPourCohorte(
+      programmeCible,
+      etapeCible,
+      sessionCible,
+      anneeCible,
+      programmeAffichage || options.programme || "Programme",
+      sessionAffichage || options.session || "",
+      connection
+    );
 
     const coursSelectionnes = cours.filter((coursActuel) => {
-      if (programmeCible && !programmesCorrespondent(coursActuel.programme, programmeCible)) {
+      if (!programmesCorrespondent(coursActuel.programme, programmeCible)) {
         return false;
       }
 
-      if (etapeCible && !etapesCorrespondent(coursActuel.etape_etude, etapeCible)) {
+      if (!etapesCorrespondent(coursActuel.etape_etude, etapeCible)) {
         return false;
       }
 
       return true;
     });
 
-    if (programmeCible && etapeCible && coursSelectionnes.length === 0) {
+    if (coursSelectionnes.length === 0) {
       throw creerErreurHoraire(
         "Aucun cours ne correspond a ce programme et cette etape.",
         400
       );
     }
 
-    if (!programmeCible && !etapeCible && !idGroupeCible) {
-      await deleteAllAffectations(connection);
-    } else if (groupesSelectionnes.length > 0) {
-      await deleteAffectationsPourGroupes(
-        groupesSelectionnes.map((groupe) => groupe.id_groupes_etudiants),
-        connection
-      );
-    } else {
-      await deleteAllAffectations(connection);
-    }
-
-    const jours = genererJoursOuvrables(NOMBRE_JOURS_GENERATION, dateDebut);
+    const jours = genererJoursCalendaires(NOMBRE_JOURS_GENERATION, dateDebut);
     const compteurAffectations = new Map();
     const affectations = [];
     const nonPlanifies = [];
@@ -1049,7 +1236,7 @@ export async function genererHoraireAutomatiquement(options = {}) {
     for (const coursActuel of coursTries) {
       const groupesCompatibles = trouverGroupesCompatibles(
         coursActuel,
-        groupesSelectionnes.length > 0 ? groupesSelectionnes : groupes
+        groupesSelectionnes
       );
 
       if (groupesCompatibles.length === 0) {
@@ -1057,22 +1244,6 @@ export async function genererHoraireAutomatiquement(options = {}) {
           id_cours: coursActuel.id_cours,
           code_cours: coursActuel.code,
           raison: "Aucun groupe correspondant au programme et a l'etape du cours.",
-        });
-        continue;
-      }
-
-      const effectifTotal = totaliserEffectifGroupes(groupesCompatibles);
-      const sallesCompatibles = trierSallesCompatibles(
-        coursActuel,
-        salles,
-        effectifTotal
-      );
-
-      if (sallesCompatibles.length === 0) {
-        nonPlanifies.push({
-          id_cours: coursActuel.id_cours,
-          code_cours: coursActuel.code,
-          raison: `Aucune salle compatible pour le type ${coursActuel.type_salle}.`,
         });
         continue;
       }
@@ -1100,27 +1271,30 @@ export async function genererHoraireAutomatiquement(options = {}) {
         ])
       );
 
-      let affectationCreee = null;
+      for (const groupe of groupesCompatibles) {
+        const sallesCompatibles = trierSallesCompatibles(
+          coursActuel,
+          salles,
+          Number(groupe.effectif) || 0
+        );
 
-      for (const date of jours) {
-        for (const heureDebut of CRENEAUX_DEBUT) {
-          const heureFin = heureFinParCreneau.get(heureDebut);
+        if (sallesCompatibles.length === 0) {
+          nonPlanifies.push({
+            id_cours: coursActuel.id_cours,
+            code_cours: coursActuel.code,
+            groupe: groupe.nom_groupe,
+            raison: `Aucune salle compatible pour le type ${coursActuel.type_salle}.`,
+          });
+          continue;
+        }
 
-          for (const professeur of professeursCompatibles) {
-            const disponible = professeurEstDisponible(
-              professeur,
-              date,
-              heureDebut,
-              heureFin,
-              disponibilitesParProfesseur
-            );
+        let affectationCreee = null;
 
-            if (!disponible) {
-              continue;
-            }
-
-            const conflitProfesseur = await verifierConflitProfesseur(
-              professeur.id_professeur,
+        for (const date of jours) {
+          for (const heureDebut of CRENEAUX_DEBUT) {
+            const heureFin = heureFinParCreneau.get(heureDebut);
+            const conflitGroupe = await verifierConflitGroupe(
+              groupe.id_groupes_etudiants,
               date,
               heureDebut,
               heureFin,
@@ -1128,13 +1302,25 @@ export async function genererHoraireAutomatiquement(options = {}) {
               connection
             );
 
-            if (conflitProfesseur > 0) {
+            if (conflitGroupe > 0) {
               continue;
             }
 
-            for (const salle of sallesCompatibles) {
-              const conflitSalle = await verifierConflitSalle(
-                salle.id_salle,
+            for (const professeur of professeursCompatibles) {
+              const disponible = professeurEstDisponible(
+                professeur,
+                date,
+                heureDebut,
+                heureFin,
+                disponibilitesParProfesseur
+              );
+
+              if (!disponible) {
+                continue;
+              }
+
+              const conflitProfesseur = await verifierConflitProfesseur(
+                professeur.id_professeur,
                 date,
                 heureDebut,
                 heureFin,
@@ -1142,49 +1328,66 @@ export async function genererHoraireAutomatiquement(options = {}) {
                 connection
               );
 
-              if (conflitSalle > 0) {
+              if (conflitProfesseur > 0) {
                 continue;
               }
 
-              const resultat = await creerAffectationValidee(
-                {
-                  idCours: coursActuel.id_cours,
-                  idProfesseur: professeur.id_professeur,
-                  idSalle: salle.id_salle,
+              for (const salle of sallesCompatibles) {
+                const conflitSalle = await verifierConflitSalle(
+                  salle.id_salle,
                   date,
                   heureDebut,
                   heureFin,
-                },
-                connection
-              );
+                  null,
+                  connection
+                );
 
-              for (const groupe of groupesCompatibles) {
+                if (conflitSalle > 0) {
+                  continue;
+                }
+
+                const resultat = await creerAffectationValidee(
+                  {
+                    idCours: coursActuel.id_cours,
+                    idProfesseur: professeur.id_professeur,
+                    idSalle: salle.id_salle,
+                    date,
+                    heureDebut,
+                    heureFin,
+                  },
+                  connection
+                );
+
                 await addAffectationGroupe(
                   groupe.id_groupes_etudiants,
                   resultat.id_affectation_cours,
                   connection
                 );
+
+                compteurAffectations.set(
+                  professeur.id_professeur,
+                  (compteurAffectations.get(professeur.id_professeur) || 0) + 1
+                );
+
+                affectationCreee = {
+                  id_affectation_cours: resultat.id_affectation_cours,
+                  cours: `${coursActuel.code} - ${coursActuel.nom}`,
+                  professeur: `${professeur.prenom} ${professeur.nom}`,
+                  salle: salle.code,
+                  date,
+                  heure_debut: heureDebut,
+                  heure_fin: heureFin,
+                  groupes: groupe.nom_groupe,
+                  effectif: Number(groupe.effectif) || 0,
+                };
+
+                affectations.push(affectationCreee);
+                break;
               }
 
-              compteurAffectations.set(
-                professeur.id_professeur,
-                (compteurAffectations.get(professeur.id_professeur) || 0) + 1
-              );
-
-              affectationCreee = {
-                id_affectation_cours: resultat.id_affectation_cours,
-                cours: `${coursActuel.code} - ${coursActuel.nom}`,
-                professeur: `${professeur.prenom} ${professeur.nom}`,
-                salle: salle.code,
-                date,
-                heure_debut: heureDebut,
-                heure_fin: heureFin,
-                groupes: groupesCompatibles.map((groupe) => groupe.nom_groupe).join(", "),
-                effectif: effectifTotal,
-              };
-
-              affectations.push(affectationCreee);
-              break;
+              if (affectationCreee) {
+                break;
+              }
             }
 
             if (affectationCreee) {
@@ -1197,17 +1400,14 @@ export async function genererHoraireAutomatiquement(options = {}) {
           }
         }
 
-        if (affectationCreee) {
-          break;
+        if (!affectationCreee) {
+          nonPlanifies.push({
+            id_cours: coursActuel.id_cours,
+            code_cours: coursActuel.code,
+            groupe: groupe.nom_groupe,
+            raison: "Aucun creneau disponible avec un professeur et une salle libres.",
+          });
         }
-      }
-
-      if (!affectationCreee) {
-        nonPlanifies.push({
-          id_cours: coursActuel.id_cours,
-          code_cours: coursActuel.code,
-          raison: "Aucun creneau disponible avec un professeur et une salle libres.",
-        });
       }
     }
 
@@ -1218,8 +1418,10 @@ export async function genererHoraireAutomatiquement(options = {}) {
       selection: {
         programme: options.programme || "",
         etape: options.etape || "",
-        id_groupe: idGroupeCible,
+        session: sessionAffichage || "",
+        annee: anneeCible,
       },
+      groupes_generes: groupesSelectionnes,
       periode: {
         debut: jours[0],
         fin: jours[jours.length - 1],
@@ -1234,3 +1436,9 @@ export async function genererHoraireAutomatiquement(options = {}) {
     connection.release();
   }
 }
+/**
+ * MODEL - Gestion des horaires
+ *
+ * Ce module centralise la generation,
+ * la validation et la gestion des affectations.
+ */

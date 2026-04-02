@@ -1,3 +1,9 @@
+/**
+ * APP - Frontend Root
+ *
+ * Ce composant configure le routage
+ * principal du frontend.
+ */
 import { useEffect, useState } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { LoginPage } from "./pages/LoginPage.jsx";
@@ -11,9 +17,12 @@ import {
   logoutUtilisateur,
   recupererUtilisateurConnecte,
 } from "./services/auth.api.js";
-import { PlanningEtudiantPage } from "./pages/PlanningEtudiantPage.jsx";
 import { AffectationsPage } from "./pages/AffectationsPage.jsx";
 import { HorairesProfesseursPage } from "./pages/HorairesProfesseursPage.jsx";
+import { HorairesGroupesPage } from "./pages/HorairesGroupesPage.jsx";
+import { AdminsPage } from "./pages/AdminsPage.jsx";
+import { utilisateurEstResponsable } from "./utils/roles.js";
+import { PopupProvider } from "./components/feedback/PopupProvider.jsx";
 
 
 export default function App() {
@@ -61,8 +70,9 @@ export default function App() {
   }
 
   return (
-    <BrowserRouter>
-      <Routes>
+    <PopupProvider>
+      <BrowserRouter>
+        <Routes>
         <Route
           path="/login"
           element={
@@ -179,10 +189,28 @@ export default function App() {
         />
 
         <Route
-          path="/planning-etudiant/:id"
+          path="/admins"
           element={
             utilisateur ? (
-              <PlanningEtudiantPage />
+              utilisateurEstResponsable(utilisateur) ? (
+                <AdminsPage utilisateur={utilisateur} onLogout={handleLogout} />
+              ) : (
+                <Navigate to="/dashboard" replace />
+              )
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        <Route
+          path="/horaires-groupes"
+          element={
+            utilisateur ? (
+              <HorairesGroupesPage
+                utilisateur={utilisateur}
+                onLogout={handleLogout}
+              />
             ) : (
               <Navigate to="/login" replace />
             )
@@ -210,7 +238,8 @@ export default function App() {
             )
           }
         />
-      </Routes>
-    </BrowserRouter>
+        </Routes>
+      </BrowserRouter>
+    </PopupProvider>
   );
 }

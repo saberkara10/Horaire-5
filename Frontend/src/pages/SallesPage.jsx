@@ -1,5 +1,12 @@
+/**
+ * PAGE - Salles
+ *
+ * Cette page gere la consultation
+ * et la maintenance des salles.
+ */
 import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "../components/layout/AppShell.jsx";
+import { usePopup } from "../components/feedback/PopupProvider.jsx";
 import {
   recupererSalles,
   creerSalle,
@@ -11,11 +18,11 @@ import "../styles/CrudPages.css";
 export function SallesPage({ utilisateur, onLogout }) {
   const [salles, setSalles] = useState([]);
   const [chargement, setChargement] = useState(true);
-  const [erreur, setErreur] = useState("");
-  const [message, setMessage] = useState("");
+  const [erreurFormulaire, setErreurFormulaire] = useState("");
   const [recherche, setRecherche] = useState("");
   const [modalOuvert, setModalOuvert] = useState(false);
   const [edition, setEdition] = useState(null);
+  const { confirm, showError, showSuccess } = usePopup();
 
   const [formulaire, setFormulaire] = useState({
     code: "",
@@ -25,13 +32,12 @@ export function SallesPage({ utilisateur, onLogout }) {
 
   async function chargerSalles() {
     setChargement(true);
-    setErreur("");
 
     try {
       const data = await recupererSalles();
       setSalles(data || []);
     } catch (error) {
-      setErreur(error.message || "Impossible de charger les salles.");
+      showError(error.message || "Impossible de charger les salles.");
     } finally {
       setChargement(false);
     }
@@ -59,6 +65,7 @@ export function SallesPage({ utilisateur, onLogout }) {
 
   function ouvrirModal(salle = null) {
     setEdition(salle);
+    setErreurFormulaire("");
 
     if (salle) {
       setFormulaire({
@@ -74,14 +81,13 @@ export function SallesPage({ utilisateur, onLogout }) {
       });
     }
 
-    setErreur("");
-    setMessage("");
     setModalOuvert(true);
   }
 
   function fermerModal() {
     setModalOuvert(false);
     setEdition(null);
+    setErreurFormulaire("");
     setFormulaire({
       code: "",
       type: "",
@@ -91,8 +97,7 @@ export function SallesPage({ utilisateur, onLogout }) {
 
   async function handleSoumettre(event) {
     event.preventDefault();
-    setErreur("");
-    setMessage("");
+    setErreurFormulaire("");
 
     try {
       if (edition) {
@@ -100,41 +105,41 @@ export function SallesPage({ utilisateur, onLogout }) {
           type: formulaire.type,
           capacite: Number(formulaire.capacite),
         });
-        setMessage("Salle modifiée avec succès.");
+        showSuccess("Salle modifiee avec succes.");
       } else {
         await creerSalle({
           code: formulaire.code,
           type: formulaire.type,
           capacite: Number(formulaire.capacite),
         });
-        setMessage("Salle ajoutée avec succès.");
+        showSuccess("Salle ajoutee avec succes.");
       }
 
       fermerModal();
       await chargerSalles();
     } catch (error) {
-      setErreur(error.message || "Erreur lors de l'enregistrement.");
+      setErreurFormulaire(error.message || "Erreur lors de l'enregistrement.");
     }
   }
 
   async function handleSupprimer(idSalle) {
-    const confirmation = window.confirm(
-      "Voulez-vous vraiment supprimer cette salle ?"
-    );
+    const confirmation = await confirm({
+      title: "Supprimer la salle",
+      message: "Voulez-vous vraiment supprimer cette salle ?",
+      confirmLabel: "Supprimer",
+      tone: "danger",
+    });
 
     if (!confirmation) {
       return;
     }
 
-    setErreur("");
-    setMessage("");
-
     try {
       await supprimerSalle(idSalle);
-      setMessage("Salle supprimée avec succès.");
+      showSuccess("Salle supprimee avec succes.");
       await chargerSalles();
     } catch (error) {
-      setErreur(error.message || "Erreur lors de la suppression.");
+      showError(error.message || "Erreur lors de la suppression.");
     }
   }
 
@@ -143,7 +148,7 @@ export function SallesPage({ utilisateur, onLogout }) {
       utilisateur={utilisateur}
       onLogout={onLogout}
       title="Salles"
-      subtitle="Gérez les salles disponibles dans l’établissement."
+      subtitle="Gerez les salles disponibles dans l'etablissement."
     >
       <div className="crud-page">
         <div className="crud-page__header">
@@ -166,9 +171,6 @@ export function SallesPage({ utilisateur, onLogout }) {
           />
         </div>
 
-        {erreur ? <div className="crud-page__alert crud-page__alert--error">{erreur}</div> : null}
-        {message ? <div className="crud-page__alert crud-page__alert--success">{message}</div> : null}
-
         <section className="crud-page__table-card">
           {chargement ? (
             <p className="crud-page__state">Chargement...</p>
@@ -178,7 +180,7 @@ export function SallesPage({ utilisateur, onLogout }) {
                 <tr>
                   <th>Code</th>
                   <th>Type</th>
-                  <th>Capacité</th>
+                  <th>Capacite</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -187,7 +189,7 @@ export function SallesPage({ utilisateur, onLogout }) {
                 {sallesFiltrees.length === 0 ? (
                   <tr>
                     <td colSpan="4" className="crud-page__empty">
-                      Aucune salle trouvée.
+                      Aucune salle trouvee.
                     </td>
                   </tr>
                 ) : (
@@ -276,7 +278,7 @@ export function SallesPage({ utilisateur, onLogout }) {
                 </label>
 
                 <label className="crud-page__field">
-                  <span>Capacité</span>
+                  <span>Capacite</span>
                   <input
                     type="number"
                     min="1"
@@ -291,6 +293,12 @@ export function SallesPage({ utilisateur, onLogout }) {
                     required
                   />
                 </label>
+
+                {erreurFormulaire ? (
+                  <div className="crud-page__alert crud-page__alert--error crud-page__form-feedback">
+                    {erreurFormulaire}
+                  </div>
+                ) : null}
 
                 <div className="crud-page__modal-actions">
                   <button

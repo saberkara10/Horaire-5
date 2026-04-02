@@ -1,3 +1,9 @@
+/**
+ * TESTS - Validations Professeurs
+ *
+ * Ce fichier couvre les validations
+ * appliquees aux donnees des professeurs.
+ */
 import { jest, describe, it, expect, beforeEach } from "@jest/globals";
 
 const recupererProfesseurParId = jest.fn();
@@ -164,3 +170,9 @@ describe("validations professeurs", () => {
     expect(next).toHaveBeenCalled();
   });
 });
+/**
+ * TESTS - Validations Professeurs
+ *
+ * Ce fichier couvre les validations
+ * appliquees aux donnees des professeurs.
+ */

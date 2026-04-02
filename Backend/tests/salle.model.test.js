@@ -1,3 +1,9 @@
+/**
+ * TESTS - Modele Salles
+ *
+ * Ce fichier couvre les operations principales
+ * du modele de gestion des salles.
+ */
 import { jest, describe, test, expect, beforeEach } from "@jest/globals";
 
 const queryMock = jest.fn();
@@ -88,3 +94,9 @@ describe("model salle", () => {
     expect(result.affectedRows).toBe(1);
   });
 });
+/**
+ * TESTS - Modele Salles
+ *
+ * Ce fichier couvre les operations principales
+ * du modele de gestion des salles.
+ */

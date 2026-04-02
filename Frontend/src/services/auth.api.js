@@ -1,18 +1,44 @@
+/**
+ * SERVICE - Auth API
+ *
+ * Ce service centralise les appels HTTP
+ * lies a l'authentification.
+ */
 import { apiRequest } from "./api.js";
 
 const AUTH_BASE_URL = "/auth";
 
-export async function loginUtilisateur({ email, password }) {
-  await apiRequest(`${AUTH_BASE_URL}/login`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    credentials: "include",
-    body: JSON.stringify({ email, password }),
-  });
+function traduireErreurConnexion(message) {
+  const code = String(message || "").trim();
 
-  return recupererUtilisateurConnecte();
+  if (code === "wrong_user" || code === "wrong_password") {
+    return "Adresse courriel ou mot de passe incorrect.";
+  }
+
+  return code || "Impossible de se connecter.";
+}
+
+export async function loginUtilisateur({ email, password }) {
+  try {
+    await apiRequest(`${AUTH_BASE_URL}/login`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+      body: JSON.stringify({ email, password }),
+    });
+  } catch (error) {
+    throw new Error(traduireErreurConnexion(error.message));
+  }
+
+  const utilisateur = await recupererUtilisateurConnecte();
+
+  if (!utilisateur) {
+    throw new Error("Session utilisateur non etablie.");
+  }
+
+  return utilisateur;
 }
 
 export async function recupererUtilisateurConnecte() {
@@ -32,3 +58,9 @@ export async function logoutUtilisateur() {
     credentials: "include",
   });
 }
+/**
+ * SERVICE - Auth API
+ *
+ * Ce service centralise les appels HTTP
+ * lies a l'authentification.
+ */

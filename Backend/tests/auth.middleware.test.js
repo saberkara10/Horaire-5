@@ -1,3 +1,9 @@
+/**
+ * TESTS - Middlewares Auth
+ *
+ * Ce fichier couvre les regles d'acces
+ * appliquees par les middlewares d'authentification.
+ */
 import { describe, it, expect, jest } from "@jest/globals";
 import {
   userAuth,
@@ -68,8 +74,19 @@ describe("middlewares auth", () => {
     expect(next).toHaveBeenCalled();
   });
 
-  it("userAdmin retourne 401 si rôle ADMIN absent", () => {
+  it("userAdmin appelle next si rôle RESPONSABLE présent", () => {
     const request = { user: { roles: ["RESPONSABLE"] } };
+    const response = createResponse();
+    const next = jest.fn();
+
+    userAdmin(request, response, next);
+
+    expect(next).toHaveBeenCalled();
+    expect(response.status).not.toHaveBeenCalled();
+  });
+
+  it("userAdmin retourne 401 si roles ADMIN et RESPONSABLE absents", () => {
+    const request = { user: { roles: ["UTILISATEUR"] } };
     const response = createResponse();
     const next = jest.fn();
 
@@ -100,3 +117,9 @@ describe("middlewares auth", () => {
     expect(response.end).toHaveBeenCalled();
   });
 });
+/**
+ * TESTS - Middlewares Auth
+ *
+ * Ce fichier couvre les regles d'acces
+ * appliquees par les middlewares d'authentification.
+ */

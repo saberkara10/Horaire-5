@@ -43,6 +43,11 @@ export default function horaireRoutes(app) {
     return /^\d{4}-\d{2}-\d{2}$/.test(String(date || ""));
   }
 
+  function anneeGenerationValide(annee) {
+    const valeur = Number(annee);
+    return Number.isInteger(valeur) && valeur >= 2000 && valeur <= 2100;
+  }
+
   /**
    * GET /api/horaires
    * Recuperer toutes les affectations de cours.
@@ -169,11 +174,12 @@ export default function horaireRoutes(app) {
     ...accesGestionHoraires,
     async (request, response) => {
       try {
-        const { programme, etape, mode_groupe, id_groupe, date_debut } = request.body || {};
+        const { programme, etape, session, annee, date_debut } = request.body || {};
 
-        if ((programme || etape) && (!programme || !etape)) {
+        if (!programme || !etape || !session || !annee) {
           return response.status(400).json({
-            message: "Le programme et l'etape doivent etre renseignes ensemble.",
+            message:
+              "Le programme, l'etape, la session et l'annee sont obligatoires pour generer l'horaire.",
           });
         }
 
@@ -183,16 +189,17 @@ export default function horaireRoutes(app) {
           });
         }
 
-        if (mode_groupe === "single" && !Number.isInteger(Number(id_groupe))) {
+        if (!anneeGenerationValide(annee)) {
           return response.status(400).json({
-            message: "Un groupe valide doit etre selectionne.",
+            message: "L'annee est invalide.",
           });
         }
 
         const resultat = await genererHoraireAutomatiquement({
           programme,
           etape,
-          idGroupe: mode_groupe === "single" ? Number(id_groupe) : null,
+          session,
+          annee: Number(annee),
           dateDebut: date_debut || null,
         });
         response.status(201).json(resultat);

@@ -1,3 +1,9 @@
+/**
+ * UTILS - Programmes
+ *
+ * Ce module fournit les helpers
+ * de normalisation des programmes.
+ */
 export function normaliserTexte(texte) {
   return String(texte || "")
     .toLowerCase()
@@ -143,3 +149,9 @@ export function programmesCorrespondent(programmeA, programmeB) {
 
   return normaliserTexte(normaliseA) === normaliserTexte(normaliseB);
 }
+/**
+ * UTILS - Programmes
+ *
+ * Ce module fournit les helpers
+ * de normalisation des programmes.
+ */

@@ -1,3 +1,9 @@
+/**
+ * UTILS - Salles
+ *
+ * Ce module fournit les helpers
+ * utilitaires lies aux salles.
+ */
 export function extraireTypes(salles) {
   const types = [...new Set(salles.map((salle) => salle.type))];
   return types.sort((a, b) => a.localeCompare(b, "fr"));
@@ -24,3 +30,9 @@ export function filtrerSalles(salles, recherche, typeSelectionne) {
     return correspondRecherche && correspondType;
   });
 }
+/**
+ * UTILS - Salles
+ *
+ * Ce module fournit les helpers
+ * utilitaires lies aux salles.
+ */

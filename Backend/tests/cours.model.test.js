@@ -1,3 +1,9 @@
+/**
+ * TESTS - Modele Cours
+ *
+ * Ce fichier couvre les operations principales
+ * du modele de gestion des cours.
+ */
 import { jest, describe, test, expect, beforeEach } from "@jest/globals";
 
 const queryMock = jest.fn();
@@ -94,3 +100,9 @@ describe("Model cours", () => {
     expect(result).toBe(true);
   });
 });
+/**
+ * TESTS - Modele Cours
+ *
+ * Ce fichier couvre les operations principales
+ * du modele de gestion des cours.
+ */

@@ -1,3 +1,9 @@
+/**
+ * SERVICE - Etudiants API
+ *
+ * Ce service centralise les appels HTTP
+ * lies aux etudiants et groupes.
+ */
 import { apiRequest } from "./api.js";
 
 const BASE_URL = "/api/etudiants";
@@ -15,6 +21,8 @@ export async function importerEtudiants(fichier) {
   });
 }
 
-export async function recupererPlanningEtudiant(id) {
-  return apiRequest(`${BASE_URL}/${id}/planning`);
+export async function supprimerTousLesEtudiants() {
+  return apiRequest(BASE_URL, {
+    method: "DELETE",
+  });
 }

@@ -1,3 +1,9 @@
+/**
+ * TESTS - Utils Programmes
+ *
+ * Ce fichier couvre la normalisation
+ * et la comparaison des programmes.
+ */
 import request from "supertest";
 import { jest, describe, test, expect, beforeEach } from "@jest/globals";
 
@@ -27,13 +33,16 @@ describe("Tests route Programmes", () => {
     const response = await request(app).get("/api/programmes");
 
     expect(response.statusCode).toBe(200);
-    expect(response.body).toContain("Techniques en administration des affaires");
-    expect(response.body).toContain("Programmation informatique");
-    expect(response.body).toContain(
-      "Technologie des systemes informatiques - cybersecurite et reseautique"
-    );
+    expect(response.body).toContain("Commerce");
+    expect(response.body).toContain("Informatique");
+    expect(response.body).toContain("Reseaux");
     expect(response.body).toContain("Design graphique");
-    expect(response.body.length).toBeGreaterThanOrEqual(20);
+    expect(response.body).toEqual([
+      "Commerce",
+      "Design graphique",
+      "Informatique",
+      "Reseaux",
+    ]);
   });
 
   test("GET /api/programmes conserve aussi les libelles importes", async () => {
@@ -43,6 +52,25 @@ describe("Tests route Programmes", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.body).toContain("Developpement Web");
+  });
+
+  test("GET /api/programmes nettoie les valeurs vides et trie les programmes", async () => {
+    queryMock.mockResolvedValue([[
+      { programme: "  Reseaux  " },
+      { programme: "" },
+      { programme: "Commerce" },
+      { programme: null },
+      { programme: "Analyse de donnees" },
+    ]]);
+
+    const response = await request(app).get("/api/programmes");
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toEqual([
+      "Analyse de donnees",
+      "Commerce",
+      "Reseaux",
+    ]);
   });
 
   test("GET /api/programmes retourne 500 si la base echoue", async () => {
@@ -56,3 +84,9 @@ describe("Tests route Programmes", () => {
     });
   });
 });
+/**
+ * TESTS - Utils Programmes
+ *
+ * Ce fichier couvre la normalisation
+ * et la comparaison des programmes.
+ */

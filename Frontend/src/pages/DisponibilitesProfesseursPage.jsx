@@ -1,3 +1,9 @@
+/**
+ * PAGE - Disponibilites Professeurs
+ *
+ * Cette page gere les disponibilites
+ * hebdomadaires des professeurs.
+ */
 import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "../components/layout/AppShell.jsx";
 import {
@@ -5,15 +11,10 @@ import {
   recupererDisponibilitesProfesseur,
   mettreAJourDisponibilitesProfesseur,
 } from "../services/professeurs.api.js";
+import { JOURS_SEMAINE_COMPLETS } from "../utils/calendar.js";
+import { usePopup } from "../components/feedback/PopupProvider.jsx";
 import "../styles/ProfesseursPage.css";
 
-const JOURS_SEMAINE = [
-  { value: 1, label: "Lundi" },
-  { value: 2, label: "Mardi" },
-  { value: 3, label: "Mercredi" },
-  { value: 4, label: "Jeudi" },
-  { value: 5, label: "Vendredi" },
-];
 const HEURES = Array.from({ length: 15 }, (_, index) =>
   `${String(index + 8).padStart(2, "0")}:00`
 );
@@ -41,7 +42,7 @@ function trierDisponibilites(disponibilites) {
 }
 
 function regrouperDisponibilitesParJour(disponibilites) {
-  return JOURS_SEMAINE.map((jour) => ({
+  return JOURS_SEMAINE_COMPLETS.map((jour) => ({
     ...jour,
     disponibilites: disponibilites.filter(
       (disponibilite) => Number(disponibilite.jour_semaine) === jour.value
@@ -55,7 +56,7 @@ function getDisponibilitesParJourEtHeure(disponibilites) {
   disponibilites.forEach((disponibilite) => {
     const jourIndex = Number(disponibilite.jour_semaine) - 1;
 
-    if (jourIndex < 0 || jourIndex > 4) {
+    if (jourIndex < 0 || jourIndex > 6) {
       return;
     }
 
@@ -81,7 +82,6 @@ function getHauteurBloc(heureDebut, heureFin) {
 export function DisponibilitesProfesseursPage({ utilisateur, onLogout }) {
   const [professeurs, setProfesseurs] = useState([]);
   const [chargement, setChargement] = useState(true);
-  const [erreur, setErreur] = useState("");
   const [idProfesseurActif, setIdProfesseurActif] = useState(null);
   const [chargementDisponibilites, setChargementDisponibilites] = useState(false);
   const [erreurDisponibilites, setErreurDisponibilites] = useState("");
@@ -93,11 +93,11 @@ export function DisponibilitesProfesseursPage({ utilisateur, onLogout }) {
     heure_debut: "08:00",
     heure_fin: "10:00",
   });
+  const { showError, showSuccess } = usePopup();
 
   useEffect(() => {
     async function chargerProfesseurs() {
       setChargement(true);
-      setErreur("");
 
       try {
         const data = await recupererProfesseurs();
@@ -114,7 +114,7 @@ export function DisponibilitesProfesseursPage({ utilisateur, onLogout }) {
           return liste[0]?.id_professeur || null;
         });
       } catch (error) {
-        setErreur(error.message || "Impossible de charger les professeurs.");
+        showError(error.message || "Impossible de charger les professeurs.");
       } finally {
         setChargement(false);
       }
@@ -138,7 +138,7 @@ export function DisponibilitesProfesseursPage({ utilisateur, onLogout }) {
           await recupererDisponibilitesProfesseur(idProfesseurActif);
         setDisponibilites(trierDisponibilites(disponibilitesData || []));
       } catch (error) {
-        setErreurDisponibilites(
+        showError(
           error.message || "Impossible de charger les disponibilites du professeur."
         );
       } finally {
@@ -289,6 +289,7 @@ export function DisponibilitesProfesseursPage({ utilisateur, onLogout }) {
 
       setDisponibilites(trierDisponibilites(resultat || []));
       setMessageDisponibilites("Disponibilites enregistrees avec succes.");
+      showSuccess("Disponibilites enregistrees avec succes.");
     } catch (error) {
       setErreurDisponibilites(error.message || "Erreur lors de l'enregistrement.");
     } finally {
@@ -304,10 +305,6 @@ export function DisponibilitesProfesseursPage({ utilisateur, onLogout }) {
       subtitle="Gerez les creneaux disponibles des enseignants entre 08:00 et 22:00."
     >
       <div className="crud-page">
-        {erreur ? (
-          <div className="crud-page__alert crud-page__alert--error">{erreur}</div>
-        ) : null}
-
         <section className="professeurs-page__workspace professeurs-page__workspace--full">
           <div className="professeurs-page__panel">
             <div className="professeurs-page__panel-header">
@@ -372,7 +369,7 @@ export function DisponibilitesProfesseursPage({ utilisateur, onLogout }) {
                       value={formulaireDisponibilite.jour_semaine}
                       onChange={handleChangerDisponibilite}
                     >
-                      {JOURS_SEMAINE.map((jour) => (
+                      {JOURS_SEMAINE_COMPLETS.map((jour) => (
                         <option key={jour.value} value={jour.value}>
                           {jour.label}
                         </option>
@@ -486,7 +483,7 @@ export function DisponibilitesProfesseursPage({ utilisateur, onLogout }) {
                   <div className="professeurs-page__schedule-list">
                     <h3>Calendrier hebdomadaire</h3>
                     <p className="professeurs-page__schedule-note">
-                      Vue fixe du lundi au vendredi, de 08:00 a 22:00.
+                      Vue fixe du lundi au dimanche, de 08:00 a 22:00.
                     </p>
 
                     <div className="professeurs-page__calendar-wrapper">
@@ -500,7 +497,7 @@ export function DisponibilitesProfesseursPage({ utilisateur, onLogout }) {
                           ))}
                         </div>
 
-                        {JOURS_SEMAINE.map((jour, jourIndex) => (
+                        {JOURS_SEMAINE_COMPLETS.map((jour, jourIndex) => (
                           <div key={jour.value} className="professeurs-page__day-column">
                             <div className="professeurs-page__calendar-head">
                               <span>{jour.label}</span>
@@ -559,3 +556,9 @@ export function DisponibilitesProfesseursPage({ utilisateur, onLogout }) {
     </AppShell>
   );
 }
+/**
+ * PAGE - Disponibilites Professeurs
+ *
+ * Cette page gere les disponibilites
+ * hebdomadaires des professeurs.
+ */

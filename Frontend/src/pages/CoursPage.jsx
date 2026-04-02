@@ -1,5 +1,12 @@
+/**
+ * PAGE - Cours
+ *
+ * Cette page gere la consultation
+ * et la maintenance des cours.
+ */
 import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "../components/layout/AppShell.jsx";
+import { usePopup } from "../components/feedback/PopupProvider.jsx";
 import {
   recupererCours,
   creerCours,
@@ -36,11 +43,11 @@ export function CoursPage({ utilisateur, onLogout }) {
   const [programmes, setProgrammes] = useState([]);
   const [salles, setSalles] = useState([]);
   const [chargement, setChargement] = useState(true);
-  const [erreur, setErreur] = useState("");
-  const [message, setMessage] = useState("");
+  const [erreurFormulaire, setErreurFormulaire] = useState("");
   const [recherche, setRecherche] = useState("");
   const [modalOuvert, setModalOuvert] = useState(false);
   const [edition, setEdition] = useState(null);
+  const { confirm, showError, showSuccess } = usePopup();
 
   const [formulaire, setFormulaire] = useState({
     code: "",
@@ -53,13 +60,12 @@ export function CoursPage({ utilisateur, onLogout }) {
 
   async function chargerCours() {
     setChargement(true);
-    setErreur("");
 
     try {
       const data = await recupererCours();
       setCours(data || []);
     } catch (error) {
-      setErreur(error.message || "Impossible de recuperer les cours.");
+      showError(error.message || "Impossible de recuperer les cours.");
     } finally {
       setChargement(false);
     }
@@ -122,6 +128,7 @@ export function CoursPage({ utilisateur, onLogout }) {
 
   function ouvrirModal(coursAEditer = null) {
     setEdition(coursAEditer);
+    setErreurFormulaire("");
 
     if (coursAEditer) {
       setFormulaire({
@@ -143,14 +150,13 @@ export function CoursPage({ utilisateur, onLogout }) {
       });
     }
 
-    setErreur("");
-    setMessage("");
     setModalOuvert(true);
   }
 
   function fermerModal() {
     setModalOuvert(false);
     setEdition(null);
+    setErreurFormulaire("");
     setFormulaire({
       code: "",
       nom: "",
@@ -163,8 +169,7 @@ export function CoursPage({ utilisateur, onLogout }) {
 
   async function handleSoumettre(event) {
     event.preventDefault();
-    setErreur("");
-    setMessage("");
+    setErreurFormulaire("");
 
     try {
       const payload = {
@@ -176,37 +181,37 @@ export function CoursPage({ utilisateur, onLogout }) {
 
       if (edition) {
         await modifierCours(edition.id_cours, payload);
-        setMessage("Cours modifie avec succes.");
+        showSuccess("Cours modifie avec succes.");
       } else {
         await creerCours(payload);
-        setMessage("Cours cree avec succes.");
+        showSuccess("Cours cree avec succes.");
       }
 
       fermerModal();
       await Promise.all([chargerCours(), chargerProgrammes(), chargerSalles()]);
     } catch (error) {
-      setErreur(error.message || "Erreur lors de la sauvegarde.");
+      setErreurFormulaire(error.message || "Erreur lors de la sauvegarde.");
     }
   }
 
   async function handleSupprimer(idCours) {
-    const confirmation = window.confirm(
-      "Voulez-vous vraiment supprimer ce cours ?"
-    );
+    const confirmation = await confirm({
+      title: "Supprimer le cours",
+      message: "Voulez-vous vraiment supprimer ce cours ?",
+      confirmLabel: "Supprimer",
+      tone: "danger",
+    });
 
     if (!confirmation) {
       return;
     }
 
-    setErreur("");
-    setMessage("");
-
     try {
       await supprimerCours(idCours);
-      setMessage("Cours supprime avec succes.");
+      showSuccess("Cours supprime avec succes.");
       await Promise.all([chargerCours(), chargerProgrammes(), chargerSalles()]);
     } catch (error) {
-      setErreur(error.message || "Erreur lors de la suppression.");
+      showError(error.message || "Erreur lors de la suppression.");
     }
   }
 
@@ -237,13 +242,6 @@ export function CoursPage({ utilisateur, onLogout }) {
             onChange={(event) => setRecherche(event.target.value)}
           />
         </div>
-
-        {erreur ? (
-          <div className="crud-page__alert crud-page__alert--error">{erreur}</div>
-        ) : null}
-        {message ? (
-          <div className="crud-page__alert crud-page__alert--success">{message}</div>
-        ) : null}
 
         <section className="crud-page__table-card">
           {chargement ? (
@@ -282,7 +280,9 @@ export function CoursPage({ utilisateur, onLogout }) {
                           <>
                             <strong>{element.salle_code}</strong>
                             <br />
-                            <small>{element.salle_type || element.type_salle || "-"}</small>
+                            <small>
+                              {element.salle_type || element.type_salle || "-"}
+                            </small>
                           </>
                         ) : (
                           element.type_salle || "-"
@@ -449,6 +449,12 @@ export function CoursPage({ utilisateur, onLogout }) {
                     ))}
                   </select>
                 </label>
+
+                {erreurFormulaire ? (
+                  <div className="crud-page__alert crud-page__alert--error crud-page__form-feedback">
+                    {erreurFormulaire}
+                  </div>
+                ) : null}
 
                 <div className="crud-page__modal-actions">
                   <button

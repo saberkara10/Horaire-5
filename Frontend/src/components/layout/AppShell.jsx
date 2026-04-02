@@ -1,5 +1,12 @@
+/**
+ * COMPONENT - App Shell
+ *
+ * Ce composant fournit la structure principale
+ * de navigation et de mise en page.
+ */
 import { NavLink } from "react-router-dom";
 import "../../styles/AppShell.css";
+import { utilisateurEstResponsable } from "../../utils/roles.js";
 
 function IconDashboard() {
   return (
@@ -90,6 +97,29 @@ function IconHorairesProfesseurs() {
   );
 }
 
+function IconHorairesGroupes() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none">
+      <rect x="4" y="5" width="16" height="14" rx="2" />
+      <path d="M8 9H16" />
+      <path d="M8 13H12" />
+      <path d="M15 12C15 10.34 16.34 9 18 9" />
+      <path d="M16 16H19" />
+    </svg>
+  );
+}
+
+function IconAdmins() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none">
+      <circle cx="9" cy="8" r="3" />
+      <path d="M4 18C4 15.79 6.24 14 9 14C11.76 14 14 15.79 14 18" />
+      <path d="M18 7V13" />
+      <path d="M15 10H21" />
+    </svg>
+  );
+}
+
 function IconLogout() {
   return (
     <svg viewBox="0 0 24 24" fill="none">
@@ -120,8 +150,13 @@ export function AppShell({
   title = "Gestion des Horaires",
   subtitle = "",
 }) {
+  const rolesUtilisateur = Array.isArray(utilisateur?.roles) ? utilisateur.roles : [];
+  const estResponsable = utilisateurEstResponsable(utilisateur);
+  const rolePrincipal = rolesUtilisateur.includes("RESPONSABLE")
+    ? "RESPONSABLE"
+    : rolesUtilisateur[0] || utilisateur?.role || "Utilisateur";
   const nomAffiche =
-    `${utilisateur?.prenom || ""} ${utilisateur?.nom || ""}`.trim() ||
+    `${utilisateur?.nom || ""} ${utilisateur?.prenom || ""}`.trim() ||
     utilisateur?.email ||
     "Utilisateur connecte";
 
@@ -225,6 +260,28 @@ export function AppShell({
             <span className="app-shell__nav-icon"><IconHorairesProfesseurs /></span>
             <span>Horaires professeurs</span>
           </NavLink>
+
+          <NavLink
+            to="/horaires-groupes"
+            className={({ isActive }) =>
+              `app-shell__nav-item ${isActive ? "app-shell__nav-item--active" : ""}`
+            }
+          >
+            <span className="app-shell__nav-icon"><IconHorairesGroupes /></span>
+            <span>Horaires groupes</span>
+          </NavLink>
+
+          {estResponsable ? (
+            <NavLink
+              to="/admins"
+              className={({ isActive }) =>
+                `app-shell__nav-item ${isActive ? "app-shell__nav-item--active" : ""}`
+              }
+            >
+              <span className="app-shell__nav-icon"><IconAdmins /></span>
+              <span>Sous-admins</span>
+            </NavLink>
+          ) : null}
         </nav>
 
         <button className="app-shell__logout" type="button" onClick={onLogout}>
@@ -249,7 +306,7 @@ export function AppShell({
             <div className="app-shell__user-text">
               <div className="app-shell__user-name">{nomAffiche}</div>
               <div className="app-shell__user-role">
-                {utilisateur?.roles?.[0] || utilisateur?.role || "Utilisateur"}
+                {rolePrincipal}
               </div>
             </div>
           </div>

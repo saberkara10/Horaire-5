@@ -14,8 +14,8 @@
 .professeurs-page__panel {
   border: 1px solid var(--line);
   border-radius: 24px;
-  background: var(--panel);
-  backdrop-filter: blur(10px);
+  background: var(--panel-strong);
+  box-shadow: var(--shadow-card);
   padding: 1.25rem;
 }
 
@@ -29,7 +29,7 @@
 
 .professeurs-page__panel-header h2 {
   margin: 0;
-  color: #ffffff;
+  color: var(--text);
 }
 
 .professeurs-page__panel-header p {
@@ -43,8 +43,8 @@
   padding: 0 1rem;
   border: 1px solid var(--line);
   border-radius: 16px;
-  background: rgba(10, 20, 44, 0.7);
-  color: #ffffff;
+  background: rgba(248, 251, 255, 0.98);
+  color: var(--text);
 }
 
 .professeurs-page__prof-card {
@@ -53,9 +53,9 @@
   margin-bottom: 1rem;
   padding: 1rem;
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(148, 163, 184, 0.14);
-  color: #e2e8f0;
+  background: rgba(248, 251, 255, 0.94);
+  border: 1px solid rgba(178, 197, 217, 0.42);
+  color: #355574;
 }
 
 .professeurs-page__availability-form {
@@ -92,14 +92,14 @@
 .professeurs-page__day-card {
   border-radius: 18px;
   padding: 0.95rem 1rem;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(148, 163, 184, 0.12);
+  background: rgba(248, 251, 255, 0.94);
+  border: 1px solid rgba(178, 197, 217, 0.38);
 }
 
 .professeurs-page__day-title {
   margin-bottom: 0.65rem;
   font-weight: 800;
-  color: #ffffff;
+  color: var(--text);
 }
 
 .professeurs-page__availability-list {
@@ -117,8 +117,9 @@
   align-items: center;
   padding: 0.75rem 0.85rem;
   border-radius: 14px;
-  background: rgba(15, 23, 42, 0.5);
-  color: #f8fafc;
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--text);
+  border: 1px solid rgba(190, 208, 227, 0.35);
 }
 
 .professeurs-page__availability-item-actions {
@@ -146,21 +147,23 @@
   padding: 0 0.9rem;
   border-radius: 12px;
   border: none;
-  color: #ffffff;
   cursor: pointer;
 }
 
 .professeurs-page__calendar-btn {
-  background: rgba(148, 163, 184, 0.18);
+  background: rgba(236, 245, 255, 0.96);
+  color: #355574;
+  border: 1px solid var(--line);
 }
 
 .professeurs-page__calendar-today {
-  background: linear-gradient(135deg, #6d5cff 0%, #a855f7 100%);
+  background: linear-gradient(135deg, #0ea5e9 0%, #6b6cf6 100%);
+  color: #ffffff;
 }
 
 .professeurs-page__calendar-title {
   font-weight: 800;
-  color: #ffffff;
+  color: var(--text);
 }
 
 .professeurs-page__calendar-wrapper {
@@ -169,36 +172,36 @@
 
 .professeurs-page__calendar-grid {
   display: flex;
-  min-width: 980px;
+  min-width: 1320px;
   border-radius: 20px;
   overflow: hidden;
-  border: 1px solid rgba(148, 163, 184, 0.16);
-  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(178, 197, 217, 0.42);
+  background: rgba(255, 255, 255, 0.95);
 }
 
 .professeurs-page__hours-column {
   width: 72px;
   flex-shrink: 0;
-  border-right: 1px solid rgba(148, 163, 184, 0.14);
+  border-right: 1px solid rgba(178, 197, 217, 0.4);
 }
 
 .professeurs-page__calendar-head-empty,
 .professeurs-page__calendar-head {
   height: 56px;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+  border-bottom: 1px solid rgba(178, 197, 217, 0.4);
 }
 
 .professeurs-page__calendar-head {
   display: block;
   padding: 0.75rem;
-  background: rgba(109, 92, 255, 0.14);
+  background: rgba(236, 245, 255, 0.98);
 }
 
 .professeurs-page__calendar-head span {
   display: block;
   font-size: 0.88rem;
   font-weight: 800;
-  color: #ffffff;
+  color: var(--text);
 }
 
 .professeurs-page__calendar-head small {
@@ -210,7 +213,7 @@
 .professeurs-page__hour-cell,
 .professeurs-page__slot {
   height: 60px;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.08);
+  border-bottom: 1px solid rgba(178, 197, 217, 0.22);
 }
 
 .professeurs-page__hour-cell {
@@ -224,7 +227,7 @@
 
 .professeurs-page__day-column {
   flex: 1;
-  border-right: 1px solid rgba(148, 163, 184, 0.14);
+  border-right: 1px solid rgba(178, 197, 217, 0.38);
 }
 
 .professeurs-page__day-column:last-child {
@@ -244,7 +247,7 @@
   gap: 0.1rem;
   padding: 0.45rem 0.55rem;
   border-radius: 10px;
-  background: linear-gradient(135deg, #4d487e, #a855f7);
+  background: linear-gradient(135deg, #6b6cf6, #0ea5e9);
   color: #ffffff;
   overflow: hidden;
 }
@@ -270,7 +273,7 @@
 
 .professeurs-page__schedule-list h3 {
   margin: 0 0 0.85rem;
-  color: #ffffff;
+  color: var(--text);
 }
 
 .professeurs-page__schedule-note {
@@ -290,7 +293,7 @@
   background: linear-gradient(135deg, #0f766e, #14b8a6);
   color: #ffffff;
   overflow: hidden;
-  box-shadow: 0 8px 24px rgba(20, 184, 166, 0.22);
+  box-shadow: 0 8px 24px rgba(20, 184, 166, 0.18);
 }
 
 .professeurs-page__availability-session strong,
@@ -315,9 +318,9 @@
   max-height: 280px;
   overflow: auto;
   padding: 0.25rem;
-  border: 1px solid rgba(148, 163, 184, 0.12);
+  border: 1px solid rgba(178, 197, 217, 0.36);
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(248, 251, 255, 0.92);
 }
 
 .professeurs-page__course-option {
@@ -326,15 +329,15 @@
   gap: 0.75rem;
   padding: 0.85rem 0.9rem;
   border-radius: 16px;
-  background: rgba(15, 23, 42, 0.42);
+  background: rgba(255, 255, 255, 0.96);
   border: 1px solid transparent;
-  color: #f8fafc;
+  color: var(--text);
   cursor: pointer;
 }
 
 .professeurs-page__course-option input {
   margin-top: 0.15rem;
-  accent-color: #8b5cf6;
+  accent-color: #6b6cf6;
 }
 
 .professeurs-page__course-option div {
@@ -343,7 +346,7 @@
 }
 
 .professeurs-page__course-option strong {
-  color: #ffffff;
+  color: var(--text);
 }
 
 .professeurs-page__course-option span {
@@ -351,8 +354,8 @@
 }
 
 .professeurs-page__course-option--active {
-  border-color: rgba(168, 85, 247, 0.45);
-  background: rgba(109, 92, 255, 0.14);
+  border-color: rgba(107, 108, 246, 0.32);
+  background: rgba(240, 241, 255, 0.92);
 }
 
 .professeurs-page__course-empty {

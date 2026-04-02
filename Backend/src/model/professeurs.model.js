@@ -40,11 +40,34 @@ async function assurerTableDisponibilites(executor = pool) {
         FOREIGN KEY (id_professeur) REFERENCES professeurs (id_professeur)
         ON DELETE CASCADE,
       CONSTRAINT chk_disponibilite_jour
-        CHECK (jour_semaine BETWEEN 1 AND 5),
+        CHECK (jour_semaine BETWEEN 1 AND 7),
       CONSTRAINT chk_disponibilite_heure
         CHECK (heure_debut < heure_fin)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
   );
+
+  try {
+    await executor.query(
+      `ALTER TABLE disponibilites_professeurs
+       DROP CHECK chk_disponibilite_jour`
+    );
+  } catch {
+    // Le check peut etre absent ou deja conforme selon l'etat de la base.
+  }
+
+  try {
+    await executor.query(
+      `ALTER TABLE disponibilites_professeurs
+       ADD CONSTRAINT chk_disponibilite_jour
+       CHECK (jour_semaine BETWEEN 1 AND 7)`
+    );
+  } catch (error) {
+    const message = String(error?.message || "").toLowerCase();
+
+    if (!message.includes("duplicate") && !message.includes("exists")) {
+      throw error;
+    }
+  }
 }
 
 async function assurerTableProfesseurCours(executor = pool) {

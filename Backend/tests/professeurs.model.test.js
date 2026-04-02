@@ -1,3 +1,9 @@
+/**
+ * TESTS - Modele Professeurs
+ *
+ * Ce fichier couvre les operations principales
+ * du modele de gestion des professeurs.
+ */
 import { jest, describe, test, expect, beforeEach } from "@jest/globals";
 
 const queryMock = jest.fn();
@@ -114,8 +120,10 @@ describe("Model professeurs", () => {
     queryMock
       .mockResolvedValueOnce([[]])
       .mockResolvedValueOnce([[]])
-      .mockResolvedValueOnce([{}])
-      .mockResolvedValueOnce([{}])
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([{ affectedRows: 0 }])
+      .mockResolvedValueOnce([{ affectedRows: 0 }])
       .mockResolvedValueOnce([{ affectedRows: 1 }]);
 
     const result = await professeursModel.supprimerProfesseur(1);
@@ -123,3 +131,9 @@ describe("Model professeurs", () => {
     expect(result).toBe(true);
   });
 });
+/**
+ * TESTS - Modele Professeurs
+ *
+ * Ce fichier couvre les operations principales
+ * du modele de gestion des professeurs.
+ */

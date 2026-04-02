@@ -1,9 +1,16 @@
+/**
+ * PAGE - Dashboard
+ *
+ * Cette page affiche la vue synthese
+ * des ressources academiques.
+ */
 import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "../components/layout/AppShell.jsx";
 import { recupererCours } from "../services/cours.api.js";
 import { recupererProfesseurs } from "../services/professeurs.api.js";
 import { recupererSalles } from "../services/salles.api.js";
 import { recupererEtudiants } from "../services/etudiantsService.js";
+import { usePopup } from "../components/feedback/PopupProvider.jsx";
 import "../styles/DashboardPage.css";
 
 function DashboardCard({ label, value, accent, detail }) {
@@ -24,16 +31,15 @@ export function DashboardPage({ utilisateur, onLogout }) {
     etudiants: 0,
   });
   const [chargement, setChargement] = useState(true);
-  const [erreur, setErreur] = useState("");
   const [cours, setCours] = useState([]);
   const [professeurs, setProfesseurs] = useState([]);
   const [salles, setSalles] = useState([]);
   const [etudiants, setEtudiants] = useState([]);
+  const { showError } = usePopup();
 
   useEffect(() => {
     async function charger() {
       setChargement(true);
-      setErreur("");
 
       try {
         const [coursData, profsData, sallesData, etudiantsData] =
@@ -56,7 +62,7 @@ export function DashboardPage({ utilisateur, onLogout }) {
           etudiants: (etudiantsData || []).length,
         });
       } catch (error) {
-        setErreur(error.message || "Impossible de charger le tableau de bord.");
+        showError(error.message || "Impossible de charger le tableau de bord.");
       } finally {
         setChargement(false);
       }
@@ -99,8 +105,6 @@ export function DashboardPage({ utilisateur, onLogout }) {
       subtitle="Vue de pilotage academique."
     >
       <div className="dashboard-page">
-        {erreur ? <div className="dashboard-page__alert">{erreur}</div> : null}
-
         <section className="dashboard-hero">
           <div className="dashboard-hero__main">
             <span className="dashboard-hero__eyebrow">Pilotage</span>
@@ -225,7 +229,14 @@ export function DashboardPage({ utilisateur, onLogout }) {
             </div>
           </div>
         </section>
+
       </div>
     </AppShell>
   );
 }
+/**
+ * PAGE - Dashboard
+ *
+ * Cette page affiche la vue synthese
+ * des ressources academiques.
+ */

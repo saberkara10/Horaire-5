@@ -1,3 +1,9 @@
+/**
+ * TESTS - Configuration Auth
+ *
+ * Ce fichier couvre la configuration Passport
+ * et la resolution des utilisateurs.
+ */
 import { jest, describe, test, expect } from "@jest/globals";
 
 const compareMock = jest.fn();
@@ -141,3 +147,9 @@ describe("auth.js (passport config)", () => {
     expect(done).toHaveBeenCalledWith(error);
   });
 });
+/**
+ * TESTS - Configuration Auth
+ *
+ * Ce fichier couvre la configuration Passport
+ * et la resolution des utilisateurs.
+ */

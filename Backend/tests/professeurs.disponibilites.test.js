@@ -1,3 +1,9 @@
+/**
+ * TESTS - Routes Disponibilites Professeurs
+ *
+ * Ce fichier couvre les principaux cas
+ * des routes de disponibilites des professeurs.
+ */
 import request from "supertest";
 import { jest, describe, test, expect, beforeEach } from "@jest/globals";
 
@@ -115,6 +121,27 @@ describe("Tests routes Professeurs disponibilites", () => {
     });
   });
 
+  test("PUT /api/professeurs/:id/disponibilites accepte une disponibilite le dimanche", async () => {
+    professeursModelMock.recupererProfesseurParId.mockResolvedValue({
+      id_professeur: 1,
+      matricule: "INF01",
+    });
+    professeursModelMock.remplacerDisponibilitesProfesseur.mockResolvedValue([
+      { jour_semaine: 7, heure_debut: "09:00:00", heure_fin: "12:00:00" },
+    ]);
+
+    const response = await request(app)
+      .put("/api/professeurs/1/disponibilites")
+      .send({
+        disponibilites: [{ jour_semaine: 7, heure_debut: "09:00", heure_fin: "12:00" }],
+      });
+
+    expect(response.statusCode).toBe(200);
+    expect(professeursModelMock.remplacerDisponibilitesProfesseur).toHaveBeenCalledWith(1, [
+      { jour_semaine: 7, heure_debut: "09:00", heure_fin: "12:00" },
+    ]);
+  });
+
   test("PUT /api/professeurs/:id/disponibilites retourne 400 si l'heure de fin precede l'heure de debut", async () => {
     professeursModelMock.recupererProfesseurParId.mockResolvedValue({
       id_professeur: 1,
@@ -173,3 +200,9 @@ describe("Tests routes Professeurs disponibilites", () => {
     expect(response.body).toEqual({ message: "Erreur serveur." });
   });
 });
+/**
+ * TESTS - Routes Disponibilites Professeurs
+ *
+ * Ce fichier couvre les principaux cas
+ * des routes de disponibilites des professeurs.
+ */

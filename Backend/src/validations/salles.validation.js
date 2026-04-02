@@ -1,3 +1,9 @@
+/**
+ * VALIDATIONS - Module Salles
+ *
+ * Ce module regroupe les validations appliquees
+ * aux operations CRUD sur les salles.
+ */
 import {
   getSalleByCode,
   getSalleById,
@@ -91,3 +97,9 @@ export async function validerDeleteSalle(request, response, next) {
 
   next();
 }
+/**
+ * VALIDATIONS - Module Salles
+ *
+ * Ce module regroupe les validations appliquees
+ * aux operations CRUD sur les salles.
+ */

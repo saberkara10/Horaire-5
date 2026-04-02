@@ -1,3 +1,9 @@
+/**
+ * SERVICE - Horaire API
+ *
+ * Ce service centralise les appels HTTP
+ * lies aux horaires et affectations.
+ */
 import { apiRequest } from "./api.js";
 
 const API_URL = "/api/horaires";
@@ -45,3 +51,9 @@ export async function resetHoraires() {
     credentials: "include",
   });
 }
+/**
+ * SERVICE - Horaire API
+ *
+ * Ce service centralise les appels HTTP
+ * lies aux horaires et affectations.
+ */
