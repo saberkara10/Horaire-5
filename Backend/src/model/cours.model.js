@@ -1,48 +1,73 @@
-
 /**
- * MODEL — Gestion des cours
+ * MODEL - Gestion des cours
  *
- * Ce module contient uniquement les requêtes SQL liées à la table `cours`.
- * Aucune validation métier ici.
- *
- * Table `cours` :
- * - id_cours (PK)
- * - code (UNIQUE)
- * - nom
- * - duree
- * - programme
- * - etape_etude
- * - type_salle
+ * Les cours restent lies a un programme et une etape,
+ * mais leur salle de reference est maintenant choisie
+ * par code de salle.
  */
 
 import pool from "../../db.js";
 
+async function recupererSalleParId(idSalle, executor = pool) {
+  const [salles] = await executor.query(
+    `SELECT id_salle, code, type, capacite
+     FROM salles
+     WHERE id_salle = ?
+     LIMIT 1`,
+    [idSalle]
+  );
+
+  return salles[0] || null;
+}
+
 /**
- * Récupérer tous les cours.
+ * Recuperer tous les cours.
  *
  * @returns {Promise<Array<Object>>} Liste des cours.
  */
 export async function recupererTousLesCours() {
   const [listeCours] = await pool.query(
-    `SELECT id_cours, code, nom, duree, programme, etape_etude, type_salle
-     FROM cours
-     ORDER BY code ASC`
+    `SELECT c.id_cours,
+            c.code,
+            c.nom,
+            c.duree,
+            c.programme,
+            c.etape_etude,
+            c.type_salle,
+            c.id_salle_reference,
+            s.code AS salle_code,
+            s.type AS salle_type
+     FROM cours c
+     LEFT JOIN salles s
+       ON s.id_salle = c.id_salle_reference
+     ORDER BY c.code ASC`
   );
 
   return listeCours;
 }
 
 /**
- * Récupérer un cours par son identifiant.
+ * Recuperer un cours par son identifiant.
  *
  * @param {number} idCours - Identifiant du cours.
- * @returns {Promise<Object|null>} Le cours trouvé ou null.
+ * @returns {Promise<Object|null>} Le cours trouve ou null.
  */
 export async function recupererCoursParId(idCours) {
   const [coursTrouve] = await pool.query(
-    `SELECT id_cours, code, nom, duree, programme, etape_etude, type_salle
-     FROM cours
-     WHERE id_cours = ?
+    `SELECT c.id_cours,
+            c.code,
+            c.nom,
+            c.duree,
+            c.programme,
+            c.etape_etude,
+            c.type_salle,
+            c.id_salle_reference,
+            s.code AS salle_code,
+            s.type AS salle_type
+     FROM cours c
+     LEFT JOIN salles s
+       ON s.id_salle = c.id_salle_reference
+     WHERE c.id_cours = ?
      LIMIT 1`,
     [idCours]
   );
@@ -63,16 +88,27 @@ export async function recupererTypesSalleDisponibles() {
 }
 
 /**
- * Vérifier si un cours existe par son code.
+ * Verifier si un cours existe par son code.
  *
  * @param {string} codeCours - Code du cours.
- * @returns {Promise<Object|null>} Le cours trouvé ou null.
+ * @returns {Promise<Object|null>} Le cours trouve ou null.
  */
 export async function recupererCoursParCode(codeCours) {
   const [coursTrouve] = await pool.query(
-    `SELECT id_cours, code, nom, duree, programme, etape_etude, type_salle
-     FROM cours
-     WHERE code = ?
+    `SELECT c.id_cours,
+            c.code,
+            c.nom,
+            c.duree,
+            c.programme,
+            c.etape_etude,
+            c.type_salle,
+            c.id_salle_reference,
+            s.code AS salle_code,
+            s.type AS salle_type
+     FROM cours c
+     LEFT JOIN salles s
+       ON s.id_salle = c.id_salle_reference
+     WHERE c.code = ?
      LIMIT 1`,
     [codeCours]
   );
@@ -84,22 +120,37 @@ export async function recupererCoursParCode(codeCours) {
  * Ajouter un nouveau cours.
  *
  * @param {Object} nouveauCours
- * @param {string} nouveauCours.code
- * @param {string} nouveauCours.nom
- * @param {number} nouveauCours.duree
- * @param {string} nouveauCours.programme
- * @param {string} nouveauCours.etape_etude
- * @param {string} nouveauCours.type_salle
- *
- * @returns {Promise<Object>} Le cours ajouté.
+ * @returns {Promise<Object>} Le cours ajoute.
  */
 export async function ajouterCours(nouveauCours) {
-  const { code, nom, duree, programme, etape_etude, type_salle } = nouveauCours;
+  const { code, nom, duree, programme, etape_etude, id_salle_reference } =
+    nouveauCours;
+  const salleReference = await recupererSalleParId(id_salle_reference);
+
+  if (!salleReference) {
+    throw new Error("Salle de reference introuvable.");
+  }
 
   const [resultatInsertion] = await pool.query(
-    `INSERT INTO cours (code, nom, duree, programme, etape_etude, type_salle)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [code, nom, duree, programme, etape_etude, type_salle]
+    `INSERT INTO cours (
+      code,
+      nom,
+      duree,
+      programme,
+      etape_etude,
+      type_salle,
+      id_salle_reference
+    )
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [
+      code,
+      nom,
+      duree,
+      programme,
+      etape_etude,
+      salleReference.type,
+      salleReference.id_salle,
+    ]
   );
 
   return recupererCoursParId(resultatInsertion.insertId);
@@ -108,10 +159,9 @@ export async function ajouterCours(nouveauCours) {
 /**
  * Modifier un cours existant.
  *
- * @param {number} idCours - Identifiant du cours.
- * @param {Object} donneesModification - Champs à modifier.
- *
- * @returns {Promise<Object|null>} Le cours modifié ou null si inexistant.
+ * @param {number} idCours
+ * @param {Object} donneesModification
+ * @returns {Promise<Object|null>}
  */
 export async function modifierCours(idCours, donneesModification) {
   const champsAModifier = [];
@@ -142,9 +192,19 @@ export async function modifierCours(idCours, donneesModification) {
     valeurs.push(donneesModification.etape_etude);
   }
 
-  if (donneesModification.type_salle !== undefined) {
+  if (donneesModification.id_salle_reference !== undefined) {
+    const salleReference = await recupererSalleParId(
+      donneesModification.id_salle_reference
+    );
+
+    if (!salleReference) {
+      throw new Error("Salle de reference introuvable.");
+    }
+
+    champsAModifier.push("id_salle_reference = ?");
+    valeurs.push(salleReference.id_salle);
     champsAModifier.push("type_salle = ?");
-    valeurs.push(donneesModification.type_salle);
+    valeurs.push(salleReference.type);
   }
 
   if (champsAModifier.length === 0) {
@@ -169,10 +229,10 @@ export async function modifierCours(idCours, donneesModification) {
 }
 
 /**
- * Vérifier si un cours est déjà affecté dans un horaire.
+ * Verifier si un cours est deja affecte dans un horaire.
  *
- * @param {number} idCours - Identifiant du cours.
- * @returns {Promise<boolean>} true si affecté, sinon false.
+ * @param {number} idCours
+ * @returns {Promise<boolean>}
  */
 export async function coursEstDejaAffecte(idCours) {
   const [affectations] = await pool.query(
@@ -189,8 +249,8 @@ export async function coursEstDejaAffecte(idCours) {
 /**
  * Supprimer un cours.
  *
- * @param {number} idCours - Identifiant du cours.
- * @returns {Promise<boolean>} true si supprimé.
+ * @param {number} idCours
+ * @returns {Promise<boolean>}
  */
 export async function supprimerCours(idCours) {
   const [resultatSuppression] = await pool.query(
@@ -204,19 +264,12 @@ export async function supprimerCours(idCours) {
 }
 
 /**
- * Vérifier si un type de salle existe.
+ * Verifier si une salle existe par son identifiant.
  *
- * @param {string} typeSalle
+ * @param {number} idSalle
  * @returns {Promise<boolean>}
  */
-export async function typeSalleExiste(typeSalle) {
-  const [salles] = await pool.query(
-    `SELECT 1
-     FROM salles
-     WHERE type = ?
-     LIMIT 1`,
-    [typeSalle]
-  );
-
-  return salles.length > 0;
+export async function salleExisteParId(idSalle) {
+  const salle = await recupererSalleParId(idSalle);
+  return Boolean(salle);
 }

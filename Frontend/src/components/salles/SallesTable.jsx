@@ -1,3 +1,9 @@
+/**
+ * COMPONENT - Salles Table
+ *
+ * Ce composant affiche le tableau
+ * principal des salles.
+ */
 import { Edit2, Trash2 } from "lucide-react";
 import { construireLibelleSalle } from "../../utils/salles.utils.js";
 

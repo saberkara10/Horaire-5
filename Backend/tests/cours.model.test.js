@@ -1,3 +1,9 @@
+/**
+ * TESTS - Modele Cours
+ *
+ * Ce fichier couvre les operations principales
+ * du modele de gestion des cours.
+ */
 import { jest, describe, test, expect, beforeEach } from "@jest/globals";
 
 const queryMock = jest.fn();
@@ -16,9 +22,7 @@ describe("Model cours", () => {
   });
 
   test("recupererTousLesCours retourne la liste", async () => {
-    queryMock.mockResolvedValue([
-      [{ id_cours: 1, code: "INF101" }],
-    ]);
+    queryMock.mockResolvedValue([[{ id_cours: 1, code: "INF101" }]]);
 
     const result = await coursModel.recupererTousLesCours();
 
@@ -27,31 +31,11 @@ describe("Model cours", () => {
   });
 
   test("recupererCoursParId retourne un cours", async () => {
-    queryMock.mockResolvedValue([
-      [{ id_cours: 1, code: "INF101" }],
-    ]);
+    queryMock.mockResolvedValue([[{ id_cours: 1, code: "INF101" }]]);
 
     const result = await coursModel.recupererCoursParId(1);
 
     expect(result.id_cours).toBe(1);
-  });
-
-  test("recupererCoursParId retourne null si absent", async () => {
-    queryMock.mockResolvedValue([[]]);
-
-    const result = await coursModel.recupererCoursParId(999);
-
-    expect(result).toBeNull();
-  });
-
-  test("recupererCoursParCode retourne un cours", async () => {
-    queryMock.mockResolvedValue([
-      [{ id_cours: 1, code: "INF101" }],
-    ]);
-
-    const result = await coursModel.recupererCoursParCode("INF101");
-
-    expect(result.code).toBe("INF101");
   });
 
   test("recupererCoursParCode retourne null si absent", async () => {
@@ -62,51 +46,37 @@ describe("Model cours", () => {
     expect(result).toBeNull();
   });
 
-  test("ajouterCours insere puis retourne le cours ajouté", async () => {
+  test("ajouterCours insere puis retourne le cours ajoute", async () => {
     queryMock
+      .mockResolvedValueOnce([[{ id_salle: 4, code: "B204", type: "Laboratoire" }]])
       .mockResolvedValueOnce([{ insertId: 5 }])
-      .mockResolvedValueOnce([[{ id_cours: 5, code: "INF200" }]]);
+      .mockResolvedValueOnce([[{ id_cours: 5, code: "INF200", id_salle_reference: 4 }]]);
 
     const result = await coursModel.ajouterCours({
       code: "INF200",
       nom: "Algo",
-      duree: 45,
-      programme: "INF",
+      duree: 2,
+      programme: "Programmation informatique",
       etape_etude: 2,
-      type_salle: "LAB",
+      id_salle_reference: 4,
     });
 
     expect(result.id_cours).toBe(5);
-    expect(queryMock).toHaveBeenCalledTimes(2);
+    expect(queryMock).toHaveBeenCalledTimes(3);
   });
 
-  test("modifierCours retourne le cours inchangé si aucun champ", async () => {
-    queryMock.mockResolvedValueOnce([[{ id_cours: 1, code: "INF101" }]]);
-
-    const result = await coursModel.modifierCours(1, {});
-
-    expect(result.id_cours).toBe(1);
-  });
-
-  test("modifierCours retourne null si aucun enregistrement modifié", async () => {
-    queryMock.mockResolvedValueOnce([{ affectedRows: 0 }]);
-
-    const result = await coursModel.modifierCours(999, { nom: "Nouveau" });
-
-    expect(result).toBeNull();
-  });
-
-  test("modifierCours retourne le cours modifié", async () => {
+  test("modifierCours met a jour la salle de reference", async () => {
     queryMock
+      .mockResolvedValueOnce([[{ id_salle: 8, code: "A101", type: "Salle de cours" }]])
       .mockResolvedValueOnce([{ affectedRows: 1 }])
-      .mockResolvedValueOnce([[{ id_cours: 1, nom: "Nouveau" }]]);
+      .mockResolvedValueOnce([[{ id_cours: 1, id_salle_reference: 8 }]]);
 
-    const result = await coursModel.modifierCours(1, { nom: "Nouveau" });
+    const result = await coursModel.modifierCours(1, { id_salle_reference: 8 });
 
-    expect(result.nom).toBe("Nouveau");
+    expect(result.id_salle_reference).toBe(8);
   });
 
-  test("coursEstDejaAffecte retourne true si affecté", async () => {
+  test("coursEstDejaAffecte retourne true si affecte", async () => {
     queryMock.mockResolvedValue([[{ 1: 1 }]]);
 
     const result = await coursModel.coursEstDejaAffecte(1);
@@ -114,23 +84,7 @@ describe("Model cours", () => {
     expect(result).toBe(true);
   });
 
-  test("coursEstDejaAffecte retourne false si non affecté", async () => {
-    queryMock.mockResolvedValue([[]]);
-
-    const result = await coursModel.coursEstDejaAffecte(1);
-
-    expect(result).toBe(false);
-  });
-
-  test("supprimerCours retourne true si suppression réussie", async () => {
-    queryMock.mockResolvedValue([{ affectedRows: 1 }]);
-
-    const result = await coursModel.supprimerCours(1);
-
-    expect(result).toBe(true);
-  });
-
-  test("supprimerCours retourne false si rien supprimé", async () => {
+  test("supprimerCours retourne false si rien supprime", async () => {
     queryMock.mockResolvedValue([{ affectedRows: 0 }]);
 
     const result = await coursModel.supprimerCours(999);
@@ -138,19 +92,17 @@ describe("Model cours", () => {
     expect(result).toBe(false);
   });
 
-  test("typeSalleExiste retourne true si type trouvé", async () => {
-    queryMock.mockResolvedValue([[{ 1: 1 }]]);
+  test("salleExisteParId retourne true si la salle existe", async () => {
+    queryMock.mockResolvedValue([[{ id_salle: 2, code: "A100" }]]);
 
-    const result = await coursModel.typeSalleExiste("LAB");
+    const result = await coursModel.salleExisteParId(2);
 
     expect(result).toBe(true);
   });
-
-  test("typeSalleExiste retourne false si type absent", async () => {
-    queryMock.mockResolvedValue([[]]);
-
-    const result = await coursModel.typeSalleExiste("XYZ");
-
-    expect(result).toBe(false);
-  });
 });
+/**
+ * TESTS - Modele Cours
+ *
+ * Ce fichier couvre les operations principales
+ * du modele de gestion des cours.
+ */

@@ -1,3 +1,9 @@
+/**
+ * SERVICE - Salles API
+ *
+ * Ce service centralise les appels HTTP
+ * lies aux salles.
+ */
 import { apiRequest } from "./api.js";
 
 const BASE_URL = "/api/salles";
@@ -27,3 +33,9 @@ export async function supprimerSalle(id) {
     method: "DELETE",
   });
 }
+/**
+ * SERVICE - Salles API
+ *
+ * Ce service centralise les appels HTTP
+ * lies aux salles.
+ */

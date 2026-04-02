@@ -1,17 +1,16 @@
 /**
  * ROUTES - Module Professeurs
- *
- * Ce module definit toutes les routes HTTP liees aux professeurs.
- * Les validations sont appliquees avant l'appel au modele.
  */
 
 import {
   ajouterProfesseur,
   modifierProfesseur,
+  recupererCoursProfesseur,
   recupererDisponibilitesProfesseur,
   recupererHoraireProfesseur,
   recupererProfesseurParId,
   recupererTousLesProfesseurs,
+  remplacerCoursProfesseur,
   remplacerDisponibilitesProfesseur,
   supprimerProfesseur,
 } from "../src/model/professeurs.model.js";
@@ -54,8 +53,8 @@ function validerDisponibilitesPayload(disponibilites) {
     const heureDebut = normaliserHeure(disponibilite?.heure_debut);
     const heureFin = normaliserHeure(disponibilite?.heure_fin);
 
-    if (!Number.isInteger(jourSemaine) || jourSemaine < 1 || jourSemaine > 5) {
-      return "Chaque disponibilite doit avoir un jour_semaine entre 1 et 5.";
+    if (!Number.isInteger(jourSemaine) || jourSemaine < 1 || jourSemaine > 7) {
+      return "Chaque disponibilite doit avoir un jour_semaine entre 1 et 7.";
     }
 
     if (!heureDebut || !heureFin) {
@@ -77,11 +76,27 @@ function validerDisponibilitesPayload(disponibilites) {
   return "";
 }
 
-/**
- * Initialiser les routes des professeurs.
- *
- * @param {import("express").Express} app Application Express.
- */
+function validerCoursPayload(coursIds) {
+  if (!Array.isArray(coursIds)) {
+    return "Le champ cours_ids doit etre un tableau.";
+  }
+
+  const ids = coursIds.map((idCours) => Number(idCours));
+  const idsValides = ids.filter(
+    (idCours) => Number.isInteger(idCours) && idCours > 0
+  );
+
+  if (ids.length !== idsValides.length) {
+    return "Chaque cours assigne doit etre un identifiant positif.";
+  }
+
+  if (new Set(idsValides).size !== idsValides.length) {
+    return "Les cours assignes dupliques ne sont pas autorises.";
+  }
+
+  return "";
+}
+
 export default function professeursRoutes(app) {
   const accesLectureProfesseurs = [userAuth, userAdminOrResponsable];
   const accesGestionProfesseurs = [userAuth, userAdmin];
@@ -101,10 +116,46 @@ export default function professeursRoutes(app) {
     validerIdProfesseur,
     verifierProfesseurExiste,
     async (request, response) => {
+      response.status(200).json(request.professeur);
+    }
+  );
+
+  app.get(
+    "/api/professeurs/:id/cours",
+    ...accesLectureProfesseurs,
+    validerIdProfesseur,
+    verifierProfesseurExiste,
+    async (request, response) => {
       try {
-        response.status(200).json(request.professeur);
+        const cours = await recupererCoursProfesseur(Number(request.params.id));
+        response.status(200).json(cours);
       } catch (error) {
         response.status(500).json({ message: "Erreur serveur." });
+      }
+    }
+  );
+
+  app.put(
+    "/api/professeurs/:id/cours",
+    ...accesGestionProfesseurs,
+    validerIdProfesseur,
+    verifierProfesseurExiste,
+    async (request, response) => {
+      try {
+        const messageErreur = validerCoursPayload(request.body?.cours_ids);
+
+        if (messageErreur) {
+          return response.status(400).json({ message: messageErreur });
+        }
+
+        const cours = await remplacerCoursProfesseur(
+          Number(request.params.id),
+          request.body.cours_ids
+        );
+
+        return response.status(200).json(cours);
+      } catch (error) {
+        return response.status(500).json({ message: "Erreur serveur." });
       }
     }
   );
@@ -211,7 +262,7 @@ export default function professeursRoutes(app) {
       try {
         const idProfesseur = Number(request.params.id);
 
-        if (Number.isNaN(idProfesseur)) {
+        if (!Number.isInteger(idProfesseur) || idProfesseur <= 0) {
           return response.status(400).json({ message: "Identifiant invalide." });
         }
 
@@ -225,7 +276,6 @@ export default function professeursRoutes(app) {
 
         return response.status(200).json(horaire);
       } catch (error) {
-        console.error("ERREUR GET /api/professeurs/:id/horaire :", error);
         return response.status(500).json({ message: "Erreur serveur." });
       }
     }

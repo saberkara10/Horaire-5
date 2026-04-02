@@ -1,45 +1,59 @@
-const API_URL = "http://localhost:3000/api/horaires";
+/**
+ * SERVICE - Horaire API
+ *
+ * Ce service centralise les appels HTTP
+ * lies aux horaires et affectations.
+ */
+import { apiRequest } from "./api.js";
 
-async function handleResponse(response) {
-  if (!response.ok) {
-    const text = await response.text();
-    try {
-      const data = JSON.parse(text);
-      throw new Error(data.message || "Une erreur est survenue.");
-    } catch {
-      throw new Error("Une erreur est survenue.");
-    }
-  }
-
-  const text = await response.text();
-  return text ? JSON.parse(text) : null;
-}
+const API_URL = "/api/horaires";
 
 export async function recupererHoraires() {
-  const response = await fetch(API_URL, { credentials: "include" });
-  return handleResponse(response);
-}
-
-export async function genererHoraire() {
-  const response = await fetch(`${API_URL}/generer`, {
-    method: "POST",
+  return apiRequest(API_URL, {
     credentials: "include",
   });
-  return handleResponse(response);
+}
+
+export async function recupererAffectation(idAffectation) {
+  return apiRequest(`${API_URL}/${idAffectation}`, {
+    credentials: "include",
+  });
+}
+
+export async function genererHoraire(parametres = {}) {
+  return apiRequest(`${API_URL}/generer`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(parametres),
+    credentials: "include",
+  });
+}
+
+export async function modifierAffectation(idAffectation, affectation) {
+  return apiRequest(`${API_URL}/${idAffectation}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(affectation),
+    credentials: "include",
+  });
 }
 
 export async function supprimerAffectation(idAffectation) {
-  const response = await fetch(`${API_URL}/${idAffectation}`, {
+  return apiRequest(`${API_URL}/${idAffectation}`, {
     method: "DELETE",
     credentials: "include",
   });
-  return handleResponse(response);
 }
 
 export async function resetHoraires() {
-  const response = await fetch(API_URL, {
+  return apiRequest(API_URL, {
     method: "DELETE",
     credentials: "include",
   });
-  return handleResponse(response);
 }
+/**
+ * SERVICE - Horaire API
+ *
+ * Ce service centralise les appels HTTP
+ * lies aux horaires et affectations.
+ */

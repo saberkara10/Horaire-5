@@ -24,7 +24,18 @@ passport.use(new Strategy(config, async (email, password, done) => {
             return done(null, false, { error: "wrong_user" });
         }
 
-        const isValid = await bcrypt.compare(password, user.mot_de_passe_hash);
+        const storedPassword = user.mot_de_passe_hash;
+        let isValid = false;
+
+        if (typeof storedPassword === "string" && storedPassword.length > 0) {
+            isValid = await bcrypt.compare(password, storedPassword);
+
+            // Compatibilite avec l'ancien schema ou le mot de passe pouvait etre stocke en clair.
+            if (!isValid && storedPassword === password) {
+                isValid = true;
+            }
+        }
+
         if (!isValid) {
             return done(null, false, { error: "wrong_password" });
         }

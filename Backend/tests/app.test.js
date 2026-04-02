@@ -1,5 +1,13 @@
+/**
+ * TESTS - Application Express
+ *
+ * Ce fichier couvre les principaux cas
+ * d'initialisation de l'application.
+ */
 import request from "supertest";
 import { jest, describe, test, expect, beforeEach } from "@jest/globals";
+
+process.env.SESSION_SECRET = "test-secret";
 
 const queryMock = jest.fn();
 
@@ -51,3 +59,9 @@ describe("Tests app.js", () => {
     expect(response.body.message).toBe("Erreur lors de la recuperation des groupes.");
   });
 });
+/**
+ * TESTS - Application Express
+ *
+ * Ce fichier couvre les principaux cas
+ * d'initialisation de l'application.
+ */

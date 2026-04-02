@@ -1,3 +1,9 @@
+/**
+ * HOOK - useSalles
+ *
+ * Ce hook centralise la logique
+ * associee a la gestion des salles.
+ */
 import { useEffect, useState } from "react";
 import {
   creerSalle,

@@ -1,12 +1,13 @@
 .planning-container {
-  padding: 40px;
-  color: white;
+  display: grid;
+  gap: 1rem;
+  color: var(--text);
 }
 
 .planning-retour {
   background: none;
   border: none;
-  color: #a78bfa;
+  color: #5962d9;
   cursor: pointer;
   font-size: 0.95rem;
   padding: 0;
@@ -17,7 +18,7 @@
 }
 
 .planning-retour:hover {
-  color: white;
+  color: var(--text);
 }
 
 .planning-titre {
@@ -28,49 +29,62 @@
 
 .planning-sous-titre {
   font-size: 1.25rem;
-  font-weight: 600;
+  font-weight: 700;
   margin: 32px 0 16px;
+  color: var(--text);
 }
 
 .planning-infos {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 12px;
+  background: var(--panel-strong);
+  border: 1px solid var(--line);
+  border-radius: 22px;
   padding: 20px 24px;
   margin-bottom: 8px;
+  box-shadow: var(--shadow-card);
 }
 
 .planning-info-item {
   display: flex;
   flex-direction: column;
   min-width: 140px;
+  gap: 0.2rem;
 }
 
 .planning-label {
   font-size: 0.75rem;
-  color: #94a3b8;
+  color: #7890a8;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin-bottom: 4px;
+  font-weight: 800;
 }
 
 .planning-valeur {
   font-size: 0.95rem;
-  font-weight: 500;
+  font-weight: 600;
+  color: var(--text);
 }
 
 .planning-table-wrapper {
   overflow-x: auto;
+  border-radius: 24px;
+  border: 1px solid var(--line);
+  background: var(--panel-strong);
+  box-shadow: var(--shadow-card);
 }
 
 .planning-table {
   width: 100%;
-  background: rgba(255, 255, 255, 0.05);
   border-radius: 12px;
   overflow: hidden;
   border-collapse: collapse;
+}
+
+.planning-table thead tr {
+  background: rgba(236, 245, 255, 0.9);
 }
 
 .planning-table th,
@@ -80,14 +94,14 @@
 }
 
 .planning-table tr {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid rgba(186, 205, 227, 0.34);
 }
 
 .planning-code {
   display: block;
   font-size: 0.75rem;
-  color: #a78bfa;
-  font-weight: 600;
+  color: #5962d9;
+  font-weight: 700;
 }
 
 .planning-nom-cours {
@@ -103,20 +117,180 @@
 .planning-type-salle {
   display: block;
   font-size: 0.75rem;
-  color: #94a3b8;
+  color: var(--muted);
 }
 
 .planning-message {
-  padding: 40px;
-  color: white;
+  padding: 1.25rem;
+  border-radius: 20px;
+  background: var(--panel-strong);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  box-shadow: var(--shadow-soft);
 }
 
 .planning-erreur {
-  color: #f87171;
+  color: #b42318;
 }
 
 .planning-vide {
-  color: #94a3b8;
+  color: var(--muted);
   font-style: italic;
   padding: 20px 0;
+}
+
+.cal-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.cal-nav-btn,
+.cal-nav-aujourd-hui {
+  min-height: 42px;
+  padding: 0 0.95rem;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.cal-nav-btn {
+  background: rgba(248, 251, 255, 0.98);
+  color: #355574;
+  border: 1px solid var(--line);
+}
+
+.cal-nav-aujourd-hui {
+  background: linear-gradient(135deg, #0ea5e9 0%, #6b6cf6 100%);
+  color: #ffffff;
+  box-shadow: 0 16px 28px rgba(107, 108, 246, 0.2);
+}
+
+.cal-nav-titre {
+  font-weight: 800;
+  color: var(--text);
+}
+
+.cal-wrapper {
+  overflow-x: auto;
+}
+
+.cal-grille {
+  display: flex;
+  min-width: 1320px;
+  border-radius: 22px;
+  overflow: hidden;
+  border: 1px solid rgba(178, 197, 217, 0.4);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: var(--shadow-card);
+}
+
+.cal-col-heures {
+  width: 72px;
+  flex-shrink: 0;
+  border-right: 1px solid rgba(178, 197, 217, 0.36);
+}
+
+.cal-entete-vide,
+.cal-entete-jour {
+  height: 56px;
+  border-bottom: 1px solid rgba(178, 197, 217, 0.36);
+}
+
+.cal-entete-jour {
+  display: grid;
+  gap: 0.1rem;
+  align-content: center;
+  padding: 0.75rem;
+  background: rgba(236, 245, 255, 0.96);
+}
+
+.cal-jour-nom {
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.cal-jour-date {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.cal-heure-cell,
+.cal-slot {
+  height: 60px;
+  border-bottom: 1px solid rgba(178, 197, 217, 0.22);
+}
+
+.cal-heure-cell {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 0.35rem;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.cal-col-jour {
+  flex: 1;
+  border-right: 1px solid rgba(178, 197, 217, 0.36);
+}
+
+.cal-col-jour:last-child {
+  border-right: none;
+}
+
+.cal-col-body {
+  position: relative;
+}
+
+.cal-seance {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  z-index: 1;
+  display: grid;
+  gap: 0.12rem;
+  padding: 0.45rem 0.55rem;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #0ea5e9, #6b6cf6);
+  color: #ffffff;
+  overflow: hidden;
+  box-shadow: 0 12px 24px rgba(77, 111, 229, 0.24);
+}
+
+.cal-seance-code {
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.cal-seance-nom,
+.cal-seance-salle,
+.cal-seance-prof {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.76rem;
+}
+
+.cal-seance-salle,
+.cal-seance-prof {
+  opacity: 0.9;
+}
+
+@media (max-width: 768px) {
+  .planning-container {
+    gap: 0.85rem;
+  }
+
+  .planning-infos {
+    padding: 16px;
+  }
+
+  .cal-nav {
+    gap: 0.6rem;
+  }
 }

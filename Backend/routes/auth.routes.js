@@ -1,76 +1,67 @@
 /**
- * Routes d'authentification de l'application.
+ * ROUTES - Module Authentification
+ *
+ * Ce module definit toutes les routes HTTP liees a l'authentification.
  */
 
-import { Router } from "express";
-import bcrypt from "bcrypt";
+import passport from "passport";
+import { userAuth, userNotAuth } from "../middlewares/auth.js";
 import {
-  findByEmail,
-  findRolesByUserId,
-} from "../src/model/utilisateur.js";
+  emailIsValid,
+  passwordIsValid,
+} from "../src/validations/auth.validation.js";
 
-const router = Router();
+/**
+ * Initialiser les routes d'authentification.
+ *
+ * @param {import("express").Express} app Application Express.
+ */
+export default function authRoutes(app) {
+  app.post(
+    "/auth/login",
+    userNotAuth,
+    emailIsValid,
+    passwordIsValid,
+    (request, response, next) => {
+      passport.authenticate("local", (error, user, info) => {
+        if (error) {
+          return next(error);
+        }
 
-router.post("/login", async (req, res) => {
-  try {
-    const { email, password } = req.body ?? {};
+        if (!user) {
+          return response.status(401).json(info);
+        }
 
-    if (!email || !password) {
-      return res
-        .status(400)
-        .json({ message: "Email et mot de passe requis" });
+        request.logIn(user, (erreur) => {
+          if (erreur) {
+            return next(erreur);
+          }
+
+          return response.sendStatus(200);
+        });
+      })(request, response, next);
     }
+  );
 
-    const cleanEmail = String(email).toLowerCase().trim();
-    const user = await findByEmail(cleanEmail);
+  app.post(
+    "/auth/logout",
+    userAuth,
+    (request, response, next) => {
+      request.logOut((erreur) => {
+        if (erreur) {
+          return next(erreur);
+        }
 
-    if (!user) {
-      return res.status(401).json({ message: "Identifiants invalides" });
+        return response.status(200).end();
+      });
     }
+  );
 
-    const passwordOk = await bcrypt.compare(password, user.mot_de_passe_hash);
-
-    if (!passwordOk) {
-      return res.status(401).json({ message: "Identifiants invalides" });
+  app.get(
+    "/auth/me",
+    userAuth,
+    (request, response) => {
+      response.status(200).json(request.user);
     }
-
-    const roles = await findRolesByUserId(user.id);
-
-    req.session.user = {
-      id: user.id,
-      email: user.email,
-      nom: user.nom,
-      prenom: user.prenom,
-      roles,
-    };
-
-    return res.json({
-      message: "Connexion reussie",
-      user: req.session.user,
-    });
-  } catch (error) {
-    console.error("Erreur login :", error);
-    return res.status(500).json({ message: "Erreur serveur" });
-  }
-});
-
-router.post("/logout", (req, res) => {
-  if (!req.session) {
-    return res.json({ message: "Aucune session active" });
-  }
-
-  req.session.destroy(() => {
-    res.clearCookie("sid");
-    res.json({ message: "Deconnexion reussie" });
-  });
-});
-
-router.get("/me", (req, res) => {
-  if (!req.session?.user) {
-    return res.status(401).json({ message: "Authentification requise" });
-  }
-
-  return res.json(req.session.user);
-});
-
-export default router;
+  );
+}

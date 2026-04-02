@@ -1,25 +1,27 @@
 :root {
-  color-scheme: dark;
-  --bg-start: #06142d;
-  --bg-mid: #081a3d;
-  --bg-end: #1a1d63;
-  --panel: rgba(15, 23, 42, 0.52);
-  --panel-strong: rgba(12, 22, 48, 0.82);
-  --panel-soft: rgba(30, 41, 59, 0.72);
-  --line: rgba(255, 255, 255, 0.08);
-  --line-soft: rgba(255, 255, 255, 0.06);
-  --text: #f8fafc;
-  --muted: rgba(226, 232, 240, 0.72);
-  --purple: #7c3aed;
-  --purple-2: #a855f7;
-  --success: #22c55e;
-  --danger: #fb7185;
-  --blue: #3b82f6;
+  color-scheme: light;
+  --bg-start: #f6fbff;
+  --bg-mid: #eef6ff;
+  --bg-end: #fff9ef;
+  --panel: rgba(255, 255, 255, 0.82);
+  --panel-strong: rgba(255, 255, 255, 0.94);
+  --panel-soft: rgba(244, 248, 252, 0.92);
+  --line: rgba(157, 181, 209, 0.3);
+  --line-soft: rgba(186, 205, 227, 0.26);
+  --text: #17324d;
+  --muted: #6b8198;
+  --purple: #6b6cf6;
+  --purple-2: #8a63f9;
+  --success: #16a34a;
+  --danger: #e11d48;
+  --blue: #0ea5e9;
   --teal: #14b8a6;
   --radius-xl: 24px;
   --radius-lg: 18px;
   --radius-md: 14px;
-  --shadow-purple: 0 14px 28px rgba(124, 58, 237, 0.28);
+  --shadow-purple: 0 18px 34px rgba(107, 108, 246, 0.2);
+  --shadow-card: 0 24px 55px rgba(128, 157, 189, 0.18);
+  --shadow-soft: 0 14px 30px rgba(169, 188, 210, 0.16);
 }
 
 * {
@@ -34,18 +36,25 @@ body,
 
 body {
   margin: 0;
-  font-family: Inter, Roboto, Arial, sans-serif;
+  font-family: "Segoe UI", Inter, Roboto, Arial, sans-serif;
   background:
-    radial-gradient(circle at top left, rgba(59, 130, 246, 0.12), transparent 24%),
-    radial-gradient(circle at bottom right, rgba(124, 58, 237, 0.16), transparent 26%),
-    linear-gradient(135deg, var(--bg-start) 0%, var(--bg-mid) 45%, var(--bg-end) 100%);
+    radial-gradient(circle at top left, rgba(14, 165, 233, 0.12), transparent 24%),
+    radial-gradient(circle at bottom right, rgba(107, 108, 246, 0.1), transparent 24%),
+    linear-gradient(135deg, var(--bg-start) 0%, var(--bg-mid) 48%, #f9fbff 100%);
   color: var(--text);
 }
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
+}
+
+input,
+select,
+textarea {
+  color-scheme: light;
 }
 
 svg {
@@ -73,15 +82,20 @@ svg {
   border: 1px solid var(--line);
   border-radius: 24px;
   background: var(--panel-strong);
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+  box-shadow: var(--shadow-card);
+}
+
+.app-loading-screen__card p {
+  margin: 0;
+  color: var(--muted);
 }
 
 .app-loading-screen__spinner {
   width: 46px;
   height: 46px;
   border-radius: 999px;
-  border: 4px solid rgba(255, 255, 255, 0.15);
-  border-top-color: #8b5cf6;
+  border: 4px solid rgba(125, 171, 220, 0.2);
+  border-top-color: var(--purple);
   animation: spin 0.9s linear infinite;
 }
 

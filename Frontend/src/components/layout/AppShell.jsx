@@ -1,5 +1,12 @@
+/**
+ * COMPONENT - App Shell
+ *
+ * Ce composant fournit la structure principale
+ * de navigation et de mise en page.
+ */
 import { NavLink } from "react-router-dom";
 import "../../styles/AppShell.css";
+import { utilisateurEstResponsable } from "../../utils/roles.js";
 
 function IconDashboard() {
   return (
@@ -65,6 +72,54 @@ function IconAffectations() {
   );
 }
 
+function IconDisponibilites() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none">
+      <rect x="4" y="5" width="16" height="15" rx="2" />
+      <path d="M8 3V7" />
+      <path d="M16 3V7" />
+      <path d="M4 10H20" />
+      <path d="M9 14H12" />
+      <path d="M9 17H15" />
+    </svg>
+  );
+}
+
+function IconHorairesProfesseurs() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none">
+      <circle cx="8" cy="8" r="3" />
+      <path d="M3.5 18C3.5 15.79 5.52 14 8 14C10.48 14 12.5 15.79 12.5 18" />
+      <rect x="14" y="5" width="7" height="12" rx="2" />
+      <path d="M16.5 9H18.5" />
+      <path d="M16.5 12H18.5" />
+    </svg>
+  );
+}
+
+function IconHorairesGroupes() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none">
+      <rect x="4" y="5" width="16" height="14" rx="2" />
+      <path d="M8 9H16" />
+      <path d="M8 13H12" />
+      <path d="M15 12C15 10.34 16.34 9 18 9" />
+      <path d="M16 16H19" />
+    </svg>
+  );
+}
+
+function IconAdmins() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none">
+      <circle cx="9" cy="8" r="3" />
+      <path d="M4 18C4 15.79 6.24 14 9 14C11.76 14 14 15.79 14 18" />
+      <path d="M18 7V13" />
+      <path d="M15 10H21" />
+    </svg>
+  );
+}
+
 function IconLogout() {
   return (
     <svg viewBox="0 0 24 24" fill="none">
@@ -78,8 +133,12 @@ function IconLogout() {
 function IconBrand() {
   return (
     <svg viewBox="0 0 24 24" fill="none">
-      <circle cx="12" cy="12" r="8" />
-      <path d="M12 7V12L15.5 14" />
+      <path d="M3 9L12 4L21 9" />
+      <path d="M5 10V18" />
+      <path d="M9 10V18" />
+      <path d="M15 10V18" />
+      <path d="M19 10V18" />
+      <path d="M3 20H21" />
     </svg>
   );
 }
@@ -91,10 +150,15 @@ export function AppShell({
   title = "Gestion des Horaires",
   subtitle = "",
 }) {
+  const rolesUtilisateur = Array.isArray(utilisateur?.roles) ? utilisateur.roles : [];
+  const estResponsable = utilisateurEstResponsable(utilisateur);
+  const rolePrincipal = rolesUtilisateur.includes("RESPONSABLE")
+    ? "RESPONSABLE"
+    : rolesUtilisateur[0] || utilisateur?.role || "Utilisateur";
   const nomAffiche =
-    `${utilisateur?.prenom || ""} ${utilisateur?.nom || ""}`.trim() ||
+    `${utilisateur?.nom || ""} ${utilisateur?.prenom || ""}`.trim() ||
     utilisateur?.email ||
-    "Utilisateur connecté";
+    "Utilisateur connecte";
 
   return (
     <div className="app-shell">
@@ -104,11 +168,18 @@ export function AppShell({
             <IconBrand />
           </div>
           <div className="app-shell__brand-text">
-            <div className="app-shell__brand-title">Gestion Horaires</div>
-            <div className="app-shell__brand-subtitle">v5</div>
+            <div className="app-shell__brand-title">College Horaires</div>
+            <div className="app-shell__brand-subtitle">Coordination academique</div>
           </div>
         </div>
 
+        <div className="app-shell__sidebar-note">
+          <span className="app-shell__sidebar-note-label">Session active</span>
+          <strong>Portail campus</strong>
+          <p>Organisation pedagogique, affectations et suivi des cohortes.</p>
+        </div>
+
+        <div className="app-shell__nav-label">Navigation campus</div>
         <nav className="app-shell__nav" aria-label="Navigation principale">
           <NavLink
             to="/dashboard"
@@ -151,29 +222,71 @@ export function AppShell({
           </NavLink>
 
           <NavLink
+            to="/disponibilites-professeurs"
+            className={({ isActive }) =>
+              `app-shell__nav-item ${isActive ? "app-shell__nav-item--active" : ""}`
+            }
+          >
+            <span className="app-shell__nav-icon"><IconDisponibilites /></span>
+            <span>Disponibilites</span>
+          </NavLink>
+
+          <NavLink
             to="/import-etudiants"
             className={({ isActive }) =>
               `app-shell__nav-item ${isActive ? "app-shell__nav-item--active" : ""}`
             }
           >
             <span className="app-shell__nav-icon"><IconImport /></span>
-            <span>Import étudiants</span>
+            <span>Import etudiants</span>
           </NavLink>
 
           <NavLink
-            to="/affectations"
+            to="/generer"
             className={({ isActive }) =>
               `app-shell__nav-item ${isActive ? "app-shell__nav-item--active" : ""}`
             }
           >
             <span className="app-shell__nav-icon"><IconAffectations /></span>
-            <span>Affectations</span>
+            <span>Generer</span>
           </NavLink>
+
+          <NavLink
+            to="/horaires-professeurs"
+            className={({ isActive }) =>
+              `app-shell__nav-item ${isActive ? "app-shell__nav-item--active" : ""}`
+            }
+          >
+            <span className="app-shell__nav-icon"><IconHorairesProfesseurs /></span>
+            <span>Horaires professeurs</span>
+          </NavLink>
+
+          <NavLink
+            to="/horaires-groupes"
+            className={({ isActive }) =>
+              `app-shell__nav-item ${isActive ? "app-shell__nav-item--active" : ""}`
+            }
+          >
+            <span className="app-shell__nav-icon"><IconHorairesGroupes /></span>
+            <span>Horaires groupes</span>
+          </NavLink>
+
+          {estResponsable ? (
+            <NavLink
+              to="/admins"
+              className={({ isActive }) =>
+                `app-shell__nav-item ${isActive ? "app-shell__nav-item--active" : ""}`
+              }
+            >
+              <span className="app-shell__nav-icon"><IconAdmins /></span>
+              <span>Sous-admins</span>
+            </NavLink>
+          ) : null}
         </nav>
 
         <button className="app-shell__logout" type="button" onClick={onLogout}>
           <span className="app-shell__nav-icon"><IconLogout /></span>
-          <span>Déconnexion</span>
+          <span>Deconnexion</span>
         </button>
       </aside>
 
@@ -193,7 +306,7 @@ export function AppShell({
             <div className="app-shell__user-text">
               <div className="app-shell__user-name">{nomAffiche}</div>
               <div className="app-shell__user-role">
-                {utilisateur?.roles?.[0] || utilisateur?.role || "Utilisateur"}
+                {rolePrincipal}
               </div>
             </div>
           </div>

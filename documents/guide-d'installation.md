@@ -74,12 +74,18 @@ Backend : http://localhost:3000
 
 ---
 
+
 ## 7. Compte administrateur
 
 Email : admin@ecole.ca  
 Mot de passe : Admin123!
 ## changer le mot de passe après connexion
 
+
+## 7. Compte responsable
+
+Email :   responsable@ecole.ca ,
+Mot de passe : Resp123!
 ---
 
 ## 8. Remarques

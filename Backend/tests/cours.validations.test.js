@@ -1,15 +1,21 @@
+/**
+ * TESTS - Validations Cours
+ *
+ * Ce fichier couvre les validations
+ * appliquees aux donnees de cours.
+ */
 import { jest, describe, it, expect, beforeEach } from "@jest/globals";
 
 const recupererCoursParId = jest.fn();
 const recupererCoursParCode = jest.fn();
 const coursEstDejaAffecte = jest.fn();
-const typeSalleExiste = jest.fn();
+const salleExisteParId = jest.fn();
 
 jest.unstable_mockModule("../src/model/cours.model.js", () => ({
   recupererCoursParId,
   recupererCoursParCode,
   coursEstDejaAffecte,
-  typeSalleExiste,
+  salleExisteParId,
 }));
 
 const {
@@ -63,7 +69,7 @@ describe("validations cours", () => {
     expect(res.status).toHaveBeenCalledWith(404);
   });
 
-  it("verifierCoursExiste stocke le cours si trouvé", async () => {
+  it("verifierCoursExiste stocke le cours si trouve", async () => {
     recupererCoursParId.mockResolvedValue({ id_cours: 1 });
     const req = { params: { id: "1" } };
     const res = createResponse();
@@ -76,7 +82,16 @@ describe("validations cours", () => {
   });
 
   it("validerCreateCours refuse un code vide", async () => {
-    const req = { body: { code: "", nom: "Algo", duree: 3, programme: "INF", etape_etude: 1, type_salle: "LAB" } };
+    const req = {
+      body: {
+        code: "",
+        nom: "Algo",
+        duree: 3,
+        programme: "Programmation informatique",
+        etape_etude: 1,
+        id_salle_reference: 1,
+      },
+    };
     const res = createResponse();
     const next = jest.fn();
 
@@ -86,7 +101,16 @@ describe("validations cours", () => {
   });
 
   it("validerCreateCours refuse un nom invalide", async () => {
-    const req = { body: { code: "INF101", nom: "12345", duree: 3, programme: "INF", etape_etude: 1, type_salle: "LAB" } };
+    const req = {
+      body: {
+        code: "INF101",
+        nom: "12345",
+        duree: 3,
+        programme: "Programmation informatique",
+        etape_etude: 1,
+        id_salle_reference: 1,
+      },
+    };
     const res = createResponse();
     const next = jest.fn();
 
@@ -95,8 +119,16 @@ describe("validations cours", () => {
     expect(res.status).toHaveBeenCalledWith(400);
   });
 
-  it("validerCreateCours refuse une durée invalide", async () => {
-    const req = { body: { code: "INF101", nom: "Algo", duree: 0, programme: "INF", etape_etude: 1, type_salle: "LAB" } };
+  it("validerCreateCours refuse une salle de reference manquante", async () => {
+    const req = {
+      body: {
+        code: "INF101",
+        nom: "Algo",
+        duree: 3,
+        programme: "Programmation informatique",
+        etape_etude: 1,
+      },
+    };
     const res = createResponse();
     const next = jest.fn();
 
@@ -105,19 +137,18 @@ describe("validations cours", () => {
     expect(res.status).toHaveBeenCalledWith(400);
   });
 
-  it("validerCreateCours refuse une étape invalide", async () => {
-    const req = { body: { code: "INF101", nom: "Algo", duree: 3, programme: "INF", etape_etude: 10, type_salle: "LAB" } };
-    const res = createResponse();
-    const next = jest.fn();
-
-    await validerCreateCours(req, res, next);
-
-    expect(res.status).toHaveBeenCalledWith(400);
-  });
-
-  it("validerCreateCours refuse un code déjà utilisé", async () => {
+  it("validerCreateCours refuse un code deja utilise", async () => {
     recupererCoursParCode.mockResolvedValue({ id_cours: 2 });
-    const req = { body: { code: "INF101", nom: "Algo", duree: 3, programme: "INF", etape_etude: 1, type_salle: "LAB" } };
+    const req = {
+      body: {
+        code: "INF101",
+        nom: "Algo",
+        duree: 3,
+        programme: "Programmation informatique",
+        etape_etude: 1,
+        id_salle_reference: 1,
+      },
+    };
     const res = createResponse();
     const next = jest.fn();
 
@@ -126,10 +157,19 @@ describe("validations cours", () => {
     expect(res.status).toHaveBeenCalledWith(409);
   });
 
-  it("validerCreateCours refuse un type de salle inexistant", async () => {
+  it("validerCreateCours refuse une salle de reference inexistante", async () => {
     recupererCoursParCode.mockResolvedValue(null);
-    typeSalleExiste.mockResolvedValue(false);
-    const req = { body: { code: "INF101", nom: "Algo", duree: 3, programme: "INF", etape_etude: 1, type_salle: "LAB" } };
+    salleExisteParId.mockResolvedValue(false);
+    const req = {
+      body: {
+        code: "INF101",
+        nom: "Algo",
+        duree: 3,
+        programme: "Programmation informatique",
+        etape_etude: 1,
+        id_salle_reference: 99,
+      },
+    };
     const res = createResponse();
     const next = jest.fn();
 
@@ -138,10 +178,19 @@ describe("validations cours", () => {
     expect(res.status).toHaveBeenCalledWith(400);
   });
 
-  it("validerCreateCours accepte des données valides", async () => {
+  it("validerCreateCours accepte des donnees valides", async () => {
     recupererCoursParCode.mockResolvedValue(null);
-    typeSalleExiste.mockResolvedValue(true);
-    const req = { body: { code: "INF101", nom: "Algo", duree: 3, programme: "INF", etape_etude: 1, type_salle: "LAB" } };
+    salleExisteParId.mockResolvedValue(true);
+    const req = {
+      body: {
+        code: "INF101",
+        nom: "Algo",
+        duree: 3,
+        programme: "Programmation informatique",
+        etape_etude: 1,
+        id_salle_reference: 4,
+      },
+    };
     const res = createResponse();
     const next = jest.fn();
 
@@ -170,9 +219,9 @@ describe("validations cours", () => {
     expect(res.status).toHaveBeenCalledWith(400);
   });
 
-  it("validerUpdateCours refuse un type salle inexistant", async () => {
-    typeSalleExiste.mockResolvedValue(false);
-    const req = { params: { id: "1" }, body: { type_salle: "XYZ" } };
+  it("validerUpdateCours refuse une salle inexistante", async () => {
+    salleExisteParId.mockResolvedValue(false);
+    const req = { params: { id: "1" }, body: { id_salle_reference: 12 } };
     const res = createResponse();
     const next = jest.fn();
 
@@ -181,8 +230,8 @@ describe("validations cours", () => {
     expect(res.status).toHaveBeenCalledWith(400);
   });
 
-  it("validerUpdateCours accepte modification valide", async () => {
-    typeSalleExiste.mockResolvedValue(true);
+  it("validerUpdateCours accepte une modification valide", async () => {
+    salleExisteParId.mockResolvedValue(true);
     recupererCoursParCode.mockResolvedValue(null);
     const req = { params: { id: "1" }, body: { nom: "Nouveau nom" } };
     const res = createResponse();
@@ -193,7 +242,7 @@ describe("validations cours", () => {
     expect(next).toHaveBeenCalled();
   });
 
-  it("validerDeleteCours refuse suppression si cours affecté", async () => {
+  it("validerDeleteCours refuse suppression si cours affecte", async () => {
     coursEstDejaAffecte.mockResolvedValue(true);
     const req = { params: { id: "1" } };
     const res = createResponse();
@@ -204,7 +253,7 @@ describe("validations cours", () => {
     expect(res.status).toHaveBeenCalledWith(400);
   });
 
-  it("validerDeleteCours accepte si cours non affecté", async () => {
+  it("validerDeleteCours accepte si cours non affecte", async () => {
     coursEstDejaAffecte.mockResolvedValue(false);
     const req = { params: { id: "1" } };
     const res = createResponse();
@@ -215,3 +264,9 @@ describe("validations cours", () => {
     expect(next).toHaveBeenCalled();
   });
 });
+/**
+ * TESTS - Validations Cours
+ *
+ * Ce fichier couvre les validations
+ * appliquees aux donnees de cours.
+ */

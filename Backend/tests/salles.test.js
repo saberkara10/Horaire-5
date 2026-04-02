@@ -1,3 +1,9 @@
+/**
+ * TESTS - Routes Salles
+ *
+ * Ce fichier couvre les principaux cas
+ * des routes de gestion des salles.
+ */
 import express from "express";
 import request from "supertest";
 import { jest } from "@jest/globals";
@@ -217,3 +223,9 @@ describe("Tests routes Salles", () => {
     expect(sallesModelMock.deleteSalle).toHaveBeenCalledWith(1);
   });
 });
+/**
+ * TESTS - Routes Salles
+ *
+ * Ce fichier couvre les principaux cas
+ * des routes de gestion des salles.
+ */

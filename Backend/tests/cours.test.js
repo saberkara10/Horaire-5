@@ -1,5 +1,18 @@
+/**
+ * TESTS - Routes Cours
+ *
+ * Ce fichier couvre les principaux cas
+ * des routes de gestion des cours.
+ */
 import request from "supertest";
-import { beforeEach, describe, expect, jest, test } from "@jest/globals";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  jest,
+  test,
+} from "@jest/globals";
 
 const coursModelMock = {
   recupererTousLesCours: jest.fn(),
@@ -10,7 +23,7 @@ const coursModelMock = {
   modifierCours: jest.fn(),
   supprimerCours: jest.fn(),
   coursEstDejaAffecte: jest.fn(),
-  typeSalleExiste: jest.fn(),
+  salleExisteParId: jest.fn(),
 };
 
 await jest.unstable_mockModule("../src/model/cours.model.js", () => coursModelMock);
@@ -18,8 +31,15 @@ await jest.unstable_mockModule("../src/model/cours.model.js", () => coursModelMo
 const { default: app } = await import("../src/app.js");
 
 describe("Tests routes Cours", () => {
+  let consoleErrorSpy;
+
   beforeEach(() => {
     jest.clearAllMocks();
+    consoleErrorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    consoleErrorSpy.mockRestore();
   });
 
   test("GET /api/cours retourne 200 avec la liste des cours", async () => {
@@ -28,10 +48,12 @@ describe("Tests routes Cours", () => {
         id_cours: 1,
         code: "INF101",
         nom: "Programmation",
-        duree: 30,
-        programme: "Informatique",
+        duree: 2,
+        programme: "Programmation informatique",
         etape_etude: 1,
-        type_salle: "Laboratoire",
+        id_salle_reference: 3,
+        salle_code: "A101",
+        salle_type: "Laboratoire",
       },
     ]);
 
@@ -70,10 +92,12 @@ describe("Tests routes Cours", () => {
       id_cours: 1,
       code: "INF101",
       nom: "Programmation",
-      duree: 30,
-      programme: "Informatique",
+      duree: 2,
+      programme: "Programmation informatique",
       etape_etude: 1,
-      type_salle: "Laboratoire",
+      id_salle_reference: 3,
+      salle_code: "A101",
+      salle_type: "Laboratoire",
     });
 
     const response = await request(app).get("/api/cours/1");
@@ -89,7 +113,7 @@ describe("Tests routes Cours", () => {
       duree: 0,
       programme: "",
       etape_etude: 10,
-      type_salle: "",
+      id_salle_reference: 0,
     });
 
     expect(response.statusCode).toBe(400);
@@ -104,10 +128,10 @@ describe("Tests routes Cours", () => {
     const response = await request(app).post("/api/cours").send({
       code: "INF101",
       nom: "Cours Test",
-      duree: 30,
-      programme: "Informatique",
+      duree: 2,
+      programme: "Programmation informatique",
       etape_etude: 1,
-      type_salle: "Laboratoire",
+      id_salle_reference: 5,
     });
 
     expect(response.statusCode).toBe(409);
@@ -115,42 +139,56 @@ describe("Tests routes Cours", () => {
 
   test("POST /api/cours retourne 201 si succes", async () => {
     coursModelMock.recupererCoursParCode.mockResolvedValue(null);
-    coursModelMock.typeSalleExiste.mockResolvedValue(true);
+    coursModelMock.salleExisteParId.mockResolvedValue(true);
     coursModelMock.ajouterCours.mockResolvedValue({
       id_cours: 2,
       code: "TEST101",
       nom: "Cours Test",
-      duree: 30,
-      programme: "Informatique",
+      duree: 2,
+      programme: "Programmation informatique",
       etape_etude: 1,
-      type_salle: "Laboratoire",
+      id_salle_reference: 5,
+      salle_code: "B204",
+      salle_type: "Laboratoire",
     });
 
     const response = await request(app).post("/api/cours").send({
       code: "TEST101",
       nom: "Cours Test",
-      duree: 30,
-      programme: "Informatique",
+      duree: 2,
+      programme: "Programmation informatique",
       etape_etude: 1,
-      type_salle: "Laboratoire",
+      id_salle_reference: 5,
     });
 
     expect(response.statusCode).toBe(201);
     expect(response.body.code).toBe("TEST101");
   });
 
+  test("POST /api/cours retourne 400 si salle de reference absente", async () => {
+    const response = await request(app).post("/api/cours").send({
+      code: "TEST101",
+      nom: "Cours Test",
+      duree: 2,
+      programme: "Programmation informatique",
+      etape_etude: 1,
+    });
+
+    expect(response.statusCode).toBe(400);
+  });
+
   test("POST /api/cours retourne 500 si erreur serveur", async () => {
     coursModelMock.recupererCoursParCode.mockResolvedValue(null);
-    coursModelMock.typeSalleExiste.mockResolvedValue(true);
+    coursModelMock.salleExisteParId.mockResolvedValue(true);
     coursModelMock.ajouterCours.mockRejectedValue(new Error("DB error"));
 
     const response = await request(app).post("/api/cours").send({
       code: "TEST101",
       nom: "Cours Test",
-      duree: 30,
-      programme: "Informatique",
+      duree: 2,
+      programme: "Programmation informatique",
       etape_etude: 1,
-      type_salle: "Laboratoire",
+      id_salle_reference: 5,
     });
 
     expect(response.statusCode).toBe(500);
@@ -180,10 +218,10 @@ describe("Tests routes Cours", () => {
       id_cours: 1,
       code: "INF101",
       nom: "Programmation",
-      duree: 30,
-      programme: "Informatique",
+      duree: 2,
+      programme: "Programmation informatique",
       etape_etude: 1,
-      type_salle: "Laboratoire",
+      id_salle_reference: 3,
     });
 
     const response = await request(app).put("/api/cours/1").send({ archive: true });
@@ -196,10 +234,10 @@ describe("Tests routes Cours", () => {
       id_cours: 1,
       code: "INF101",
       nom: "Programmation",
-      duree: 30,
-      programme: "Informatique",
+      duree: 2,
+      programme: "Programmation informatique",
       etape_etude: 1,
-      type_salle: "Laboratoire",
+      id_salle_reference: 3,
     });
     coursModelMock.recupererCoursParCode.mockResolvedValue(null);
     coursModelMock.modifierCours.mockResolvedValue({
@@ -221,10 +259,10 @@ describe("Tests routes Cours", () => {
       id_cours: 1,
       code: "INF101",
       nom: "Programmation",
-      duree: 30,
-      programme: "Informatique",
+      duree: 2,
+      programme: "Programmation informatique",
       etape_etude: 1,
-      type_salle: "Laboratoire",
+      id_salle_reference: 3,
     });
     coursModelMock.recupererCoursParCode.mockResolvedValue(null);
     coursModelMock.modifierCours.mockRejectedValue(new Error("DB error"));

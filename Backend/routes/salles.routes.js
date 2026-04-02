@@ -1,3 +1,9 @@
+/**
+ * ROUTES - Module Salles
+ *
+ * Ce module definit les routes HTTP liees
+ * a la gestion des salles.
+ */
 import {
   addSalle,
   deleteSalle,
@@ -114,3 +120,9 @@ export default function sallesRoutes(app) {
     }
   );
 }
+/**
+ * ROUTES - Module Salles
+ *
+ * Ce module definit les routes HTTP liees
+ * a la gestion des salles.
+ */

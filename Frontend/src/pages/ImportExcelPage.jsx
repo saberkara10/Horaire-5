@@ -1,3 +1,9 @@
+/**
+ * PAGE - Import Excel
+ *
+ * Cette page gere les imports
+ * de donnees depuis des fichiers Excel.
+ */
 import { useState } from "react";
 import { AppShell } from "../components/layout/AppShell.jsx";
 import * as XLSX from "xlsx";
@@ -119,3 +125,9 @@ export function ImportExcelPage({ moduleActif, onChangerModule }) {
     </AppShell>
   );
 }
+/**
+ * PAGE - Import Excel
+ *
+ * Cette page gere les imports
+ * de donnees depuis des fichiers Excel.
+ */

@@ -1,3 +1,9 @@
+/**
+ * SERVICE - API Core
+ *
+ * Ce service centralise les appels HTTP
+ * generiques de l'application.
+ */
 async function lireReponse(response) {
   const contentType = response.headers.get("content-type") || "";
 
@@ -9,7 +15,10 @@ async function lireReponse(response) {
 }
 
 export async function apiRequest(url, options = {}) {
-  const response = await fetch(url, options);
+  const response = await fetch(url, {
+    credentials: "include",
+    ...options,
+  });
   const data = await lireReponse(response);
 
   if (!response.ok) {
@@ -20,3 +29,9 @@ export async function apiRequest(url, options = {}) {
 
   return data;
 }
+/**
+ * SERVICE - API Core
+ *
+ * Ce service centralise les appels HTTP
+ * generiques de l'application.
+ */

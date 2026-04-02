@@ -1,3 +1,10 @@
+/**
+ * UTILS - Salles
+ *
+ * Ce module fournit les helpers
+ * utilitaires lies aux salles.
+ */
+
 export function construireLibelleSalle(salle) {
   return `${salle.code} - ${salle.type}`.trim();
 }
