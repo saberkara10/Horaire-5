@@ -1,0 +1,4957 @@
+{
+  "session": {
+    "id_session": 3,
+    "nom": "Hiver 2026",
+    "date_debut": "2026-01-01T05:00:00.000Z",
+    "date_fin": "2026-04-24T04:00:00.000Z"
+  },
+  "filtres": {
+    "codes": [
+      "INF105",
+      "INF201"
+    ],
+    "matricules": [],
+    "idEtudiant": null,
+    "statut": "resolution_manuelle"
+  },
+  "total_cas": 5,
+  "diagnostics": [
+    {
+      "etudiant": {
+        "id_etudiant": 28699,
+        "matricule": "RPT20260408222942PIE2005",
+        "nom": "Benali",
+        "prenom": "Ethan",
+        "groupe_principal": "GPI-E2-1"
+      },
+      "cours_echoue": {
+        "id_cours_echoue": 1301,
+        "id_cours": 8,
+        "code": "INF105",
+        "nom": "Genie logiciel et versionnement",
+        "statut": "resolution_manuelle"
+      },
+      "groupes_candidats": [
+        {
+          "id_groupe": 1636,
+          "nom_groupe": "GPI-E1-1",
+          "max_etudiants_par_groupe": 28,
+          "effectif_principal": 28,
+          "reprises_planifiees": 0,
+          "effectif_total": 28,
+          "plages_horaires": [
+            {
+              "date": "2026-01-07",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-01-14",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-01-21",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-01-28",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-02-04",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-02-11",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-02-18",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-02-25",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-03-04",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-03-11",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-03-18",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-03-25",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-04-01",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-04-08",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-04-15",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-04-22",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            }
+          ],
+          "decision": "REJETE",
+          "compatibilite_horaire": true,
+          "place_disponible": false,
+          "raisons": [
+            {
+              "code": "GROUPE_COMPLET",
+              "message": "Le groupe est plein: 28/28."
+            }
+          ],
+          "conflits": []
+        },
+        {
+          "id_groupe": 1637,
+          "nom_groupe": "GPI-E1-2",
+          "max_etudiants_par_groupe": 28,
+          "effectif_principal": 28,
+          "reprises_planifiees": 0,
+          "effectif_total": 28,
+          "plages_horaires": [
+            {
+              "date": "2026-01-02",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-01-09",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-01-16",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-01-23",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-01-30",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-02-06",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-02-13",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-02-20",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-02-27",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-03-06",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-03-13",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-03-20",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-03-27",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-04-03",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-04-10",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-04-17",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-04-24",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            }
+          ],
+          "decision": "REJETE",
+          "compatibilite_horaire": false,
+          "place_disponible": false,
+          "raisons": [
+            {
+              "code": "GROUPE_COMPLET",
+              "message": "Le groupe est plein: 28/28."
+            },
+            {
+              "code": "CONFLIT_HORAIRE",
+              "message": "17 conflit(s) detecte(s) avec l'horaire principal ou une reprise deja planifiee."
+            }
+          ],
+          "conflits": [
+            {
+              "date": "2026-01-02",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF201",
+                "nom_cours": "Programmation orientee objet",
+                "groupe_source": "GPI-E2-1",
+                "date": "2026-01-02",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-01-09",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF201",
+                "nom_cours": "Programmation orientee objet",
+                "groupe_source": "GPI-E2-1",
+                "date": "2026-01-09",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-01-16",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF201",
+                "nom_cours": "Programmation orientee objet",
+                "groupe_source": "GPI-E2-1",
+                "date": "2026-01-16",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-01-23",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF201",
+                "nom_cours": "Programmation orientee objet",
+                "groupe_source": "GPI-E2-1",
+                "date": "2026-01-23",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-01-30",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF201",
+                "nom_cours": "Programmation orientee objet",
+                "groupe_source": "GPI-E2-1",
+                "date": "2026-01-30",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-02-06",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF201",
+                "nom_cours": "Programmation orientee objet",
+                "groupe_source": "GPI-E2-1",
+                "date": "2026-02-06",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-02-13",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF201",
+                "nom_cours": "Programmation orientee objet",
+                "groupe_source": "GPI-E2-1",
+                "date": "2026-02-13",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-02-20",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF201",
+                "nom_cours": "Programmation orientee objet",
+                "groupe_source": "GPI-E2-1",
+                "date": "2026-02-20",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-02-27",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF201",
+                "nom_cours": "Programmation orientee objet",
+                "groupe_source": "GPI-E2-1",
+                "date": "2026-02-27",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-03-06",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF201",
+                "nom_cours": "Programmation orientee objet",
+                "groupe_source": "GPI-E2-1",
+                "date": "2026-03-06",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-03-13",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF201",
+                "nom_cours": "Programmation orientee objet",
+                "groupe_source": "GPI-E2-1",
+                "date": "2026-03-13",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-03-20",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF201",
+                "nom_cours": "Programmation orientee objet",
+                "groupe_source": "GPI-E2-1",
+                "date": "2026-03-20",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-03-27",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF201",
+                "nom_cours": "Programmation orientee objet",
+                "groupe_source": "GPI-E2-1",
+                "date": "2026-03-27",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-04-03",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF201",
+                "nom_cours": "Programmation orientee objet",
+                "groupe_source": "GPI-E2-1",
+                "date": "2026-04-03",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-04-10",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF201",
+                "nom_cours": "Programmation orientee objet",
+                "groupe_source": "GPI-E2-1",
+                "date": "2026-04-10",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-04-17",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF201",
+                "nom_cours": "Programmation orientee objet",
+                "groupe_source": "GPI-E2-1",
+                "date": "2026-04-17",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-04-24",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF201",
+                "nom_cours": "Programmation orientee objet",
+                "groupe_source": "GPI-E2-1",
+                "date": "2026-04-24",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            }
+          ]
+        },
+        {
+          "id_groupe": 1638,
+          "nom_groupe": "GPI-E1-3",
+          "max_etudiants_par_groupe": 28,
+          "effectif_principal": 28,
+          "reprises_planifiees": 0,
+          "effectif_total": 28,
+          "plages_horaires": [
+            {
+              "date": "2026-01-02",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-01-09",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-01-16",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-01-23",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-01-30",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-02-06",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-02-13",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-02-20",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-02-27",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-03-06",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-03-13",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-03-20",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-03-27",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-04-03",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-04-10",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-04-17",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-04-24",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            }
+          ],
+          "decision": "REJETE",
+          "compatibilite_horaire": true,
+          "place_disponible": false,
+          "raisons": [
+            {
+              "code": "GROUPE_COMPLET",
+              "message": "Le groupe est plein: 28/28."
+            }
+          ],
+          "conflits": []
+        },
+        {
+          "id_groupe": 1639,
+          "nom_groupe": "GPI-E1-4",
+          "max_etudiants_par_groupe": 28,
+          "effectif_principal": 28,
+          "reprises_planifiees": 0,
+          "effectif_total": 28,
+          "plages_horaires": [
+            {
+              "date": "2026-01-05",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB217"
+            },
+            {
+              "date": "2026-01-12",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB217"
+            },
+            {
+              "date": "2026-01-19",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB217"
+            },
+            {
+              "date": "2026-01-26",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB217"
+            },
+            {
+              "date": "2026-02-02",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB217"
+            },
+            {
+              "date": "2026-02-09",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB217"
+            },
+            {
+              "date": "2026-02-16",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB217"
+            },
+            {
+              "date": "2026-02-23",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB217"
+            },
+            {
+              "date": "2026-03-02",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB217"
+            },
+            {
+              "date": "2026-03-09",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB217"
+            },
+            {
+              "date": "2026-03-16",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB217"
+            },
+            {
+              "date": "2026-03-23",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB217"
+            },
+            {
+              "date": "2026-03-30",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB217"
+            },
+            {
+              "date": "2026-04-06",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB217"
+            },
+            {
+              "date": "2026-04-13",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB217"
+            },
+            {
+              "date": "2026-04-20",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB217"
+            }
+          ],
+          "decision": "REJETE",
+          "compatibilite_horaire": true,
+          "place_disponible": false,
+          "raisons": [
+            {
+              "code": "GROUPE_COMPLET",
+              "message": "Le groupe est plein: 28/28."
+            }
+          ],
+          "conflits": []
+        }
+      ],
+      "conclusion": {
+        "cause_principale": "DONNEES_ET_CONTRAINTES",
+        "resume": "Aucun groupe n'est attribuable pour INF105: 3 groupe(s) sans conflit sont pleins, 1 groupe(s) supplementaires ont un conflit horaire."
+      }
+    },
+    {
+      "etudiant": {
+        "id_etudiant": 28735,
+        "matricule": "RPT20260408222942PIE3005",
+        "nom": "Ahmed",
+        "prenom": "Aya",
+        "groupe_principal": "GPI-E3-1"
+      },
+      "cours_echoue": {
+        "id_cours_echoue": 1313,
+        "id_cours": 8,
+        "code": "INF105",
+        "nom": "Genie logiciel et versionnement",
+        "statut": "resolution_manuelle"
+      },
+      "groupes_candidats": [
+        {
+          "id_groupe": 1636,
+          "nom_groupe": "GPI-E1-1",
+          "max_etudiants_par_groupe": 28,
+          "effectif_principal": 28,
+          "reprises_planifiees": 0,
+          "effectif_total": 28,
+          "plages_horaires": [
+            {
+              "date": "2026-01-07",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-01-14",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-01-21",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-01-28",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-02-04",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-02-11",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-02-18",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-02-25",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-03-04",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-03-11",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-03-18",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-03-25",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-04-01",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-04-08",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-04-15",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-04-22",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            }
+          ],
+          "decision": "REJETE",
+          "compatibilite_horaire": false,
+          "place_disponible": false,
+          "raisons": [
+            {
+              "code": "GROUPE_COMPLET",
+              "message": "Le groupe est plein: 28/28."
+            },
+            {
+              "code": "CONFLIT_HORAIRE",
+              "message": "16 conflit(s) detecte(s) avec l'horaire principal ou une reprise deja planifiee."
+            }
+          ],
+          "conflits": [
+            {
+              "date": "2026-01-07",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF305",
+                "nom_cours": "Tests automatises et integration continue",
+                "groupe_source": "GPI-E3-1",
+                "date": "2026-01-07",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-01-14",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF305",
+                "nom_cours": "Tests automatises et integration continue",
+                "groupe_source": "GPI-E3-1",
+                "date": "2026-01-14",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-01-21",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF305",
+                "nom_cours": "Tests automatises et integration continue",
+                "groupe_source": "GPI-E3-1",
+                "date": "2026-01-21",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-01-28",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF305",
+                "nom_cours": "Tests automatises et integration continue",
+                "groupe_source": "GPI-E3-1",
+                "date": "2026-01-28",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-02-04",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF305",
+                "nom_cours": "Tests automatises et integration continue",
+                "groupe_source": "GPI-E3-1",
+                "date": "2026-02-04",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-02-11",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF305",
+                "nom_cours": "Tests automatises et integration continue",
+                "groupe_source": "GPI-E3-1",
+                "date": "2026-02-11",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-02-18",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF305",
+                "nom_cours": "Tests automatises et integration continue",
+                "groupe_source": "GPI-E3-1",
+                "date": "2026-02-18",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-02-25",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF305",
+                "nom_cours": "Tests automatises et integration continue",
+                "groupe_source": "GPI-E3-1",
+                "date": "2026-02-25",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-03-04",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF305",
+                "nom_cours": "Tests automatises et integration continue",
+                "groupe_source": "GPI-E3-1",
+                "date": "2026-03-04",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-03-11",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF305",
+                "nom_cours": "Tests automatises et integration continue",
+                "groupe_source": "GPI-E3-1",
+                "date": "2026-03-11",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-03-18",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF305",
+                "nom_cours": "Tests automatises et integration continue",
+                "groupe_source": "GPI-E3-1",
+                "date": "2026-03-18",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-03-25",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF305",
+                "nom_cours": "Tests automatises et integration continue",
+                "groupe_source": "GPI-E3-1",
+                "date": "2026-03-25",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-04-01",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF305",
+                "nom_cours": "Tests automatises et integration continue",
+                "groupe_source": "GPI-E3-1",
+                "date": "2026-04-01",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-04-08",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF305",
+                "nom_cours": "Tests automatises et integration continue",
+                "groupe_source": "GPI-E3-1",
+                "date": "2026-04-08",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-04-15",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF305",
+                "nom_cours": "Tests automatises et integration continue",
+                "groupe_source": "GPI-E3-1",
+                "date": "2026-04-15",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-04-22",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF305",
+                "nom_cours": "Tests automatises et integration continue",
+                "groupe_source": "GPI-E3-1",
+                "date": "2026-04-22",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            }
+          ]
+        },
+        {
+          "id_groupe": 1637,
+          "nom_groupe": "GPI-E1-2",
+          "max_etudiants_par_groupe": 28,
+          "effectif_principal": 28,
+          "reprises_planifiees": 0,
+          "effectif_total": 28,
+          "plages_horaires": [
+            {
+              "date": "2026-01-02",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-01-09",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-01-16",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-01-23",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-01-30",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-02-06",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-02-13",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-02-20",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-02-27",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-03-06",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-03-13",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-03-20",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-03-27",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-04-03",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-04-10",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-04-17",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-04-24",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            }
+          ],
+          "decision": "REJETE",
+          "compatibilite_horaire": true,
+          "place_disponible": false,
+          "raisons": [
+            {
+              "code": "GROUPE_COMPLET",
+              "message": "Le groupe est plein: 28/28."
+            }
+          ],
+          "conflits": []
+        },
+        {
+          "id_groupe": 1638,
+          "nom_groupe": "GPI-E1-3",
+          "max_etudiants_par_groupe": 28,
+          "effectif_principal": 28,
+          "reprises_planifiees": 0,
+          "effectif_total": 28,
+          "plages_horaires": [
+            {
+              "date": "2026-01-02",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-01-09",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-01-16",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-01-23",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-01-30",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-02-06",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-02-13",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-02-20",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-02-27",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-03-06",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-03-13",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-03-20",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-03-27",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-04-03",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-04-10",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-04-17",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            },
+            {
+              "date": "2026-04-24",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB216"
+            }
+          ],
+          "decision": "REJETE",
+          "compatibilite_horaire": true,
+          "place_disponible": false,
+          "raisons": [
+            {
+              "code": "GROUPE_COMPLET",
+              "message": "Le groupe est plein: 28/28."
+            }
+          ],
+          "conflits": []
+        },
+        {
+          "id_groupe": 1639,
+          "nom_groupe": "GPI-E1-4",
+          "max_etudiants_par_groupe": 28,
+          "effectif_principal": 28,
+          "reprises_planifiees": 0,
+          "effectif_total": 28,
+          "plages_horaires": [
+            {
+              "date": "2026-01-05",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB217"
+            },
+            {
+              "date": "2026-01-12",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB217"
+            },
+            {
+              "date": "2026-01-19",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB217"
+            },
+            {
+              "date": "2026-01-26",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB217"
+            },
+            {
+              "date": "2026-02-02",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB217"
+            },
+            {
+              "date": "2026-02-09",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB217"
+            },
+            {
+              "date": "2026-02-16",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB217"
+            },
+            {
+              "date": "2026-02-23",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB217"
+            },
+            {
+              "date": "2026-03-02",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB217"
+            },
+            {
+              "date": "2026-03-09",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB217"
+            },
+            {
+              "date": "2026-03-16",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB217"
+            },
+            {
+              "date": "2026-03-23",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB217"
+            },
+            {
+              "date": "2026-03-30",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB217"
+            },
+            {
+              "date": "2026-04-06",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB217"
+            },
+            {
+              "date": "2026-04-13",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB217"
+            },
+            {
+              "date": "2026-04-20",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Sophie Tremblay",
+              "salle": "LAB217"
+            }
+          ],
+          "decision": "REJETE",
+          "compatibilite_horaire": false,
+          "place_disponible": false,
+          "raisons": [
+            {
+              "code": "GROUPE_COMPLET",
+              "message": "Le groupe est plein: 28/28."
+            },
+            {
+              "code": "CONFLIT_HORAIRE",
+              "message": "16 conflit(s) detecte(s) avec l'horaire principal ou une reprise deja planifiee."
+            }
+          ],
+          "conflits": [
+            {
+              "date": "2026-01-05",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF301",
+                "nom_cours": "Structures de donnees et complexite",
+                "groupe_source": "GPI-E3-1",
+                "date": "2026-01-05",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-01-12",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF301",
+                "nom_cours": "Structures de donnees et complexite",
+                "groupe_source": "GPI-E3-1",
+                "date": "2026-01-12",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-01-19",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF301",
+                "nom_cours": "Structures de donnees et complexite",
+                "groupe_source": "GPI-E3-1",
+                "date": "2026-01-19",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-01-26",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF301",
+                "nom_cours": "Structures de donnees et complexite",
+                "groupe_source": "GPI-E3-1",
+                "date": "2026-01-26",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-02-02",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF301",
+                "nom_cours": "Structures de donnees et complexite",
+                "groupe_source": "GPI-E3-1",
+                "date": "2026-02-02",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-02-09",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF301",
+                "nom_cours": "Structures de donnees et complexite",
+                "groupe_source": "GPI-E3-1",
+                "date": "2026-02-09",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-02-16",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF301",
+                "nom_cours": "Structures de donnees et complexite",
+                "groupe_source": "GPI-E3-1",
+                "date": "2026-02-16",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-02-23",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF301",
+                "nom_cours": "Structures de donnees et complexite",
+                "groupe_source": "GPI-E3-1",
+                "date": "2026-02-23",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-03-02",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF301",
+                "nom_cours": "Structures de donnees et complexite",
+                "groupe_source": "GPI-E3-1",
+                "date": "2026-03-02",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-03-09",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF301",
+                "nom_cours": "Structures de donnees et complexite",
+                "groupe_source": "GPI-E3-1",
+                "date": "2026-03-09",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-03-16",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF301",
+                "nom_cours": "Structures de donnees et complexite",
+                "groupe_source": "GPI-E3-1",
+                "date": "2026-03-16",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-03-23",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF301",
+                "nom_cours": "Structures de donnees et complexite",
+                "groupe_source": "GPI-E3-1",
+                "date": "2026-03-23",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-03-30",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF301",
+                "nom_cours": "Structures de donnees et complexite",
+                "groupe_source": "GPI-E3-1",
+                "date": "2026-03-30",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-04-06",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF301",
+                "nom_cours": "Structures de donnees et complexite",
+                "groupe_source": "GPI-E3-1",
+                "date": "2026-04-06",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-04-13",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF301",
+                "nom_cours": "Structures de donnees et complexite",
+                "groupe_source": "GPI-E3-1",
+                "date": "2026-04-13",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-04-20",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF301",
+                "nom_cours": "Structures de donnees et complexite",
+                "groupe_source": "GPI-E3-1",
+                "date": "2026-04-20",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            }
+          ]
+        }
+      ],
+      "conclusion": {
+        "cause_principale": "DONNEES_ET_CONTRAINTES",
+        "resume": "Aucun groupe n'est attribuable pour INF105: 2 groupe(s) sans conflit sont pleins, 2 groupe(s) supplementaires ont un conflit horaire."
+      }
+    },
+    {
+      "etudiant": {
+        "id_etudiant": 28735,
+        "matricule": "RPT20260408222942PIE3005",
+        "nom": "Ahmed",
+        "prenom": "Aya",
+        "groupe_principal": "GPI-E3-1"
+      },
+      "cours_echoue": {
+        "id_cours_echoue": 1314,
+        "id_cours": 11,
+        "code": "INF201",
+        "nom": "Programmation orientee objet",
+        "statut": "resolution_manuelle"
+      },
+      "groupes_candidats": [
+        {
+          "id_groupe": 1640,
+          "nom_groupe": "GPI-E2-1",
+          "max_etudiants_par_groupe": 28,
+          "effectif_principal": 28,
+          "reprises_planifiees": 0,
+          "effectif_total": 28,
+          "plages_horaires": [
+            {
+              "date": "2026-01-02",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-01-09",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-01-16",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-01-23",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-01-30",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-02-06",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-02-13",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-02-20",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-02-27",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-03-06",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-03-13",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-03-20",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-03-27",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-04-03",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-04-10",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-04-17",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-04-24",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            }
+          ],
+          "decision": "REJETE",
+          "compatibilite_horaire": true,
+          "place_disponible": false,
+          "raisons": [
+            {
+              "code": "GROUPE_COMPLET",
+              "message": "Le groupe est plein: 28/28."
+            }
+          ],
+          "conflits": []
+        },
+        {
+          "id_groupe": 1641,
+          "nom_groupe": "GPI-E2-2",
+          "max_etudiants_par_groupe": 28,
+          "effectif_principal": 28,
+          "reprises_planifiees": 0,
+          "effectif_total": 28,
+          "plages_horaires": [
+            {
+              "date": "2026-01-02",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB203"
+            },
+            {
+              "date": "2026-01-09",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB203"
+            },
+            {
+              "date": "2026-01-16",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB203"
+            },
+            {
+              "date": "2026-01-23",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB203"
+            },
+            {
+              "date": "2026-01-30",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB203"
+            },
+            {
+              "date": "2026-02-06",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB203"
+            },
+            {
+              "date": "2026-02-13",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB203"
+            },
+            {
+              "date": "2026-02-20",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB203"
+            },
+            {
+              "date": "2026-02-27",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB203"
+            },
+            {
+              "date": "2026-03-06",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB203"
+            },
+            {
+              "date": "2026-03-13",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB203"
+            },
+            {
+              "date": "2026-03-20",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB203"
+            },
+            {
+              "date": "2026-03-27",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB203"
+            },
+            {
+              "date": "2026-04-03",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB203"
+            },
+            {
+              "date": "2026-04-10",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB203"
+            },
+            {
+              "date": "2026-04-17",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB203"
+            },
+            {
+              "date": "2026-04-24",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB203"
+            }
+          ],
+          "decision": "REJETE",
+          "compatibilite_horaire": true,
+          "place_disponible": false,
+          "raisons": [
+            {
+              "code": "GROUPE_COMPLET",
+              "message": "Le groupe est plein: 28/28."
+            }
+          ],
+          "conflits": []
+        },
+        {
+          "id_groupe": 1642,
+          "nom_groupe": "GPI-E2-3",
+          "max_etudiants_par_groupe": 28,
+          "effectif_principal": 28,
+          "reprises_planifiees": 0,
+          "effectif_total": 28,
+          "plages_horaires": [
+            {
+              "date": "2026-01-07",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB207"
+            },
+            {
+              "date": "2026-01-14",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB207"
+            },
+            {
+              "date": "2026-01-21",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB207"
+            },
+            {
+              "date": "2026-01-28",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB207"
+            },
+            {
+              "date": "2026-02-04",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB207"
+            },
+            {
+              "date": "2026-02-11",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB207"
+            },
+            {
+              "date": "2026-02-18",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB207"
+            },
+            {
+              "date": "2026-02-25",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB207"
+            },
+            {
+              "date": "2026-03-04",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB207"
+            },
+            {
+              "date": "2026-03-11",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB207"
+            },
+            {
+              "date": "2026-03-18",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB207"
+            },
+            {
+              "date": "2026-03-25",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB207"
+            },
+            {
+              "date": "2026-04-01",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB207"
+            },
+            {
+              "date": "2026-04-08",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB207"
+            },
+            {
+              "date": "2026-04-15",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB207"
+            },
+            {
+              "date": "2026-04-22",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB207"
+            }
+          ],
+          "decision": "REJETE",
+          "compatibilite_horaire": false,
+          "place_disponible": false,
+          "raisons": [
+            {
+              "code": "GROUPE_COMPLET",
+              "message": "Le groupe est plein: 28/28."
+            },
+            {
+              "code": "CONFLIT_HORAIRE",
+              "message": "16 conflit(s) detecte(s) avec l'horaire principal ou une reprise deja planifiee."
+            }
+          ],
+          "conflits": [
+            {
+              "date": "2026-01-07",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF305",
+                "nom_cours": "Tests automatises et integration continue",
+                "groupe_source": "GPI-E3-1",
+                "date": "2026-01-07",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-01-14",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF305",
+                "nom_cours": "Tests automatises et integration continue",
+                "groupe_source": "GPI-E3-1",
+                "date": "2026-01-14",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-01-21",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF305",
+                "nom_cours": "Tests automatises et integration continue",
+                "groupe_source": "GPI-E3-1",
+                "date": "2026-01-21",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-01-28",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF305",
+                "nom_cours": "Tests automatises et integration continue",
+                "groupe_source": "GPI-E3-1",
+                "date": "2026-01-28",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-02-04",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF305",
+                "nom_cours": "Tests automatises et integration continue",
+                "groupe_source": "GPI-E3-1",
+                "date": "2026-02-04",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-02-11",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF305",
+                "nom_cours": "Tests automatises et integration continue",
+                "groupe_source": "GPI-E3-1",
+                "date": "2026-02-11",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-02-18",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF305",
+                "nom_cours": "Tests automatises et integration continue",
+                "groupe_source": "GPI-E3-1",
+                "date": "2026-02-18",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-02-25",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF305",
+                "nom_cours": "Tests automatises et integration continue",
+                "groupe_source": "GPI-E3-1",
+                "date": "2026-02-25",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-03-04",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF305",
+                "nom_cours": "Tests automatises et integration continue",
+                "groupe_source": "GPI-E3-1",
+                "date": "2026-03-04",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-03-11",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF305",
+                "nom_cours": "Tests automatises et integration continue",
+                "groupe_source": "GPI-E3-1",
+                "date": "2026-03-11",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-03-18",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF305",
+                "nom_cours": "Tests automatises et integration continue",
+                "groupe_source": "GPI-E3-1",
+                "date": "2026-03-18",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-03-25",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF305",
+                "nom_cours": "Tests automatises et integration continue",
+                "groupe_source": "GPI-E3-1",
+                "date": "2026-03-25",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-04-01",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF305",
+                "nom_cours": "Tests automatises et integration continue",
+                "groupe_source": "GPI-E3-1",
+                "date": "2026-04-01",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-04-08",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF305",
+                "nom_cours": "Tests automatises et integration continue",
+                "groupe_source": "GPI-E3-1",
+                "date": "2026-04-08",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-04-15",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF305",
+                "nom_cours": "Tests automatises et integration continue",
+                "groupe_source": "GPI-E3-1",
+                "date": "2026-04-15",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-04-22",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF305",
+                "nom_cours": "Tests automatises et integration continue",
+                "groupe_source": "GPI-E3-1",
+                "date": "2026-04-22",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            }
+          ]
+        },
+        {
+          "id_groupe": 1643,
+          "nom_groupe": "GPI-E2-4",
+          "max_etudiants_par_groupe": 28,
+          "effectif_principal": 28,
+          "reprises_planifiees": 0,
+          "effectif_total": 28,
+          "plages_horaires": [
+            {
+              "date": "2026-01-07",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-01-14",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-01-21",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-01-28",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-02-04",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-02-11",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-02-18",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-02-25",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-03-04",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-03-11",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-03-18",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-03-25",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-04-01",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-04-08",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-04-15",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-04-22",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            }
+          ],
+          "decision": "REJETE",
+          "compatibilite_horaire": true,
+          "place_disponible": false,
+          "raisons": [
+            {
+              "code": "GROUPE_COMPLET",
+              "message": "Le groupe est plein: 28/28."
+            }
+          ],
+          "conflits": []
+        }
+      ],
+      "conclusion": {
+        "cause_principale": "DONNEES_ET_CONTRAINTES",
+        "resume": "Aucun groupe n'est attribuable pour INF201: 3 groupe(s) sans conflit sont pleins, 1 groupe(s) supplementaires ont un conflit horaire."
+      }
+    },
+    {
+      "etudiant": {
+        "id_etudiant": 28738,
+        "matricule": "RPT20260408222942PIE3008",
+        "nom": "Traore",
+        "prenom": "Rayan",
+        "groupe_principal": "GPI-E3-4"
+      },
+      "cours_echoue": {
+        "id_cours_echoue": 1317,
+        "id_cours": 11,
+        "code": "INF201",
+        "nom": "Programmation orientee objet",
+        "statut": "resolution_manuelle"
+      },
+      "groupes_candidats": [
+        {
+          "id_groupe": 1640,
+          "nom_groupe": "GPI-E2-1",
+          "max_etudiants_par_groupe": 28,
+          "effectif_principal": 28,
+          "reprises_planifiees": 0,
+          "effectif_total": 28,
+          "plages_horaires": [
+            {
+              "date": "2026-01-02",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-01-09",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-01-16",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-01-23",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-01-30",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-02-06",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-02-13",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-02-20",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-02-27",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-03-06",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-03-13",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-03-20",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-03-27",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-04-03",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-04-10",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-04-17",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-04-24",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            }
+          ],
+          "decision": "REJETE",
+          "compatibilite_horaire": false,
+          "place_disponible": false,
+          "raisons": [
+            {
+              "code": "GROUPE_COMPLET",
+              "message": "Le groupe est plein: 28/28."
+            },
+            {
+              "code": "CONFLIT_HORAIRE",
+              "message": "17 conflit(s) detecte(s) avec l'horaire principal ou une reprise deja planifiee."
+            }
+          ],
+          "conflits": [
+            {
+              "date": "2026-01-02",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF304",
+                "nom_cours": "Applications mobiles et interfaces",
+                "groupe_source": "GPI-E3-4",
+                "date": "2026-01-02",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-01-09",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF304",
+                "nom_cours": "Applications mobiles et interfaces",
+                "groupe_source": "GPI-E3-4",
+                "date": "2026-01-09",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-01-16",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF304",
+                "nom_cours": "Applications mobiles et interfaces",
+                "groupe_source": "GPI-E3-4",
+                "date": "2026-01-16",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-01-23",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF304",
+                "nom_cours": "Applications mobiles et interfaces",
+                "groupe_source": "GPI-E3-4",
+                "date": "2026-01-23",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-01-30",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF304",
+                "nom_cours": "Applications mobiles et interfaces",
+                "groupe_source": "GPI-E3-4",
+                "date": "2026-01-30",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-02-06",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF304",
+                "nom_cours": "Applications mobiles et interfaces",
+                "groupe_source": "GPI-E3-4",
+                "date": "2026-02-06",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-02-13",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF304",
+                "nom_cours": "Applications mobiles et interfaces",
+                "groupe_source": "GPI-E3-4",
+                "date": "2026-02-13",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-02-20",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF304",
+                "nom_cours": "Applications mobiles et interfaces",
+                "groupe_source": "GPI-E3-4",
+                "date": "2026-02-20",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-02-27",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF304",
+                "nom_cours": "Applications mobiles et interfaces",
+                "groupe_source": "GPI-E3-4",
+                "date": "2026-02-27",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-03-06",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF304",
+                "nom_cours": "Applications mobiles et interfaces",
+                "groupe_source": "GPI-E3-4",
+                "date": "2026-03-06",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-03-13",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF304",
+                "nom_cours": "Applications mobiles et interfaces",
+                "groupe_source": "GPI-E3-4",
+                "date": "2026-03-13",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-03-20",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF304",
+                "nom_cours": "Applications mobiles et interfaces",
+                "groupe_source": "GPI-E3-4",
+                "date": "2026-03-20",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-03-27",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF304",
+                "nom_cours": "Applications mobiles et interfaces",
+                "groupe_source": "GPI-E3-4",
+                "date": "2026-03-27",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-04-03",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF304",
+                "nom_cours": "Applications mobiles et interfaces",
+                "groupe_source": "GPI-E3-4",
+                "date": "2026-04-03",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-04-10",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF304",
+                "nom_cours": "Applications mobiles et interfaces",
+                "groupe_source": "GPI-E3-4",
+                "date": "2026-04-10",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-04-17",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF304",
+                "nom_cours": "Applications mobiles et interfaces",
+                "groupe_source": "GPI-E3-4",
+                "date": "2026-04-17",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-04-24",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF304",
+                "nom_cours": "Applications mobiles et interfaces",
+                "groupe_source": "GPI-E3-4",
+                "date": "2026-04-24",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            }
+          ]
+        },
+        {
+          "id_groupe": 1641,
+          "nom_groupe": "GPI-E2-2",
+          "max_etudiants_par_groupe": 28,
+          "effectif_principal": 28,
+          "reprises_planifiees": 0,
+          "effectif_total": 28,
+          "plages_horaires": [
+            {
+              "date": "2026-01-02",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB203"
+            },
+            {
+              "date": "2026-01-09",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB203"
+            },
+            {
+              "date": "2026-01-16",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB203"
+            },
+            {
+              "date": "2026-01-23",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB203"
+            },
+            {
+              "date": "2026-01-30",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB203"
+            },
+            {
+              "date": "2026-02-06",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB203"
+            },
+            {
+              "date": "2026-02-13",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB203"
+            },
+            {
+              "date": "2026-02-20",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB203"
+            },
+            {
+              "date": "2026-02-27",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB203"
+            },
+            {
+              "date": "2026-03-06",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB203"
+            },
+            {
+              "date": "2026-03-13",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB203"
+            },
+            {
+              "date": "2026-03-20",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB203"
+            },
+            {
+              "date": "2026-03-27",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB203"
+            },
+            {
+              "date": "2026-04-03",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB203"
+            },
+            {
+              "date": "2026-04-10",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB203"
+            },
+            {
+              "date": "2026-04-17",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB203"
+            },
+            {
+              "date": "2026-04-24",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB203"
+            }
+          ],
+          "decision": "REJETE",
+          "compatibilite_horaire": false,
+          "place_disponible": false,
+          "raisons": [
+            {
+              "code": "GROUPE_COMPLET",
+              "message": "Le groupe est plein: 28/28."
+            },
+            {
+              "code": "CONFLIT_HORAIRE",
+              "message": "17 conflit(s) detecte(s) avec l'horaire principal ou une reprise deja planifiee."
+            }
+          ],
+          "conflits": [
+            {
+              "date": "2026-01-02",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF306",
+                "nom_cours": "Conteneurs et orchestration",
+                "groupe_source": "GPI-E3-4",
+                "date": "2026-01-02",
+                "heure_debut": "11:00:00",
+                "heure_fin": "14:00:00"
+              }
+            },
+            {
+              "date": "2026-01-09",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF306",
+                "nom_cours": "Conteneurs et orchestration",
+                "groupe_source": "GPI-E3-4",
+                "date": "2026-01-09",
+                "heure_debut": "11:00:00",
+                "heure_fin": "14:00:00"
+              }
+            },
+            {
+              "date": "2026-01-16",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF306",
+                "nom_cours": "Conteneurs et orchestration",
+                "groupe_source": "GPI-E3-4",
+                "date": "2026-01-16",
+                "heure_debut": "11:00:00",
+                "heure_fin": "14:00:00"
+              }
+            },
+            {
+              "date": "2026-01-23",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF306",
+                "nom_cours": "Conteneurs et orchestration",
+                "groupe_source": "GPI-E3-4",
+                "date": "2026-01-23",
+                "heure_debut": "11:00:00",
+                "heure_fin": "14:00:00"
+              }
+            },
+            {
+              "date": "2026-01-30",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF306",
+                "nom_cours": "Conteneurs et orchestration",
+                "groupe_source": "GPI-E3-4",
+                "date": "2026-01-30",
+                "heure_debut": "11:00:00",
+                "heure_fin": "14:00:00"
+              }
+            },
+            {
+              "date": "2026-02-06",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF306",
+                "nom_cours": "Conteneurs et orchestration",
+                "groupe_source": "GPI-E3-4",
+                "date": "2026-02-06",
+                "heure_debut": "11:00:00",
+                "heure_fin": "14:00:00"
+              }
+            },
+            {
+              "date": "2026-02-13",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF306",
+                "nom_cours": "Conteneurs et orchestration",
+                "groupe_source": "GPI-E3-4",
+                "date": "2026-02-13",
+                "heure_debut": "11:00:00",
+                "heure_fin": "14:00:00"
+              }
+            },
+            {
+              "date": "2026-02-20",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF306",
+                "nom_cours": "Conteneurs et orchestration",
+                "groupe_source": "GPI-E3-4",
+                "date": "2026-02-20",
+                "heure_debut": "11:00:00",
+                "heure_fin": "14:00:00"
+              }
+            },
+            {
+              "date": "2026-02-27",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF306",
+                "nom_cours": "Conteneurs et orchestration",
+                "groupe_source": "GPI-E3-4",
+                "date": "2026-02-27",
+                "heure_debut": "11:00:00",
+                "heure_fin": "14:00:00"
+              }
+            },
+            {
+              "date": "2026-03-06",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF306",
+                "nom_cours": "Conteneurs et orchestration",
+                "groupe_source": "GPI-E3-4",
+                "date": "2026-03-06",
+                "heure_debut": "11:00:00",
+                "heure_fin": "14:00:00"
+              }
+            },
+            {
+              "date": "2026-03-13",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF306",
+                "nom_cours": "Conteneurs et orchestration",
+                "groupe_source": "GPI-E3-4",
+                "date": "2026-03-13",
+                "heure_debut": "11:00:00",
+                "heure_fin": "14:00:00"
+              }
+            },
+            {
+              "date": "2026-03-20",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF306",
+                "nom_cours": "Conteneurs et orchestration",
+                "groupe_source": "GPI-E3-4",
+                "date": "2026-03-20",
+                "heure_debut": "11:00:00",
+                "heure_fin": "14:00:00"
+              }
+            },
+            {
+              "date": "2026-03-27",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF306",
+                "nom_cours": "Conteneurs et orchestration",
+                "groupe_source": "GPI-E3-4",
+                "date": "2026-03-27",
+                "heure_debut": "11:00:00",
+                "heure_fin": "14:00:00"
+              }
+            },
+            {
+              "date": "2026-04-03",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF306",
+                "nom_cours": "Conteneurs et orchestration",
+                "groupe_source": "GPI-E3-4",
+                "date": "2026-04-03",
+                "heure_debut": "11:00:00",
+                "heure_fin": "14:00:00"
+              }
+            },
+            {
+              "date": "2026-04-10",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF306",
+                "nom_cours": "Conteneurs et orchestration",
+                "groupe_source": "GPI-E3-4",
+                "date": "2026-04-10",
+                "heure_debut": "11:00:00",
+                "heure_fin": "14:00:00"
+              }
+            },
+            {
+              "date": "2026-04-17",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF306",
+                "nom_cours": "Conteneurs et orchestration",
+                "groupe_source": "GPI-E3-4",
+                "date": "2026-04-17",
+                "heure_debut": "11:00:00",
+                "heure_fin": "14:00:00"
+              }
+            },
+            {
+              "date": "2026-04-24",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF306",
+                "nom_cours": "Conteneurs et orchestration",
+                "groupe_source": "GPI-E3-4",
+                "date": "2026-04-24",
+                "heure_debut": "11:00:00",
+                "heure_fin": "14:00:00"
+              }
+            }
+          ]
+        },
+        {
+          "id_groupe": 1642,
+          "nom_groupe": "GPI-E2-3",
+          "max_etudiants_par_groupe": 28,
+          "effectif_principal": 28,
+          "reprises_planifiees": 0,
+          "effectif_total": 28,
+          "plages_horaires": [
+            {
+              "date": "2026-01-07",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB207"
+            },
+            {
+              "date": "2026-01-14",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB207"
+            },
+            {
+              "date": "2026-01-21",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB207"
+            },
+            {
+              "date": "2026-01-28",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB207"
+            },
+            {
+              "date": "2026-02-04",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB207"
+            },
+            {
+              "date": "2026-02-11",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB207"
+            },
+            {
+              "date": "2026-02-18",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB207"
+            },
+            {
+              "date": "2026-02-25",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB207"
+            },
+            {
+              "date": "2026-03-04",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB207"
+            },
+            {
+              "date": "2026-03-11",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB207"
+            },
+            {
+              "date": "2026-03-18",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB207"
+            },
+            {
+              "date": "2026-03-25",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB207"
+            },
+            {
+              "date": "2026-04-01",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB207"
+            },
+            {
+              "date": "2026-04-08",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB207"
+            },
+            {
+              "date": "2026-04-15",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB207"
+            },
+            {
+              "date": "2026-04-22",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB207"
+            }
+          ],
+          "decision": "REJETE",
+          "compatibilite_horaire": true,
+          "place_disponible": false,
+          "raisons": [
+            {
+              "code": "GROUPE_COMPLET",
+              "message": "Le groupe est plein: 28/28."
+            }
+          ],
+          "conflits": []
+        },
+        {
+          "id_groupe": 1643,
+          "nom_groupe": "GPI-E2-4",
+          "max_etudiants_par_groupe": 28,
+          "effectif_principal": 28,
+          "reprises_planifiees": 0,
+          "effectif_total": 28,
+          "plages_horaires": [
+            {
+              "date": "2026-01-07",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-01-14",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-01-21",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-01-28",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-02-04",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-02-11",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-02-18",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-02-25",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-03-04",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-03-11",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-03-18",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-03-25",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-04-01",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-04-08",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-04-15",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-04-22",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            }
+          ],
+          "decision": "REJETE",
+          "compatibilite_horaire": false,
+          "place_disponible": false,
+          "raisons": [
+            {
+              "code": "GROUPE_COMPLET",
+              "message": "Le groupe est plein: 28/28."
+            },
+            {
+              "code": "CONFLIT_HORAIRE",
+              "message": "16 conflit(s) detecte(s) avec l'horaire principal ou une reprise deja planifiee."
+            }
+          ],
+          "conflits": [
+            {
+              "date": "2026-01-07",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF301",
+                "nom_cours": "Structures de donnees et complexite",
+                "groupe_source": "GPI-E3-4",
+                "date": "2026-01-07",
+                "heure_debut": "11:00:00",
+                "heure_fin": "14:00:00"
+              }
+            },
+            {
+              "date": "2026-01-14",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF301",
+                "nom_cours": "Structures de donnees et complexite",
+                "groupe_source": "GPI-E3-4",
+                "date": "2026-01-14",
+                "heure_debut": "11:00:00",
+                "heure_fin": "14:00:00"
+              }
+            },
+            {
+              "date": "2026-01-21",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF301",
+                "nom_cours": "Structures de donnees et complexite",
+                "groupe_source": "GPI-E3-4",
+                "date": "2026-01-21",
+                "heure_debut": "11:00:00",
+                "heure_fin": "14:00:00"
+              }
+            },
+            {
+              "date": "2026-01-28",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF301",
+                "nom_cours": "Structures de donnees et complexite",
+                "groupe_source": "GPI-E3-4",
+                "date": "2026-01-28",
+                "heure_debut": "11:00:00",
+                "heure_fin": "14:00:00"
+              }
+            },
+            {
+              "date": "2026-02-04",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF301",
+                "nom_cours": "Structures de donnees et complexite",
+                "groupe_source": "GPI-E3-4",
+                "date": "2026-02-04",
+                "heure_debut": "11:00:00",
+                "heure_fin": "14:00:00"
+              }
+            },
+            {
+              "date": "2026-02-11",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF301",
+                "nom_cours": "Structures de donnees et complexite",
+                "groupe_source": "GPI-E3-4",
+                "date": "2026-02-11",
+                "heure_debut": "11:00:00",
+                "heure_fin": "14:00:00"
+              }
+            },
+            {
+              "date": "2026-02-18",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF301",
+                "nom_cours": "Structures de donnees et complexite",
+                "groupe_source": "GPI-E3-4",
+                "date": "2026-02-18",
+                "heure_debut": "11:00:00",
+                "heure_fin": "14:00:00"
+              }
+            },
+            {
+              "date": "2026-02-25",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF301",
+                "nom_cours": "Structures de donnees et complexite",
+                "groupe_source": "GPI-E3-4",
+                "date": "2026-02-25",
+                "heure_debut": "11:00:00",
+                "heure_fin": "14:00:00"
+              }
+            },
+            {
+              "date": "2026-03-04",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF301",
+                "nom_cours": "Structures de donnees et complexite",
+                "groupe_source": "GPI-E3-4",
+                "date": "2026-03-04",
+                "heure_debut": "11:00:00",
+                "heure_fin": "14:00:00"
+              }
+            },
+            {
+              "date": "2026-03-11",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF301",
+                "nom_cours": "Structures de donnees et complexite",
+                "groupe_source": "GPI-E3-4",
+                "date": "2026-03-11",
+                "heure_debut": "11:00:00",
+                "heure_fin": "14:00:00"
+              }
+            },
+            {
+              "date": "2026-03-18",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF301",
+                "nom_cours": "Structures de donnees et complexite",
+                "groupe_source": "GPI-E3-4",
+                "date": "2026-03-18",
+                "heure_debut": "11:00:00",
+                "heure_fin": "14:00:00"
+              }
+            },
+            {
+              "date": "2026-03-25",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF301",
+                "nom_cours": "Structures de donnees et complexite",
+                "groupe_source": "GPI-E3-4",
+                "date": "2026-03-25",
+                "heure_debut": "11:00:00",
+                "heure_fin": "14:00:00"
+              }
+            },
+            {
+              "date": "2026-04-01",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF301",
+                "nom_cours": "Structures de donnees et complexite",
+                "groupe_source": "GPI-E3-4",
+                "date": "2026-04-01",
+                "heure_debut": "11:00:00",
+                "heure_fin": "14:00:00"
+              }
+            },
+            {
+              "date": "2026-04-08",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF301",
+                "nom_cours": "Structures de donnees et complexite",
+                "groupe_source": "GPI-E3-4",
+                "date": "2026-04-08",
+                "heure_debut": "11:00:00",
+                "heure_fin": "14:00:00"
+              }
+            },
+            {
+              "date": "2026-04-15",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF301",
+                "nom_cours": "Structures de donnees et complexite",
+                "groupe_source": "GPI-E3-4",
+                "date": "2026-04-15",
+                "heure_debut": "11:00:00",
+                "heure_fin": "14:00:00"
+              }
+            },
+            {
+              "date": "2026-04-22",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF301",
+                "nom_cours": "Structures de donnees et complexite",
+                "groupe_source": "GPI-E3-4",
+                "date": "2026-04-22",
+                "heure_debut": "11:00:00",
+                "heure_fin": "14:00:00"
+              }
+            }
+          ]
+        }
+      ],
+      "conclusion": {
+        "cause_principale": "DONNEES_ET_CONTRAINTES",
+        "resume": "Aucun groupe n'est attribuable pour INF201: 1 groupe(s) sans conflit sont pleins, 3 groupe(s) supplementaires ont un conflit horaire."
+      }
+    },
+    {
+      "etudiant": {
+        "id_etudiant": 28768,
+        "matricule": "RPT20260408222942PIE4008",
+        "nom": "Benoit",
+        "prenom": "Jade",
+        "groupe_principal": "GPI-E4-1"
+      },
+      "cours_echoue": {
+        "id_cours_echoue": 1339,
+        "id_cours": 11,
+        "code": "INF201",
+        "nom": "Programmation orientee objet",
+        "statut": "resolution_manuelle"
+      },
+      "groupes_candidats": [
+        {
+          "id_groupe": 1640,
+          "nom_groupe": "GPI-E2-1",
+          "max_etudiants_par_groupe": 28,
+          "effectif_principal": 28,
+          "reprises_planifiees": 0,
+          "effectif_total": 28,
+          "plages_horaires": [
+            {
+              "date": "2026-01-02",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-01-09",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-01-16",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-01-23",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-01-30",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-02-06",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-02-13",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-02-20",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-02-27",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-03-06",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-03-13",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-03-20",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-03-27",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-04-03",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-04-10",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-04-17",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-04-24",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            }
+          ],
+          "decision": "REJETE",
+          "compatibilite_horaire": false,
+          "place_disponible": false,
+          "raisons": [
+            {
+              "code": "GROUPE_COMPLET",
+              "message": "Le groupe est plein: 28/28."
+            },
+            {
+              "code": "CONFLIT_HORAIRE",
+              "message": "17 conflit(s) detecte(s) avec l'horaire principal ou une reprise deja planifiee."
+            }
+          ],
+          "conflits": [
+            {
+              "date": "2026-01-02",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF401",
+                "nom_cours": "Architecture logicielle et integration",
+                "groupe_source": "GPI-E4-1",
+                "date": "2026-01-02",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-01-09",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF401",
+                "nom_cours": "Architecture logicielle et integration",
+                "groupe_source": "GPI-E4-1",
+                "date": "2026-01-09",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-01-16",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF401",
+                "nom_cours": "Architecture logicielle et integration",
+                "groupe_source": "GPI-E4-1",
+                "date": "2026-01-16",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-01-23",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF401",
+                "nom_cours": "Architecture logicielle et integration",
+                "groupe_source": "GPI-E4-1",
+                "date": "2026-01-23",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-01-30",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF401",
+                "nom_cours": "Architecture logicielle et integration",
+                "groupe_source": "GPI-E4-1",
+                "date": "2026-01-30",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-02-06",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF401",
+                "nom_cours": "Architecture logicielle et integration",
+                "groupe_source": "GPI-E4-1",
+                "date": "2026-02-06",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-02-13",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF401",
+                "nom_cours": "Architecture logicielle et integration",
+                "groupe_source": "GPI-E4-1",
+                "date": "2026-02-13",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-02-20",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF401",
+                "nom_cours": "Architecture logicielle et integration",
+                "groupe_source": "GPI-E4-1",
+                "date": "2026-02-20",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-02-27",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF401",
+                "nom_cours": "Architecture logicielle et integration",
+                "groupe_source": "GPI-E4-1",
+                "date": "2026-02-27",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-03-06",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF401",
+                "nom_cours": "Architecture logicielle et integration",
+                "groupe_source": "GPI-E4-1",
+                "date": "2026-03-06",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-03-13",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF401",
+                "nom_cours": "Architecture logicielle et integration",
+                "groupe_source": "GPI-E4-1",
+                "date": "2026-03-13",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-03-20",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF401",
+                "nom_cours": "Architecture logicielle et integration",
+                "groupe_source": "GPI-E4-1",
+                "date": "2026-03-20",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-03-27",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF401",
+                "nom_cours": "Architecture logicielle et integration",
+                "groupe_source": "GPI-E4-1",
+                "date": "2026-03-27",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-04-03",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF401",
+                "nom_cours": "Architecture logicielle et integration",
+                "groupe_source": "GPI-E4-1",
+                "date": "2026-04-03",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-04-10",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF401",
+                "nom_cours": "Architecture logicielle et integration",
+                "groupe_source": "GPI-E4-1",
+                "date": "2026-04-10",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-04-17",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF401",
+                "nom_cours": "Architecture logicielle et integration",
+                "groupe_source": "GPI-E4-1",
+                "date": "2026-04-17",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            },
+            {
+              "date": "2026-04-24",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF401",
+                "nom_cours": "Architecture logicielle et integration",
+                "groupe_source": "GPI-E4-1",
+                "date": "2026-04-24",
+                "heure_debut": "08:00:00",
+                "heure_fin": "11:00:00"
+              }
+            }
+          ]
+        },
+        {
+          "id_groupe": 1641,
+          "nom_groupe": "GPI-E2-2",
+          "max_etudiants_par_groupe": 28,
+          "effectif_principal": 28,
+          "reprises_planifiees": 0,
+          "effectif_total": 28,
+          "plages_horaires": [
+            {
+              "date": "2026-01-02",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB203"
+            },
+            {
+              "date": "2026-01-09",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB203"
+            },
+            {
+              "date": "2026-01-16",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB203"
+            },
+            {
+              "date": "2026-01-23",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB203"
+            },
+            {
+              "date": "2026-01-30",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB203"
+            },
+            {
+              "date": "2026-02-06",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB203"
+            },
+            {
+              "date": "2026-02-13",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB203"
+            },
+            {
+              "date": "2026-02-20",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB203"
+            },
+            {
+              "date": "2026-02-27",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB203"
+            },
+            {
+              "date": "2026-03-06",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB203"
+            },
+            {
+              "date": "2026-03-13",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB203"
+            },
+            {
+              "date": "2026-03-20",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB203"
+            },
+            {
+              "date": "2026-03-27",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB203"
+            },
+            {
+              "date": "2026-04-03",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB203"
+            },
+            {
+              "date": "2026-04-10",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB203"
+            },
+            {
+              "date": "2026-04-17",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB203"
+            },
+            {
+              "date": "2026-04-24",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB203"
+            }
+          ],
+          "decision": "REJETE",
+          "compatibilite_horaire": true,
+          "place_disponible": false,
+          "raisons": [
+            {
+              "code": "GROUPE_COMPLET",
+              "message": "Le groupe est plein: 28/28."
+            }
+          ],
+          "conflits": []
+        },
+        {
+          "id_groupe": 1642,
+          "nom_groupe": "GPI-E2-3",
+          "max_etudiants_par_groupe": 28,
+          "effectif_principal": 28,
+          "reprises_planifiees": 0,
+          "effectif_total": 28,
+          "plages_horaires": [
+            {
+              "date": "2026-01-07",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB207"
+            },
+            {
+              "date": "2026-01-14",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB207"
+            },
+            {
+              "date": "2026-01-21",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB207"
+            },
+            {
+              "date": "2026-01-28",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB207"
+            },
+            {
+              "date": "2026-02-04",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB207"
+            },
+            {
+              "date": "2026-02-11",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB207"
+            },
+            {
+              "date": "2026-02-18",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB207"
+            },
+            {
+              "date": "2026-02-25",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB207"
+            },
+            {
+              "date": "2026-03-04",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB207"
+            },
+            {
+              "date": "2026-03-11",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB207"
+            },
+            {
+              "date": "2026-03-18",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB207"
+            },
+            {
+              "date": "2026-03-25",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB207"
+            },
+            {
+              "date": "2026-04-01",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB207"
+            },
+            {
+              "date": "2026-04-08",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB207"
+            },
+            {
+              "date": "2026-04-15",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB207"
+            },
+            {
+              "date": "2026-04-22",
+              "heure_debut": "08:00:00",
+              "heure_fin": "11:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB207"
+            }
+          ],
+          "decision": "REJETE",
+          "compatibilite_horaire": true,
+          "place_disponible": false,
+          "raisons": [
+            {
+              "code": "GROUPE_COMPLET",
+              "message": "Le groupe est plein: 28/28."
+            }
+          ],
+          "conflits": []
+        },
+        {
+          "id_groupe": 1643,
+          "nom_groupe": "GPI-E2-4",
+          "max_etudiants_par_groupe": 28,
+          "effectif_principal": 28,
+          "reprises_planifiees": 0,
+          "effectif_total": 28,
+          "plages_horaires": [
+            {
+              "date": "2026-01-07",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-01-14",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-01-21",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-01-28",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-02-04",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-02-11",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-02-18",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-02-25",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-03-04",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-03-11",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-03-18",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-03-25",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-04-01",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-04-08",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-04-15",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            },
+            {
+              "date": "2026-04-22",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "professeur": "Marc Bouchard",
+              "salle": "LAB205"
+            }
+          ],
+          "decision": "REJETE",
+          "compatibilite_horaire": false,
+          "place_disponible": false,
+          "raisons": [
+            {
+              "code": "GROUPE_COMPLET",
+              "message": "Le groupe est plein: 28/28."
+            },
+            {
+              "code": "CONFLIT_HORAIRE",
+              "message": "16 conflit(s) detecte(s) avec l'horaire principal ou une reprise deja planifiee."
+            }
+          ],
+          "conflits": [
+            {
+              "date": "2026-01-07",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF407",
+                "nom_cours": "Projet de fin d'etudes en logiciel",
+                "groupe_source": "GPI-E4-1",
+                "date": "2026-01-07",
+                "heure_debut": "11:00:00",
+                "heure_fin": "14:00:00"
+              }
+            },
+            {
+              "date": "2026-01-14",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF407",
+                "nom_cours": "Projet de fin d'etudes en logiciel",
+                "groupe_source": "GPI-E4-1",
+                "date": "2026-01-14",
+                "heure_debut": "11:00:00",
+                "heure_fin": "14:00:00"
+              }
+            },
+            {
+              "date": "2026-01-21",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF407",
+                "nom_cours": "Projet de fin d'etudes en logiciel",
+                "groupe_source": "GPI-E4-1",
+                "date": "2026-01-21",
+                "heure_debut": "11:00:00",
+                "heure_fin": "14:00:00"
+              }
+            },
+            {
+              "date": "2026-01-28",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF407",
+                "nom_cours": "Projet de fin d'etudes en logiciel",
+                "groupe_source": "GPI-E4-1",
+                "date": "2026-01-28",
+                "heure_debut": "11:00:00",
+                "heure_fin": "14:00:00"
+              }
+            },
+            {
+              "date": "2026-02-04",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF407",
+                "nom_cours": "Projet de fin d'etudes en logiciel",
+                "groupe_source": "GPI-E4-1",
+                "date": "2026-02-04",
+                "heure_debut": "11:00:00",
+                "heure_fin": "14:00:00"
+              }
+            },
+            {
+              "date": "2026-02-11",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF407",
+                "nom_cours": "Projet de fin d'etudes en logiciel",
+                "groupe_source": "GPI-E4-1",
+                "date": "2026-02-11",
+                "heure_debut": "11:00:00",
+                "heure_fin": "14:00:00"
+              }
+            },
+            {
+              "date": "2026-02-18",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF407",
+                "nom_cours": "Projet de fin d'etudes en logiciel",
+                "groupe_source": "GPI-E4-1",
+                "date": "2026-02-18",
+                "heure_debut": "11:00:00",
+                "heure_fin": "14:00:00"
+              }
+            },
+            {
+              "date": "2026-02-25",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF407",
+                "nom_cours": "Projet de fin d'etudes en logiciel",
+                "groupe_source": "GPI-E4-1",
+                "date": "2026-02-25",
+                "heure_debut": "11:00:00",
+                "heure_fin": "14:00:00"
+              }
+            },
+            {
+              "date": "2026-03-04",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF407",
+                "nom_cours": "Projet de fin d'etudes en logiciel",
+                "groupe_source": "GPI-E4-1",
+                "date": "2026-03-04",
+                "heure_debut": "11:00:00",
+                "heure_fin": "14:00:00"
+              }
+            },
+            {
+              "date": "2026-03-11",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF407",
+                "nom_cours": "Projet de fin d'etudes en logiciel",
+                "groupe_source": "GPI-E4-1",
+                "date": "2026-03-11",
+                "heure_debut": "11:00:00",
+                "heure_fin": "14:00:00"
+              }
+            },
+            {
+              "date": "2026-03-18",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF407",
+                "nom_cours": "Projet de fin d'etudes en logiciel",
+                "groupe_source": "GPI-E4-1",
+                "date": "2026-03-18",
+                "heure_debut": "11:00:00",
+                "heure_fin": "14:00:00"
+              }
+            },
+            {
+              "date": "2026-03-25",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF407",
+                "nom_cours": "Projet de fin d'etudes en logiciel",
+                "groupe_source": "GPI-E4-1",
+                "date": "2026-03-25",
+                "heure_debut": "11:00:00",
+                "heure_fin": "14:00:00"
+              }
+            },
+            {
+              "date": "2026-04-01",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF407",
+                "nom_cours": "Projet de fin d'etudes en logiciel",
+                "groupe_source": "GPI-E4-1",
+                "date": "2026-04-01",
+                "heure_debut": "11:00:00",
+                "heure_fin": "14:00:00"
+              }
+            },
+            {
+              "date": "2026-04-08",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF407",
+                "nom_cours": "Projet de fin d'etudes en logiciel",
+                "groupe_source": "GPI-E4-1",
+                "date": "2026-04-08",
+                "heure_debut": "11:00:00",
+                "heure_fin": "14:00:00"
+              }
+            },
+            {
+              "date": "2026-04-15",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF407",
+                "nom_cours": "Projet de fin d'etudes en logiciel",
+                "groupe_source": "GPI-E4-1",
+                "date": "2026-04-15",
+                "heure_debut": "11:00:00",
+                "heure_fin": "14:00:00"
+              }
+            },
+            {
+              "date": "2026-04-22",
+              "heure_debut": "11:00:00",
+              "heure_fin": "14:00:00",
+              "conflit_avec": {
+                "source_type": "principal",
+                "code_cours": "INF407",
+                "nom_cours": "Projet de fin d'etudes en logiciel",
+                "groupe_source": "GPI-E4-1",
+                "date": "2026-04-22",
+                "heure_debut": "11:00:00",
+                "heure_fin": "14:00:00"
+              }
+            }
+          ]
+        }
+      ],
+      "conclusion": {
+        "cause_principale": "DONNEES_ET_CONTRAINTES",
+        "resume": "Aucun groupe n'est attribuable pour INF201: 2 groupe(s) sans conflit sont pleins, 2 groupe(s) supplementaires ont un conflit horaire."
+      }
+    }
+  ]
+}

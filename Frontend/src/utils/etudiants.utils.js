@@ -20,11 +20,57 @@ export function extraireProgrammesEtudiants(etudiants) {
   ].sort((programmeA, programmeB) => programmeA.localeCompare(programmeB, "fr"));
 }
 
-export function filtrerEtudiants(etudiants, recherche, groupeSelectionne) {
+export function extraireSessionsEtudiants(etudiants) {
+  return [
+    ...new Set(
+      etudiants.map((etudiant) => String(etudiant.session ?? ""))
+    ),
+  ].sort((sessionA, sessionB) =>
+    sessionA.localeCompare(sessionB, "fr", { sensitivity: "base" })
+  );
+}
+
+export function extraireEtapesEtudiants(etudiants) {
+  return [...new Set(etudiants.map((etudiant) => Number(etudiant.etape)).filter(Boolean))].sort(
+    (etapeA, etapeB) => etapeA - etapeB
+  );
+}
+
+export function filtrerEtudiants(
+  etudiants,
+  recherche,
+  {
+    groupeSelectionne = "tous",
+    programmeSelectionne = "tous",
+    sessionSelectionnee = "toutes",
+    etapeSelectionnee = "toutes",
+  } = {}
+) {
   const rechercheNormalisee = recherche.trim().toLowerCase();
 
   return etudiants.filter((etudiant) => {
     if (groupeSelectionne !== "tous" && etudiant.groupe !== groupeSelectionne) {
+      return false;
+    }
+
+    if (
+      programmeSelectionne !== "tous" &&
+      etudiant.programme !== programmeSelectionne
+    ) {
+      return false;
+    }
+
+    if (
+      sessionSelectionnee !== "toutes" &&
+      etudiant.session !== sessionSelectionnee
+    ) {
+      return false;
+    }
+
+    if (
+      etapeSelectionnee !== "toutes" &&
+      Number(etudiant.etape) !== Number(etapeSelectionnee)
+    ) {
       return false;
     }
 

@@ -1,82 +1,98 @@
 /**
  * Middlewares d'authentification et d'autorisation.
- *
- * Ce module regroupe les middlewares qui contrôlent
- * l'accès aux routes selon l'état de connexion et
- * les rôles de l'utilisateur.
  */
 
-/**
- * Middleware qui valide que l'utilisateur est connecté.
- * @param {import("express").Request} request Objet de requête HTTP.
- * @param {import("express").Response} response Objet de réponse HTTP.
- * @param {import("express").NextFunction} next Fonction pour passer au prochain middleware.
- */
-export function userAuth(request, response, next) {
-    if (request.user) {
-        return next();
-    }
-
-    response.status(401).end();
+function getUser(request) {
+  return request.user || request.session?.user || null;
 }
 
-/**
- * Middleware qui valide que l'utilisateur n'est pas connecté.
- * @param {import("express").Request} request Objet de requête HTTP.
- * @param {import("express").Response} response Objet de réponse HTTP.
- * @param {import("express").NextFunction} next Fonction pour passer au prochain middleware.
- */
-export function userNotAuth(request, response, next) {
-    if (!request.user) {
-        return next();
-    }
+function getUserRoles(user) {
+  if (!user) {
+    return [];
+  }
 
-    response.status(401).end();
+  if (Array.isArray(user.roles)) {
+    return user.roles;
+  }
+
+  if (typeof user.role === "string" && user.role.trim()) {
+    return [user.role.trim()];
+  }
+
+  return [];
 }
 
 function utilisateurPossedeUnRole(request, rolesAutorises) {
-    const roles = Array.isArray(request.user?.roles) ? request.user.roles : [];
-    return rolesAutorises.some((role) => roles.includes(role));
+  const roles = getUserRoles(getUser(request));
+  return rolesAutorises.some((role) => roles.includes(role));
 }
 
-/**
- * Middleware qui valide que l'utilisateur possède le rôle ADMIN.
- * @param {import("express").Request} request Objet de requête HTTP.
- * @param {import("express").Response} response Objet de réponse HTTP.
- * @param {import("express").NextFunction} next Fonction pour passer au prochain middleware.
- */
+function refuserAcces(response, statusCode, message) {
+  response.status(statusCode);
+
+  if (typeof response.json === "function") {
+    return response.json({ message });
+  }
+
+  return response.end();
+}
+
+export function userAuth(request, response, next) {
+  if (getUser(request)) {
+    return next();
+  }
+
+  return refuserAcces(response, 401, "Non authentifie.");
+}
+
+export function userNotAuth(request, response, next) {
+  if (!getUser(request)) {
+    return next();
+  }
+
+  return refuserAcces(response, 401, "Utilisateur deja authentifie.");
+}
+
 export function userAdmin(request, response, next) {
-    if (request.user && utilisateurPossedeUnRole(request, ['ADMIN', 'RESPONSABLE'])) {
-        return next();
-    }
+  if (
+    utilisateurPossedeUnRole(request, [
+      "ADMIN",
+      "RESPONSABLE",
+      "ADMIN_RESPONSABLE",
+    ])
+  ) {
+    return next();
+  }
 
-    response.status(401).end();
+  return refuserAcces(response, 401, "Acces reserve aux administrateurs.");
 }
 
-/**
- * Middleware qui valide que l'utilisateur possède le rôle RESPONSABLE.
- * @param {import("express").Request} request Objet de requête HTTP.
- * @param {import("express").Response} response Objet de réponse HTTP.
- * @param {import("express").NextFunction} next Fonction pour passer au prochain middleware.
- */
+export function userAdminResponsable(request, response, next) {
+  if (utilisateurPossedeUnRole(request, ["ADMIN_RESPONSABLE"])) {
+    return next();
+  }
+
+  return refuserAcces(response, 401, "Acces reserve a l'Admin Responsable.");
+}
+
 export function userResponsable(request, response, next) {
-    if (request.user && utilisateurPossedeUnRole(request, ['RESPONSABLE'])) {
-        return next();
-    }
+  if (utilisateurPossedeUnRole(request, ["RESPONSABLE", "ADMIN_RESPONSABLE"])) {
+    return next();
+  }
 
-    response.status(401).end();
+  return refuserAcces(response, 401, "Acces reserve au responsable.");
 }
 
-/**
- * Middleware qui valide que l'utilisateur possede le role ADMIN ou RESPONSABLE.
- * @param {import("express").Request} request Objet de requete HTTP.
- * @param {import("express").Response} response Objet de reponse HTTP.
- * @param {import("express").NextFunction} next Fonction pour passer au prochain middleware.
- */
 export function userAdminOrResponsable(request, response, next) {
-    if (utilisateurPossedeUnRole(request, ["ADMIN", "RESPONSABLE"])) {
-        return next();
-    }
+  if (
+    utilisateurPossedeUnRole(request, [
+      "ADMIN",
+      "RESPONSABLE",
+      "ADMIN_RESPONSABLE",
+    ])
+  ) {
+    return next();
+  }
 
-    response.status(403).json({ message: "Acces refuse." });
+  return refuserAcces(response, 403, "Acces refuse.");
 }

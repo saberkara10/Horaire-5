@@ -1,0 +1,5 @@
+CREE: {"sessions":0,"programmes_reference":0,"salles":0,"cours":0,"professeurs":0,"professeur_cours":224,"disponibilites":0,"groupes_sources":0,"etudiants":0}
+UPDATED: {"sessions":0,"salles":26,"cours":224,"professeurs":56}
+CLEANED: {"professeurs":0,"professeur_cours":0,"programmes_reference":0,"cours_archives":0}
+> 32 cohortes programme-etape cibles, 224 cours de 3h et 56 professeurs bootstrap assures.
+> 28 etudiants vises par groupe, 2 programmes max et 5 cours par programme pour chaque professeur (10 cours distincts max, 10 seances hebdomadaires max).

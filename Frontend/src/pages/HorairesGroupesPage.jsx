@@ -93,7 +93,10 @@ export function HorairesGroupesPage({ utilisateur, onLogout }) {
       setLoading(true);
 
       try {
-        const groupesData = await recupererGroupes(true);
+        const groupesData = await recupererGroupes(true, {
+          sessionActive: true,
+          seulementAvecPlanning: true,
+        });
         const liste = Array.isArray(groupesData) ? groupesData : [];
         setGroupes(liste);
 

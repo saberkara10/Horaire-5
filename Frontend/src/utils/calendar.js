@@ -14,9 +14,42 @@ export const JOURS_SEMAINE_COMPLETS = [
   { value: 7, label: "Dimanche" },
 ];
 
+export const JOURS_SEMAINE_OUVRABLES = JOURS_SEMAINE_COMPLETS.filter(
+  (jour) => jour.value >= 1 && jour.value <= 5
+);
+
 export function creerDateLocale(dateString) {
-  const [annee, mois, jour] = String(dateString || "").split("-").map(Number);
-  return new Date(annee || 1970, (mois || 1) - 1, jour || 1);
+  if (dateString instanceof Date) {
+    return new Date(
+      dateString.getFullYear(),
+      dateString.getMonth(),
+      dateString.getDate()
+    );
+  }
+
+  const texte = String(dateString || "").trim();
+  if (!texte) {
+    return new Date(1970, 0, 1);
+  }
+
+  const dateIso = texte.includes("T") ? texte.slice(0, 10) : texte;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateIso);
+
+  if (!match) {
+    const fallback = new Date(texte);
+    if (Number.isNaN(fallback.getTime())) {
+      return new Date(1970, 0, 1);
+    }
+
+    return new Date(
+      fallback.getFullYear(),
+      fallback.getMonth(),
+      fallback.getDate()
+    );
+  }
+
+  const [, annee, mois, jour] = match;
+  return new Date(Number(annee), Number(mois) - 1, Number(jour));
 }
 
 export function getDebutSemaine(date) {
@@ -36,9 +69,3 @@ export function getIndexJourCalendrier(date) {
 export function formaterDateCourte(date) {
   return date.toLocaleDateString("fr-CA", { day: "numeric", month: "short" });
 }
-/**
- * UTILS - Calendar
- *
- * Ce module fournit les constantes
- * et helpers de calendrier du frontend.
- */

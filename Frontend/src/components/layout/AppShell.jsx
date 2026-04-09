@@ -109,6 +109,29 @@ function IconHorairesGroupes() {
   );
 }
 
+function IconHorairesEtudiants() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none">
+      <circle cx="8" cy="8" r="3" />
+      <path d="M3.5 18C3.5 15.79 5.52 14 8 14C10.48 14 12.5 15.79 12.5 18" />
+      <path d="M16 7H20" />
+      <path d="M16 11H20" />
+      <path d="M16 15H20" />
+    </svg>
+  );
+}
+
+function IconGestionGroupes() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  );
+}
+
 function IconAdmins() {
   return (
     <svg viewBox="0 0 24 24" fill="none">
@@ -116,6 +139,22 @@ function IconAdmins() {
       <path d="M4 18C4 15.79 6.24 14 9 14C11.76 14 14 15.79 14 18" />
       <path d="M18 7V13" />
       <path d="M15 10H21" />
+    </svg>
+  );
+}
+
+function IconScheduler() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none">
+      <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+    </svg>
+  );
+}
+
+function IconAdminCentral() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none">
+      <path d="M12 3L4 7v5c0 4.4 3.4 8.5 8 9.5 4.6-1 8-5.1 8-9.5V7l-8-4z" />
     </svg>
   );
 }
@@ -152,7 +191,13 @@ export function AppShell({
 }) {
   const rolesUtilisateur = Array.isArray(utilisateur?.roles) ? utilisateur.roles : [];
   const estResponsable = utilisateurEstResponsable(utilisateur);
-  const rolePrincipal = rolesUtilisateur.includes("RESPONSABLE")
+  const peutUtiliserScheduler =
+    rolesUtilisateur.includes("ADMIN") ||
+    rolesUtilisateur.includes("RESPONSABLE") ||
+    rolesUtilisateur.includes("ADMIN_RESPONSABLE");
+  const rolePrincipal = rolesUtilisateur.includes("ADMIN_RESPONSABLE")
+    ? "ADMIN_RESPONSABLE"
+    : rolesUtilisateur.includes("RESPONSABLE")
     ? "RESPONSABLE"
     : rolesUtilisateur[0] || utilisateur?.role || "Utilisateur";
   const nomAffiche =
@@ -271,6 +316,38 @@ export function AppShell({
             <span>Horaires groupes</span>
           </NavLink>
 
+          <NavLink
+            to="/horaires-etudiants"
+            className={({ isActive }) =>
+              `app-shell__nav-item ${isActive ? "app-shell__nav-item--active" : ""}`
+            }
+          >
+            <span className="app-shell__nav-icon"><IconHorairesEtudiants /></span>
+            <span>Horaires etudiants</span>
+          </NavLink>
+
+          <NavLink
+            to="/gestion-groupes"
+            className={({ isActive }) =>
+              `app-shell__nav-item ${isActive ? "app-shell__nav-item--active" : ""}`
+            }
+          >
+            <span className="app-shell__nav-icon"><IconGestionGroupes /></span>
+            <span>Gestion groupes</span>
+          </NavLink>
+
+          {peutUtiliserScheduler ? (
+            <NavLink
+              to="/scheduler"
+              className={({ isActive }) =>
+                `app-shell__nav-item ${isActive ? "app-shell__nav-item--active" : ""}`
+              }
+            >
+              <span className="app-shell__nav-icon"><IconScheduler /></span>
+              <span>Pilotage sessions</span>
+            </NavLink>
+          ) : null}
+
           {estResponsable ? (
             <NavLink
               to="/admins"
@@ -280,6 +357,18 @@ export function AppShell({
             >
               <span className="app-shell__nav-icon"><IconAdmins /></span>
               <span>Sous-admins</span>
+            </NavLink>
+          ) : null}
+
+          {rolesUtilisateur.includes("ADMIN_RESPONSABLE") ? (
+            <NavLink
+              to="/admin-responsable"
+              className={({ isActive }) =>
+                `app-shell__nav-item ${isActive ? "app-shell__nav-item--active" : ""}`
+              }
+            >
+              <span className="app-shell__nav-icon"><IconAdminCentral /></span>
+              <span>Admin central</span>
             </NavLink>
           ) : null}
         </nav>
@@ -305,9 +394,7 @@ export function AppShell({
             </div>
             <div className="app-shell__user-text">
               <div className="app-shell__user-name">{nomAffiche}</div>
-              <div className="app-shell__user-role">
-                {rolePrincipal}
-              </div>
+              <div className="app-shell__user-role">{rolePrincipal}</div>
             </div>
           </div>
         </header>

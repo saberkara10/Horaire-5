@@ -22,7 +22,11 @@ import professeursRoutes from "../routes/professeurs.routes.js";
 import etudiantsRoutes from "../routes/etudiants.routes.js";
 import groupesRoutes from "../routes/groupes.routes.js";
 import adminsRoutes from "../routes/admins.routes.js";
+import dashboardRoutes from "../routes/dashboard.routes.js";
+import schedulerRoutes from "../routes/scheduler.routes.js";
+import exportRoutes from "../routes/export.routes.js";
 import pool from "../db.js";
+
 
 dotenv.config();
 
@@ -117,6 +121,10 @@ horaireRoutes(app);
 etudiantsRoutes(app);
 groupesRoutes(app);
 adminsRoutes(app);
+dashboardRoutes(app);
+schedulerRoutes(app);
+exportRoutes(app);
+
 
 app.get("/admin-only", userAuth, userAdmin, (request, response) => {
   response.status(200).json({

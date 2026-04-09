@@ -33,6 +33,7 @@ export default function horaireRoutes(app) {
       body.id_cours &&
       body.id_professeur &&
       body.id_salle &&
+      body.id_groupes_etudiants &&
       body.date &&
       body.heure_debut &&
       body.heure_fin
@@ -43,18 +44,15 @@ export default function horaireRoutes(app) {
     return /^\d{4}-\d{2}-\d{2}$/.test(String(date || ""));
   }
 
-  function anneeGenerationValide(annee) {
-    const valeur = Number(annee);
-    return Number.isInteger(valeur) && valeur >= 2000 && valeur <= 2100;
-  }
-
   /**
    * GET /api/horaires
    * Recuperer toutes les affectations de cours.
    */
   app.get("/api/horaires", ...accesLectureHoraires, async (request, response) => {
     try {
-      const affectations = await getAllAffectations();
+      const affectations = await getAllAffectations({
+        sessionActive: request.query.session_active === "1",
+      });
       response.status(200).json(affectations);
     } catch (error) {
       console.error("Erreur consultation horaires :", error);
@@ -97,6 +95,7 @@ export default function horaireRoutes(app) {
         id_cours,
         id_professeur,
         id_salle,
+        id_groupes_etudiants,
         date,
         heure_debut,
         heure_fin,
@@ -106,6 +105,7 @@ export default function horaireRoutes(app) {
         !id_cours ||
         !id_professeur ||
         !id_salle ||
+        !id_groupes_etudiants ||
         !date ||
         !heure_debut ||
         !heure_fin
@@ -117,6 +117,7 @@ export default function horaireRoutes(app) {
         idCours: Number(id_cours),
         idProfesseur: Number(id_professeur),
         idSalle: Number(id_salle),
+        idGroupeEtudiants: Number(id_groupes_etudiants),
         date,
         heureDebut: heure_debut,
         heureFin: heure_fin,
@@ -150,6 +151,7 @@ export default function horaireRoutes(app) {
           idCours: Number(request.body.id_cours),
           idProfesseur: Number(request.body.id_professeur),
           idSalle: Number(request.body.id_salle),
+          idGroupeEtudiants: Number(request.body.id_groupes_etudiants),
           date: request.body.date,
           heureDebut: request.body.heure_debut,
           heureFin: request.body.heure_fin,
@@ -174,12 +176,12 @@ export default function horaireRoutes(app) {
     ...accesGestionHoraires,
     async (request, response) => {
       try {
-        const { programme, etape, session, annee, date_debut } = request.body || {};
+        const { programme, etape, session, date_debut } = request.body || {};
 
-        if (!programme || !etape || !session || !annee) {
+        if (!programme || !etape || !session) {
           return response.status(400).json({
             message:
-              "Le programme, l'etape, la session et l'annee sont obligatoires pour generer l'horaire.",
+              "Le programme, l'etape et la session sont obligatoires pour generer l'horaire.",
           });
         }
 
@@ -189,17 +191,10 @@ export default function horaireRoutes(app) {
           });
         }
 
-        if (!anneeGenerationValide(annee)) {
-          return response.status(400).json({
-            message: "L'annee est invalide.",
-          });
-        }
-
         const resultat = await genererHoraireAutomatiquement({
           programme,
           etape,
           session,
-          annee: Number(annee),
           dateDebut: date_debut || null,
         });
         response.status(201).json(resultat);
@@ -248,7 +243,10 @@ export default function horaireRoutes(app) {
    */
   app.delete("/api/horaires", ...accesGestionHoraires, async (request, response) => {
     try {
-      await deleteAllAffectations();
+      await deleteAllAffectations({
+        deleteStudents: request.query.delete_students === "1",
+        sessionActive: request.query.session_active === "1",
+      });
       response.status(200).json({ message: "Horaires reinitialises." });
     } catch (error) {
       console.error("Erreur reset horaires :", error);

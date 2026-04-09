@@ -16,9 +16,14 @@ import { FeedbackBanner } from "../components/ui/FeedbackBanner.jsx";
 import { useEtudiants } from "../hooks/useEtudiants.js";
 import {
   calculerStatistiquesEtudiants,
+  extraireEtapesEtudiants,
   extraireGroupes,
+  extraireProgrammesEtudiants,
+  extraireSessionsEtudiants,
   filtrerEtudiants,
 } from "../utils/etudiants.utils.js";
+import "../styles/EtudiantsPage.css";
+import "../styles/PlanningEtudiantPage.css";
 
 /**
  * Page principale de gestion des etudiants.
@@ -28,7 +33,7 @@ import {
  * - parcourir et filtrer la liste ;
  * - consulter la fiche et l'horaire reconstitue d'un etudiant.
  */
-export function EtudiantsPage({ moduleActif, onChangerModule }) {
+export function EtudiantsPage({ utilisateur, onLogout }) {
   const {
     etudiants,
     consultationsParId,
@@ -43,20 +48,43 @@ export function EtudiantsPage({ moduleActif, onChangerModule }) {
 
   const [recherche, setRecherche] = useState("");
   const [groupeSelectionne, setGroupeSelectionne] = useState("tous");
+  const [programmeSelectionne, setProgrammeSelectionne] = useState("tous");
+  const [sessionSelectionnee, setSessionSelectionnee] = useState("toutes");
+  const [etapeSelectionnee, setEtapeSelectionnee] = useState("toutes");
   const [etudiantSelectionneId, setEtudiantSelectionneId] = useState(null);
+  const [vueActive, setVueActive] = useState("liste");
   const [messageSucces, setMessageSucces] = useState("");
   const inputImportRef = useRef(null);
 
   const rechercheDifferee = useDeferredValue(recherche);
   const groupes = useMemo(() => extraireGroupes(etudiants), [etudiants]);
+  const programmes = useMemo(
+    () => extraireProgrammesEtudiants(etudiants),
+    [etudiants]
+  );
+  const sessions = useMemo(() => extraireSessionsEtudiants(etudiants), [etudiants]);
+  const etapes = useMemo(() => extraireEtapesEtudiants(etudiants), [etudiants]);
   const statistiques = useMemo(
     () => calculerStatistiquesEtudiants(etudiants),
     [etudiants]
   );
 
   const etudiantsFiltres = useMemo(
-    () => filtrerEtudiants(etudiants, rechercheDifferee, groupeSelectionne),
-    [etudiants, rechercheDifferee, groupeSelectionne]
+    () =>
+      filtrerEtudiants(etudiants, rechercheDifferee, {
+        groupeSelectionne,
+        programmeSelectionne,
+        sessionSelectionnee,
+        etapeSelectionnee,
+      }),
+    [
+      etudiants,
+      rechercheDifferee,
+      groupeSelectionne,
+      programmeSelectionne,
+      sessionSelectionnee,
+      etapeSelectionnee,
+    ]
   );
 
   const etudiantSelectionne = useMemo(
@@ -66,19 +94,18 @@ export function EtudiantsPage({ moduleActif, onChangerModule }) {
   );
 
   useEffect(() => {
-    // On maintient automatiquement une selection valide afin que le panneau
-    // de details reste utile apres un filtrage ou un nouvel import.
     if (etudiantsFiltres.length === 0) {
       setEtudiantSelectionneId(null);
+      setVueActive("liste");
       return;
     }
 
-    const selectionExisteEncore = etudiantsFiltres.some(
-      (etudiant) => etudiant.id_etudiant === etudiantSelectionneId
-    );
-
-    if (!selectionExisteEncore) {
-      setEtudiantSelectionneId(etudiantsFiltres[0].id_etudiant);
+    if (
+      etudiantSelectionneId &&
+      !etudiantsFiltres.some((etudiant) => etudiant.id_etudiant === etudiantSelectionneId)
+    ) {
+      setEtudiantSelectionneId(null);
+      setVueActive("liste");
     }
   }, [etudiantsFiltres, etudiantSelectionneId]);
 
@@ -115,9 +142,37 @@ export function EtudiantsPage({ moduleActif, onChangerModule }) {
 
     try {
       const resultat = await importer(fichier);
-      setMessageSucces(
-        `${resultat.message} ${resultat.nombre_importes} etudiant(s) ajoute(s).`
-      );
+      const segments = [resultat.message];
+      const nombreImportes = Number(resultat.nombre_importes || 0);
+      const nombreMisAJour = Number(resultat.nombre_mis_a_jour || 0);
+      const nombreCoursEchoues = Number(resultat.nombre_cours_echoues_importes || 0);
+
+      if (nombreImportes > 0) {
+        segments.push(`${nombreImportes} etudiant(s) ajoute(s).`);
+      }
+
+      if (nombreMisAJour > 0) {
+        segments.push(`${nombreMisAJour} etudiant(s) mis a jour.`);
+      }
+
+      if (nombreCoursEchoues > 0) {
+        segments.push(`${nombreCoursEchoues} cours echoue(s) importes.`);
+      }
+
+      const nombreEtudiantsIgnores = Number(resultat.nombre_etudiants_ignores || 0);
+      const nombreCohortesIgnorees = Number(resultat.nombre_cohortes_ignorees || 0);
+
+      if (nombreEtudiantsIgnores > 0) {
+        segments.push(`${nombreEtudiantsIgnores} etudiant(s) non utilisable(s) ignore(s).`);
+      }
+
+      if (nombreCohortesIgnorees > 0) {
+        segments.push(`${nombreCohortesIgnorees} cohorte(s) non exploitable(s) ignoree(s).`);
+      }
+
+      setEtudiantSelectionneId(null);
+      setVueActive("liste");
+      setMessageSucces(segments.join(" "));
     } finally {
       event.target.value = "";
     }
@@ -126,8 +181,13 @@ export function EtudiantsPage({ moduleActif, onChangerModule }) {
   function selectionnerEtudiant(idEtudiant) {
     startTransition(() => {
       setEtudiantSelectionneId(idEtudiant);
+      setVueActive("detail");
       setMessageSucces("");
     });
+  }
+
+  function retournerALaListe() {
+    setVueActive("liste");
   }
 
   async function rechargerHoraireSelectionne() {
@@ -138,13 +198,15 @@ export function EtudiantsPage({ moduleActif, onChangerModule }) {
     await consulter(etudiantSelectionneId, { forcer: true });
   }
 
+  const afficherVueDetail = vueActive === "detail" && Boolean(etudiantSelectionneId);
+
   return (
-    <AppShell moduleActif={moduleActif} onChangerModule={onChangerModule}>
+    <AppShell utilisateur={utilisateur} onLogout={onLogout} title="Horaires etudiants" subtitle="Consultez le tronc commun des groupes et les reprises individuelles dans un horaire fusionne.">
       <div className="page-layout">
         <input
           ref={inputImportRef}
           type="file"
-          accept=".xlsx,.csv"
+          accept=".xlsx,.xls,.csv"
           hidden
           onChange={gererSelectionFichier}
         />
@@ -170,33 +232,48 @@ export function EtudiantsPage({ moduleActif, onChangerModule }) {
           groupeSelectionne={groupeSelectionne}
           groupes={groupes}
           onGroupeChange={setGroupeSelectionne}
+          programmeSelectionne={programmeSelectionne}
+          programmes={programmes}
+          onProgrammeChange={setProgrammeSelectionne}
+          sessionSelectionnee={sessionSelectionnee}
+          sessions={sessions}
+          onSessionChange={setSessionSelectionnee}
+          etapeSelectionnee={etapeSelectionnee}
+          etapes={etapes}
+          onEtapeChange={setEtapeSelectionnee}
           totalAffiche={etudiantsFiltres.length}
           totalGlobal={etudiants.length}
           onRecharger={recharger}
           surChargement={etatChargement === "loading"}
         />
 
-        <div className="content-grid">
-          <EtudiantsTable
-            etudiants={etudiantsFiltres}
-            etudiantSelectionneId={etudiantSelectionneId}
-            onSelectionner={selectionnerEtudiant}
-            actionEnCours={actionEnCours}
-            surChargement={etatChargement === "loading"}
-            surRafraichissement={etatChargement === "refreshing"}
-            estEnErreur={etatChargement === "error"}
-            messageErreur={messageErreur}
-          />
+        <div className={`content-grid ${afficherVueDetail ? "content-grid--detail" : ""}`}>
+          {!afficherVueDetail ? (
+            <EtudiantsTable
+              etudiants={etudiantsFiltres}
+              etudiantSelectionneId={etudiantSelectionneId}
+              onSelectionner={selectionnerEtudiant}
+              actionEnCours={actionEnCours}
+              surChargement={etatChargement === "loading"}
+              surRafraichissement={etatChargement === "refreshing"}
+              estEnErreur={etatChargement === "error"}
+              messageErreur={messageErreur}
+            />
+          ) : null}
 
-          <EtudiantDetails
-            consultation={consultationSelectionnee}
-            actionEnCours={actionEnCours}
-            chargementConsultation={
-              Boolean(etudiantSelectionneId) &&
-              actionEnCours === `consultation-${etudiantSelectionneId}`
-            }
-            onRechargerHoraire={rechargerHoraireSelectionne}
-          />
+          {afficherVueDetail ? (
+            <EtudiantDetails
+              consultation={consultationSelectionnee}
+              actionEnCours={actionEnCours}
+              chargementConsultation={
+                Boolean(etudiantSelectionneId) &&
+                actionEnCours === `consultation-${etudiantSelectionneId}`
+              }
+              onRechargerHoraire={rechargerHoraireSelectionne}
+              onRetourListe={retournerALaListe}
+              affichagePleinEcran
+            />
+          ) : null}
         </div>
       </div>
     </AppShell>

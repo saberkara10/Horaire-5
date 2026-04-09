@@ -12,7 +12,6 @@ import {
   importerEtudiants,
   supprimerTousLesEtudiants,
 } from "../services/etudiantsService.js";
-import { SESSIONS_ACADEMIQUES } from "../utils/sessions.js";
 import "../styles/EtudiantsImportPage.css";
 
 export function EtudiantsImportPage({ utilisateur, onLogout }) {
@@ -22,6 +21,7 @@ export function EtudiantsImportPage({ utilisateur, onLogout }) {
   const [etatChargement, setEtatChargement] = useState("idle");
   const [suppressionEnCours, setSuppressionEnCours] = useState(false);
   const [erreurFormulaire, setErreurFormulaire] = useState("");
+  const [detailsErreur, setDetailsErreur] = useState([]);
   const [resultatImport, setResultatImport] = useState(null);
   const { confirm, showError, showSuccess } = usePopup();
 
@@ -57,8 +57,7 @@ export function EtudiantsImportPage({ utilisateur, onLogout }) {
         String(etudiant.programme || "").toLowerCase().includes(terme) ||
         String(etudiant.groupe || "").toLowerCase().includes(terme) ||
         String(etudiant.etape || "").toLowerCase().includes(terme) ||
-        String(etudiant.session || "").toLowerCase().includes(terme) ||
-        String(etudiant.annee || "").toLowerCase().includes(terme)
+        String(etudiant.session || "").toLowerCase().includes(terme)
       );
     });
   }, [etudiants, recherche]);
@@ -66,6 +65,7 @@ export function EtudiantsImportPage({ utilisateur, onLogout }) {
   async function handleImport(event) {
     event.preventDefault();
     setErreurFormulaire("");
+    setDetailsErreur([]);
     setResultatImport(null);
 
     if (!fichier) {
@@ -83,6 +83,7 @@ export function EtudiantsImportPage({ utilisateur, onLogout }) {
       await chargerEtudiants();
     } catch (error) {
       setErreurFormulaire(error.message || "Erreur lors de l'import.");
+      setDetailsErreur(Array.isArray(error.details) ? error.details : []);
       setEtatChargement("error");
     }
   }
@@ -102,6 +103,7 @@ export function EtudiantsImportPage({ utilisateur, onLogout }) {
 
     setSuppressionEnCours(true);
     setErreurFormulaire("");
+    setDetailsErreur([]);
 
     try {
       await supprimerTousLesEtudiants();
@@ -121,7 +123,7 @@ export function EtudiantsImportPage({ utilisateur, onLogout }) {
       utilisateur={utilisateur}
       onLogout={onLogout}
       title="Import etudiants"
-      subtitle="Importez les etudiants avec leur session et annee. Les groupes seront formes pendant la generation."
+      subtitle="Importez un fichier melangeant plusieurs etapes. Les groupes sont crees automatiquement par cohorte."
     >
       <div className="import-page">
         <section className="import-page__card import-page__card--upload">
@@ -129,10 +131,10 @@ export function EtudiantsImportPage({ utilisateur, onLogout }) {
             <div>
               <h2>Importer un fichier</h2>
               <p className="import-page__text">
-                Colonnes attendues : matricule, nom, prenom, programme, etape, session, annee.
+                Colonnes attendues : matricule, nom, prenom, programme, etape.
               </p>
               <p className="import-page__text">
-                Sessions acceptees : {SESSIONS_ACADEMIQUES.join(", ")}.
+                La session reste optionnelle dans le fichier. Les groupes sont generes automatiquement par programme, etape et session avec une repartition equilibree.
               </p>
             </div>
 
@@ -166,6 +168,14 @@ export function EtudiantsImportPage({ utilisateur, onLogout }) {
               </div>
             ) : null}
 
+            {detailsErreur.length > 0 ? (
+              <div className="crud-page__alert crud-page__alert--error crud-page__form-feedback">
+                {detailsErreur.slice(0, 8).map((detail) => (
+                  <div key={detail}>{detail}</div>
+                ))}
+              </div>
+            ) : null}
+
             <button
               className="import-page__primary-button"
               type="submit"
@@ -175,10 +185,26 @@ export function EtudiantsImportPage({ utilisateur, onLogout }) {
             </button>
           </form>
 
-          {resultatImport?.nombreImportes !== undefined ? (
+          {resultatImport?.nombre_importes !== undefined ? (
             <div className="import-page__summary">
-              <strong>{resultatImport.nombreImportes} etudiant(s) importe(s).</strong>
-              <span>La liste ci-dessous a ete rechargee apres l'import.</span>
+              <strong>{resultatImport.nombre_importes} etudiant(s) importe(s).</strong>
+              <span>
+                {resultatImport.cohorte_utilisee
+                  ? `Session par defaut utilisee : ${resultatImport.cohorte_utilisee.session}.`
+                  : "La liste ci-dessous a ete rechargee apres l'import."}
+              </span>
+              {Number(resultatImport.nombre_etudiants_ignores || 0) > 0 ? (
+                <span>
+                  {resultatImport.nombre_etudiants_ignores} etudiant(s) non utilisable(s)
+                  ont ete ignore(s) automatiquement.
+                </span>
+              ) : null}
+              {Number(resultatImport.nombre_cohortes_ignorees || 0) > 0 ? (
+                <span>
+                  {resultatImport.nombre_cohortes_ignorees} cohorte(s) non exploitable(s)
+                  ont ete exclue(s) de l'import.
+                </span>
+              ) : null}
             </div>
           ) : null}
         </section>
@@ -205,18 +231,17 @@ export function EtudiantsImportPage({ utilisateur, onLogout }) {
                   <th>Matricule</th>
                   <th>Nom</th>
                   <th>Prenom</th>
-                  <th>Groupe genere</th>
+                  <th>Groupe</th>
                   <th>Programme</th>
                   <th>Etape</th>
                   <th>Session</th>
-                  <th>Annee</th>
                 </tr>
               </thead>
 
               <tbody>
                 {etudiantsFiltres.length === 0 ? (
                   <tr>
-                    <td colSpan="8" className="crud-page__empty">
+                    <td colSpan="7" className="crud-page__empty">
                       Aucun etudiant trouve.
                     </td>
                   </tr>
@@ -230,7 +255,6 @@ export function EtudiantsImportPage({ utilisateur, onLogout }) {
                       <td>{etudiant.programme}</td>
                       <td>{etudiant.etape}</td>
                       <td>{etudiant.session}</td>
-                      <td>{etudiant.annee}</td>
                     </tr>
                   ))
                 )}

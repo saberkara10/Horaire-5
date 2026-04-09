@@ -49,6 +49,7 @@ describe("Model cours", () => {
   test("ajouterCours insere puis retourne le cours ajoute", async () => {
     queryMock
       .mockResolvedValueOnce([[{ id_salle: 4, code: "B204", type: "Laboratoire" }]])
+      .mockResolvedValueOnce([{ affectedRows: 1 }])
       .mockResolvedValueOnce([{ insertId: 5 }])
       .mockResolvedValueOnce([[{ id_cours: 5, code: "INF200", id_salle_reference: 4 }]]);
 
@@ -62,7 +63,7 @@ describe("Model cours", () => {
     });
 
     expect(result.id_cours).toBe(5);
-    expect(queryMock).toHaveBeenCalledTimes(3);
+    expect(queryMock).toHaveBeenCalledTimes(4);
   });
 
   test("modifierCours met a jour la salle de reference", async () => {

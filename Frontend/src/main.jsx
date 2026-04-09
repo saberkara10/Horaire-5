@@ -14,9 +14,3 @@ ReactDOM.createRoot(document.getElementById("root")).render(
     <App />
   </React.StrictMode>
 );
-/**
- * ENTRYPOINT - Frontend
- *
- * Ce fichier initialise React
- * et monte l'application dans le DOM.
- */

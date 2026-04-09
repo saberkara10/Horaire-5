@@ -8,13 +8,33 @@ import { apiRequest } from "./api.js";
 
 const BASE_URL = "/api/etudiants";
 
-export async function recupererEtudiants() {
-  return apiRequest(BASE_URL);
+function construireUrlEtudiants(options = {}) {
+  const params = new URLSearchParams();
+
+  if (options.sessionActive) {
+    params.set("session_active", "1");
+  }
+
+  const suffixe = params.toString() ? `?${params.toString()}` : "";
+  return `${BASE_URL}${suffixe}`;
+}
+
+export async function recupererEtudiants(options = {}) {
+  return apiRequest(construireUrlEtudiants(options));
+}
+
+export async function recupererEtudiant(idEtudiant) {
+  return apiRequest(`${BASE_URL}/${idEtudiant}`);
+}
+
+export async function recupererHoraireEtudiant(idEtudiant) {
+  return apiRequest(`${BASE_URL}/${idEtudiant}/horaire`);
 }
 
 export async function importerEtudiants(fichier) {
   const formData = new FormData();
   formData.append("fichier", fichier);
+
   return apiRequest(`${BASE_URL}/import`, {
     method: "POST",
     body: formData,

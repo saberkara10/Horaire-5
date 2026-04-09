@@ -6,6 +6,24 @@
  */
 
 import pool from "../../db.js";
+import {
+  MAX_COURSES_PER_PROGRAM_PER_PROFESSOR,
+  MAX_COURSES_PER_PROFESSOR,
+  MAX_PROGRAMS_PER_PROFESSOR,
+} from "../services/scheduler/AcademicCatalog.js";
+import { replanifierSeancesImpacteesParDisponibilites } from "../services/professeurs/availability-rescheduler.js";
+import { enregistrerJournalReplanificationDisponibilites } from "../services/professeurs/availability-replanning-journal.js";
+import {
+  ajouterJours,
+  calculerFenetreApplicationDisponibilites,
+  calculerFenetreSemaineSession,
+  calculerNombreSemainesSession,
+  comparerDisponibilitesTemporelles,
+  datesSeChevauchent,
+  determinerSemaineReferenceSession,
+  enrichirDisponibilitePourSession,
+  normaliserDateIso,
+} from "../services/professeurs/availability-temporal.js";
 
 function normaliserHeure(heure) {
   const valeur = String(heure || "").trim();
@@ -21,6 +39,49 @@ function normaliserHeure(heure) {
   return valeur.slice(0, 8);
 }
 
+function normaliserTexteOptionnel(valeur) {
+  const texte = String(valeur || "").trim();
+  return texte || null;
+}
+
+function normaliserTexteIdentite(valeur) {
+  return String(valeur || "")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+function creerCleIdentiteProfesseur(professeur) {
+  return [
+    normaliserTexteIdentite(professeur?.prenom).toLowerCase(),
+    normaliserTexteIdentite(professeur?.nom).toLowerCase(),
+  ].join("|");
+}
+
+function matriculeEstAuto(matricule) {
+  return /^AUTO-/i.test(String(matricule || "").trim());
+}
+
+async function mettreAJourAbsencesProfesseur(idSource, idCible, executor = pool) {
+  try {
+    await executor.query(
+      `UPDATE absences_professeurs
+       SET id_professeur = ?
+       WHERE id_professeur = ?`,
+      [idCible, idSource]
+    );
+  } catch (error) {
+    const message = String(error?.message || "").toLowerCase();
+
+    if (
+      !message.includes("doesn't exist") &&
+      !message.includes("unknown table") &&
+      !message.includes("no such table")
+    ) {
+      throw error;
+    }
+  }
+}
+
 async function assurerTableDisponibilites(executor = pool) {
   await executor.query(
     `CREATE TABLE IF NOT EXISTS disponibilites_professeurs (
@@ -29,12 +90,22 @@ async function assurerTableDisponibilites(executor = pool) {
       jour_semaine TINYINT NOT NULL,
       heure_debut TIME NOT NULL,
       heure_fin TIME NOT NULL,
+      date_debut_effet DATE NOT NULL DEFAULT '2000-01-01',
+      date_fin_effet DATE NOT NULL DEFAULT '2099-12-31',
       PRIMARY KEY (id_disponibilite_professeur),
       UNIQUE KEY uniq_disponibilite_professeur (
         id_professeur,
         jour_semaine,
         heure_debut,
-        heure_fin
+        heure_fin,
+        date_debut_effet,
+        date_fin_effet
+      ),
+      KEY idx_disponibilite_professeur_effet (
+        id_professeur,
+        date_debut_effet,
+        date_fin_effet,
+        jour_semaine
       ),
       CONSTRAINT fk_disponibilite_professeur
         FOREIGN KEY (id_professeur) REFERENCES professeurs (id_professeur)
@@ -42,9 +113,106 @@ async function assurerTableDisponibilites(executor = pool) {
       CONSTRAINT chk_disponibilite_jour
         CHECK (jour_semaine BETWEEN 1 AND 7),
       CONSTRAINT chk_disponibilite_heure
-        CHECK (heure_debut < heure_fin)
+        CHECK (heure_debut < heure_fin),
+      CONSTRAINT chk_disponibilite_effet
+        CHECK (date_debut_effet <= date_fin_effet)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
   );
+
+  try {
+    await executor.query(
+      `ALTER TABLE disponibilites_professeurs
+       ADD COLUMN date_debut_effet DATE NULL AFTER heure_fin`
+    );
+  } catch (error) {
+    const message = String(error?.message || "").toLowerCase();
+    if (!message.includes("duplicate") && !message.includes("exists")) {
+      throw error;
+    }
+  }
+
+  try {
+    await executor.query(
+      `ALTER TABLE disponibilites_professeurs
+       ADD COLUMN date_fin_effet DATE NULL AFTER date_debut_effet`
+    );
+  } catch (error) {
+    const message = String(error?.message || "").toLowerCase();
+    if (!message.includes("duplicate") && !message.includes("exists")) {
+      throw error;
+    }
+  }
+
+  await executor.query(
+    `UPDATE disponibilites_professeurs
+     SET date_debut_effet = COALESCE(date_debut_effet, '2000-01-01'),
+         date_fin_effet = COALESCE(date_fin_effet, '2099-12-31')
+     WHERE date_debut_effet IS NULL
+        OR date_fin_effet IS NULL`
+  );
+
+  try {
+    await executor.query(
+      `ALTER TABLE disponibilites_professeurs
+       MODIFY COLUMN date_debut_effet DATE NOT NULL`
+    );
+  } catch {
+    // La colonne peut deja etre conforme.
+  }
+
+  try {
+    await executor.query(
+      `ALTER TABLE disponibilites_professeurs
+       MODIFY COLUMN date_fin_effet DATE NOT NULL`
+    );
+  } catch {
+    // La colonne peut deja etre conforme.
+  }
+
+  try {
+    await executor.query(
+      `ALTER TABLE disponibilites_professeurs
+       DROP INDEX uniq_disponibilite_professeur`
+    );
+  } catch {
+    // L'index peut etre absent ou deja migre.
+  }
+
+  try {
+    await executor.query(
+      `ALTER TABLE disponibilites_professeurs
+       ADD UNIQUE KEY uniq_disponibilite_professeur (
+         id_professeur,
+         jour_semaine,
+         heure_debut,
+         heure_fin,
+         date_debut_effet,
+         date_fin_effet
+       )`
+    );
+  } catch (error) {
+    const message = String(error?.message || "").toLowerCase();
+    if (!message.includes("duplicate") && !message.includes("exists")) {
+      throw error;
+    }
+  }
+
+  try {
+    await executor.query(
+      `ALTER TABLE disponibilites_professeurs
+       ADD KEY idx_disponibilite_professeur_effet (
+         id_professeur,
+         date_debut_effet,
+         date_fin_effet,
+         jour_semaine
+       )`
+    );
+  } catch (error) {
+    const message = String(error?.message || "").toLowerCase();
+    if (!message.includes("duplicate") && !message.includes("exists")) {
+      throw error;
+    }
+  }
 
   try {
     await executor.query(
@@ -68,6 +236,33 @@ async function assurerTableDisponibilites(executor = pool) {
       throw error;
     }
   }
+
+  try {
+    await executor.query(
+      `ALTER TABLE disponibilites_professeurs
+       DROP CHECK chk_disponibilite_effet`
+    );
+  } catch {
+    // Le check peut etre absent ou deja conforme selon l'etat de la base.
+  }
+
+  try {
+    await executor.query(
+      `ALTER TABLE disponibilites_professeurs
+       ADD CONSTRAINT chk_disponibilite_effet
+       CHECK (date_debut_effet <= date_fin_effet)`
+    );
+  } catch (error) {
+    const message = String(error?.message || "").toLowerCase();
+
+    if (!message.includes("duplicate") && !message.includes("exists")) {
+      throw error;
+    }
+  }
+}
+
+export async function assurerTableDisponibilitesProfesseurs(executor = pool) {
+  await assurerTableDisponibilites(executor);
 }
 
 async function assurerTableProfesseurCours(executor = pool) {
@@ -96,6 +291,75 @@ function normaliserCoursIds(coursIds = []) {
   )];
 }
 
+async function recupererCoursParIds(coursIds = [], executor = pool) {
+  const coursNormalises = normaliserCoursIds(coursIds);
+
+  if (coursNormalises.length === 0) {
+    return [];
+  }
+
+  const placeholders = coursNormalises.map(() => "?").join(", ");
+  const [cours] = await executor.query(
+    `SELECT id_cours, code, nom, programme, archive
+     FROM cours
+     WHERE id_cours IN (${placeholders})`,
+    coursNormalises
+  );
+
+  const coursParId = new Map(
+    cours.map((coursProfesseur) => [
+      Number(coursProfesseur.id_cours),
+      coursProfesseur,
+    ])
+  );
+
+  return coursNormalises.map((idCours) => coursParId.get(idCours)).filter(Boolean);
+}
+
+export async function validerContrainteCoursProfesseur(coursIds = [], executor = pool) {
+  const coursNormalises = normaliserCoursIds(coursIds);
+
+  if (coursNormalises.length === 0) {
+    return "";
+  }
+
+  const cours = await recupererCoursParIds(coursNormalises, executor);
+
+  if (cours.length !== coursNormalises.length) {
+    return "Un ou plusieurs cours sont introuvables.";
+  }
+
+  if (cours.some((coursProfesseur) => Number(coursProfesseur.archive || 0) === 1)) {
+    return "Impossible d'assigner un cours archive a un professeur.";
+  }
+
+  const coursParProgramme = new Map();
+
+  for (const coursProfesseur of cours) {
+    const programme = String(coursProfesseur.programme || "").trim();
+    coursParProgramme.set(
+      programme,
+      (coursParProgramme.get(programme) || 0) + 1
+    );
+  }
+
+  if (coursParProgramme.size > MAX_PROGRAMS_PER_PROFESSOR) {
+    return `Un professeur ne peut pas enseigner plus de ${MAX_PROGRAMS_PER_PROFESSOR} programmes.`;
+  }
+
+  for (const nombreCours of coursParProgramme.values()) {
+    if (nombreCours > MAX_COURSES_PER_PROGRAM_PER_PROFESSOR) {
+      return `Un professeur ne peut pas avoir plus de ${MAX_COURSES_PER_PROGRAM_PER_PROFESSOR} cours dans le meme programme.`;
+    }
+  }
+
+  if (cours.length > MAX_COURSES_PER_PROFESSOR) {
+    return `Un professeur ne peut pas avoir plus de ${MAX_COURSES_PER_PROFESSOR} cours assignes.`;
+  }
+
+  return "";
+}
+
 async function recupererProfesseurParColonne(colonne, valeur) {
   await assurerTableProfesseurCours();
 
@@ -105,6 +369,17 @@ async function recupererProfesseurParColonne(colonne, valeur) {
             p.nom,
             p.prenom,
             p.specialite,
+            COALESCE(
+              NULLIF(
+                GROUP_CONCAT(
+                  DISTINCT c.programme
+                  ORDER BY c.programme SEPARATOR ', '
+                ),
+                ''
+              ),
+              p.specialite,
+              ''
+            ) AS programmes_assignes,
             COALESCE(GROUP_CONCAT(DISTINCT c.code ORDER BY c.code SEPARATOR ', '), '') AS cours_assignes,
             COALESCE(GROUP_CONCAT(DISTINCT c.id_cours ORDER BY c.code SEPARATOR ','), '') AS cours_ids,
             COUNT(DISTINCT c.id_cours) AS nombre_cours
@@ -113,6 +388,7 @@ async function recupererProfesseurParColonne(colonne, valeur) {
        ON pc.id_professeur = p.id_professeur
      LEFT JOIN cours c
        ON c.id_cours = pc.id_cours
+      AND COALESCE(c.archive, 0) = 0
      WHERE p.${colonne} = ?
      GROUP BY p.id_professeur, p.matricule, p.nom, p.prenom, p.specialite
      LIMIT 1`,
@@ -131,6 +407,17 @@ export async function recupererTousLesProfesseurs() {
             p.nom,
             p.prenom,
             p.specialite,
+            COALESCE(
+              NULLIF(
+                GROUP_CONCAT(
+                  DISTINCT c.programme
+                  ORDER BY c.programme SEPARATOR ', '
+                ),
+                ''
+              ),
+              p.specialite,
+              ''
+            ) AS programmes_assignes,
             COALESCE(GROUP_CONCAT(DISTINCT c.code ORDER BY c.code SEPARATOR ', '), '') AS cours_assignes,
             COALESCE(GROUP_CONCAT(DISTINCT c.id_cours ORDER BY c.code SEPARATOR ','), '') AS cours_ids,
             COUNT(DISTINCT c.id_cours) AS nombre_cours
@@ -139,6 +426,7 @@ export async function recupererTousLesProfesseurs() {
        ON pc.id_professeur = p.id_professeur
      LEFT JOIN cours c
        ON c.id_cours = pc.id_cours
+      AND COALESCE(c.archive, 0) = 0
      GROUP BY p.id_professeur, p.matricule, p.nom, p.prenom, p.specialite
      ORDER BY p.matricule ASC`
   );
@@ -154,6 +442,53 @@ export async function recupererProfesseurParMatricule(matriculeProfesseur) {
   return recupererProfesseurParColonne("matricule", matriculeProfesseur);
 }
 
+export async function recupererProfesseurParNomPrenom(nomProfesseur, prenomProfesseur) {
+  await assurerTableProfesseurCours();
+
+  const nomNormalise = normaliserTexteIdentite(nomProfesseur);
+  const prenomNormalise = normaliserTexteIdentite(prenomProfesseur);
+
+  if (!nomNormalise || !prenomNormalise) {
+    return null;
+  }
+
+  const [listeProfesseurs] = await pool.query(
+    `SELECT p.id_professeur,
+            p.matricule,
+            p.nom,
+            p.prenom,
+            p.specialite,
+            COALESCE(
+              NULLIF(
+                GROUP_CONCAT(
+                  DISTINCT c.programme
+                  ORDER BY c.programme SEPARATOR ', '
+                ),
+                ''
+              ),
+              p.specialite,
+              ''
+            ) AS programmes_assignes,
+            COALESCE(GROUP_CONCAT(DISTINCT c.code ORDER BY c.code SEPARATOR ', '), '') AS cours_assignes,
+            COALESCE(GROUP_CONCAT(DISTINCT c.id_cours ORDER BY c.code SEPARATOR ','), '') AS cours_ids,
+            COUNT(DISTINCT c.id_cours) AS nombre_cours
+     FROM professeurs p
+     LEFT JOIN professeur_cours pc
+       ON pc.id_professeur = p.id_professeur
+     LEFT JOIN cours c
+       ON c.id_cours = pc.id_cours
+      AND COALESCE(c.archive, 0) = 0
+     WHERE LOWER(TRIM(p.nom)) = LOWER(TRIM(?))
+       AND LOWER(TRIM(p.prenom)) = LOWER(TRIM(?))
+     GROUP BY p.id_professeur, p.matricule, p.nom, p.prenom, p.specialite
+     ORDER BY p.id_professeur ASC
+     LIMIT 1`,
+    [nomNormalise, prenomNormalise]
+  );
+
+  return listeProfesseurs[0] || null;
+}
+
 export async function recupererCoursProfesseur(idProfesseur) {
   await assurerTableProfesseurCours();
 
@@ -166,6 +501,7 @@ export async function recupererCoursProfesseur(idProfesseur) {
      FROM professeur_cours pc
      JOIN cours c
        ON c.id_cours = pc.id_cours
+      AND COALESCE(c.archive, 0) = 0
      WHERE pc.id_professeur = ?
      ORDER BY c.code ASC`,
     [idProfesseur]
@@ -178,9 +514,12 @@ export async function recupererIndexCoursProfesseurs(executor = pool) {
   await assurerTableProfesseurCours(executor);
 
   const [liens] = await executor.query(
-    `SELECT id_professeur, id_cours
-     FROM professeur_cours
-     ORDER BY id_professeur ASC, id_cours ASC`
+    `SELECT pc.id_professeur, pc.id_cours
+     FROM professeur_cours pc
+     INNER JOIN cours c
+       ON c.id_cours = pc.id_cours
+      AND COALESCE(c.archive, 0) = 0
+     ORDER BY pc.id_professeur ASC, pc.id_cours ASC`
   );
 
   const coursParProfesseur = new Map();
@@ -194,31 +533,226 @@ export async function recupererIndexCoursProfesseurs(executor = pool) {
   return coursParProfesseur;
 }
 
-export async function recupererDisponibilitesProfesseur(idProfesseur) {
-  await assurerTableDisponibilites();
+export async function assurerUniciteNomPrenomProfesseurs(executor = pool) {
+  try {
+    await executor.query(
+      `ALTER TABLE professeurs
+       ADD UNIQUE KEY uniq_professeur_nom_prenom (nom, prenom)`
+    );
+  } catch (error) {
+    const message = String(error?.message || "").toLowerCase();
 
-  const [disponibilites] = await pool.query(
+    if (!message.includes("duplicate") && !message.includes("already exists")) {
+      throw error;
+    }
+  }
+}
+
+export async function nettoyerAffectationsCoursArchivesProfesseurs(executor = pool) {
+  await assurerTableProfesseurCours(executor);
+
+  const [resultatSuppression] = await executor.query(
+    `DELETE pc
+     FROM professeur_cours pc
+     INNER JOIN cours c
+       ON c.id_cours = pc.id_cours
+     WHERE COALESCE(c.archive, 0) = 1`
+  );
+
+  return Number(resultatSuppression.affectedRows || 0);
+}
+
+async function recupererSessionActive(executor = pool) {
+  const [sessions] = await executor.query(
+    `SELECT id_session, nom, date_debut, date_fin
+     FROM sessions
+     WHERE active = TRUE
+     ORDER BY id_session DESC
+     LIMIT 1`
+  );
+
+  return sessions[0] || null;
+}
+
+function normaliserDisponibilitesTemporelles(
+  disponibilites = [],
+  sessionActive = null
+) {
+  const lignes = sessionActive
+    ? disponibilites
+        .filter((disponibilite) =>
+          datesSeChevauchent(
+            disponibilite.date_debut_effet,
+            disponibilite.date_fin_effet,
+            sessionActive.date_debut,
+            sessionActive.date_fin
+          )
+        )
+        .map((disponibilite) =>
+          enrichirDisponibilitePourSession(disponibilite, sessionActive)
+        )
+    : disponibilites.map((disponibilite) => ({
+        ...disponibilite,
+        date_debut_effet:
+          normaliserDateIso(disponibilite.date_debut_effet) || "2000-01-01",
+        date_fin_effet:
+          normaliserDateIso(disponibilite.date_fin_effet) || "2099-12-31",
+      }));
+
+  return lignes.sort(comparerDisponibilitesTemporelles);
+}
+
+async function listerDisponibilitesProfesseurAvecExecutor(
+  executor,
+  idProfesseur,
+  options = {}
+) {
+  const conditions = ["id_professeur = ?"];
+  const parametres = [idProfesseur];
+
+  if (options.date_debut_max) {
+    conditions.push("date_fin_effet >= ?");
+    parametres.push(normaliserDateIso(options.date_debut_max));
+  }
+
+  if (options.date_fin_min) {
+    conditions.push("date_debut_effet <= ?");
+    parametres.push(normaliserDateIso(options.date_fin_min));
+  }
+
+  const [disponibilites] = await executor.query(
     `SELECT id_disponibilite_professeur,
             id_professeur,
             jour_semaine,
             heure_debut,
-            heure_fin
+            heure_fin,
+            DATE_FORMAT(date_debut_effet, '%Y-%m-%d') AS date_debut_effet,
+            DATE_FORMAT(date_fin_effet, '%Y-%m-%d') AS date_fin_effet
      FROM disponibilites_professeurs
-     WHERE id_professeur = ?
-     ORDER BY jour_semaine ASC, heure_debut ASC`,
-    [idProfesseur]
+     WHERE ${conditions.join(" AND ")}
+     ORDER BY date_debut_effet ASC,
+              date_fin_effet ASC,
+              jour_semaine ASC,
+              heure_debut ASC`,
+    parametres
   );
 
   return disponibilites;
+}
+
+function construireContexteDisponibilitesProfesseur(
+  disponibilites = [],
+  sessionActive = null,
+  semaineCible = null
+) {
+  if (!sessionActive) {
+    return normaliserDisponibilitesTemporelles(disponibilites, null);
+  }
+
+  const fenetreSemaine = calculerFenetreSemaineSession(
+    sessionActive,
+    semaineCible
+  );
+  const timeline = normaliserDisponibilitesTemporelles(
+    disponibilites,
+    sessionActive
+  );
+  const disponibilitesEffectives = timeline.filter((disponibilite) =>
+    datesSeChevauchent(
+      disponibilite.date_debut_effet,
+      disponibilite.date_fin_effet,
+      fenetreSemaine.date_debut,
+      fenetreSemaine.date_fin
+    )
+  );
+
+  return {
+    disponibilites: disponibilitesEffectives,
+    session_active: {
+      ...sessionActive,
+      nombre_semaines: calculerNombreSemainesSession(sessionActive),
+    },
+    semaine_reference: fenetreSemaine,
+    variations: timeline,
+  };
+}
+
+export async function recupererDisponibilitesProfesseur(
+  idProfesseur,
+  options = {}
+) {
+  await assurerTableDisponibilites();
+
+  const sessionActive = await recupererSessionActive();
+  const disponibilites = await listerDisponibilitesProfesseurAvecExecutor(
+    pool,
+    idProfesseur,
+    sessionActive
+      ? {
+          date_debut_max: sessionActive.date_debut,
+          date_fin_min: sessionActive.date_fin,
+        }
+      : {}
+  );
+
+  if (options.format === "detail" || options.semaine_cible !== undefined) {
+    return construireContexteDisponibilitesProfesseur(
+      disponibilites,
+      sessionActive,
+      options.semaine_cible
+    );
+  }
+
+  return normaliserDisponibilitesTemporelles(disponibilites, sessionActive);
+}
+
+async function recupererDisponibilitesProfesseurAvecExecutor(
+  executor,
+  idProfesseur,
+  options = {}
+) {
+  const sessionActive =
+    options.session_active === undefined
+      ? await recupererSessionActive(executor)
+      : options.session_active;
+  const disponibilites = await listerDisponibilitesProfesseurAvecExecutor(
+    executor,
+    idProfesseur,
+    sessionActive
+      ? {
+          date_debut_max: sessionActive.date_debut,
+          date_fin_min: sessionActive.date_fin,
+        }
+      : {}
+  );
+
+  if (options.format === "detail" || options.semaine_cible !== undefined) {
+    return construireContexteDisponibilitesProfesseur(
+      disponibilites,
+      sessionActive,
+      options.semaine_cible
+    );
+  }
+
+  return normaliserDisponibilitesTemporelles(disponibilites, sessionActive);
 }
 
 export async function recupererDisponibilitesProfesseurs(executor = pool) {
   await assurerTableDisponibilites(executor);
 
   const [disponibilites] = await executor.query(
-    `SELECT id_professeur, jour_semaine, heure_debut, heure_fin
+    `SELECT id_professeur,
+            jour_semaine,
+            heure_debut,
+            heure_fin,
+            DATE_FORMAT(date_debut_effet, '%Y-%m-%d') AS date_debut_effet,
+            DATE_FORMAT(date_fin_effet, '%Y-%m-%d') AS date_fin_effet
      FROM disponibilites_professeurs
-     ORDER BY id_professeur ASC, jour_semaine ASC, heure_debut ASC`
+     ORDER BY id_professeur ASC,
+              date_debut_effet ASC,
+              date_fin_effet ASC,
+              jour_semaine ASC,
+              heure_debut ASC`
   );
 
   const disponibilitesParProfesseur = new Map();
@@ -236,46 +770,237 @@ export async function recupererDisponibilitesProfesseurs(executor = pool) {
   return disponibilitesParProfesseur;
 }
 
-export async function remplacerDisponibilitesProfesseur(idProfesseur, disponibilites) {
+async function insererDisponibilitesProfesseurDansFenetre(
+  executor,
+  idProfesseur,
+  disponibilites,
+  dateDebutEffet,
+  dateFinEffet
+) {
+  const clesVues = new Set();
+
+  for (const disponibilite of disponibilites) {
+    const cle = [
+      Number(idProfesseur),
+      Number(disponibilite.jour_semaine),
+      normaliserHeure(disponibilite.heure_debut),
+      normaliserHeure(disponibilite.heure_fin),
+      normaliserDateIso(dateDebutEffet),
+      normaliserDateIso(dateFinEffet),
+    ].join("|");
+
+    if (clesVues.has(cle)) {
+      continue;
+    }
+
+    clesVues.add(cle);
+
+    await executor.query(
+      `INSERT INTO disponibilites_professeurs (
+        id_professeur,
+        jour_semaine,
+        heure_debut,
+        heure_fin,
+        date_debut_effet,
+        date_fin_effet
+      )
+      VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        idProfesseur,
+        Number(disponibilite.jour_semaine),
+        normaliserHeure(disponibilite.heure_debut),
+        normaliserHeure(disponibilite.heure_fin),
+        normaliserDateIso(dateDebutEffet),
+        normaliserDateIso(dateFinEffet),
+      ]
+    );
+  }
+}
+
+export async function remplacerDisponibilitesProfesseur(
+  idProfesseur,
+  disponibilites,
+  options = {}
+) {
   const connection = await pool.getConnection();
+  const disponibilitesNormalisees = disponibilites.map((disponibilite) => ({
+    jour_semaine: Number(disponibilite.jour_semaine),
+    heure_debut: normaliserHeure(disponibilite.heure_debut),
+    heure_fin: normaliserHeure(disponibilite.heure_fin),
+  }));
+  let disponibilitesAvant = [];
+  let disponibilitesApres = [];
 
   try {
     await connection.beginTransaction();
     await assurerTableDisponibilites(connection);
+    const sessionActive = await recupererSessionActive(connection);
+
+    if (!sessionActive) {
+      const erreur = new Error(
+        "Aucune session active n'est disponible pour appliquer des disponibilites datees."
+      );
+      erreur.statusCode = 400;
+      throw erreur;
+    }
+
+    const semaineReference = determinerSemaineReferenceSession(
+      sessionActive,
+      options.semaine_cible
+    );
+    const fenetreApplication = calculerFenetreApplicationDisponibilites(
+      sessionActive,
+      semaineReference,
+      options.mode_application
+    );
+
+    disponibilitesAvant = await recupererDisponibilitesProfesseurAvecExecutor(
+      connection,
+      idProfesseur,
+      {
+        format: "detail",
+        semaine_cible: semaineReference,
+        session_active: sessionActive,
+      }
+    );
+    const disponibilitesChevauchantes =
+      await listerDisponibilitesProfesseurAvecExecutor(connection, idProfesseur, {
+        date_debut_max: fenetreApplication.date_debut_effet,
+        date_fin_min: fenetreApplication.date_fin_effet,
+      });
 
     await connection.query(
       `DELETE FROM disponibilites_professeurs
-       WHERE id_professeur = ?`,
-      [idProfesseur]
+       WHERE id_professeur = ?
+         AND date_fin_effet >= ?
+         AND date_debut_effet <= ?`,
+      [
+        idProfesseur,
+        fenetreApplication.date_debut_effet,
+        fenetreApplication.date_fin_effet,
+      ]
     );
 
-    for (const disponibilite of disponibilites) {
-      await connection.query(
-        `INSERT INTO disponibilites_professeurs (
-          id_professeur,
-          jour_semaine,
-          heure_debut,
-          heure_fin
-        )
-        VALUES (?, ?, ?, ?)`,
-        [
+    for (const disponibilite of disponibilitesChevauchantes) {
+      if (
+        normaliserDateIso(disponibilite.date_debut_effet) <
+        fenetreApplication.date_debut_effet
+      ) {
+        await insererDisponibilitesProfesseurDansFenetre(
+          connection,
           idProfesseur,
-          disponibilite.jour_semaine,
-          normaliserHeure(disponibilite.heure_debut),
-          normaliserHeure(disponibilite.heure_fin),
-        ]
-      );
+          [disponibilite],
+          disponibilite.date_debut_effet,
+          ajouterJours(fenetreApplication.date_debut_effet, -1)
+        );
+      }
+
+      if (
+        normaliserDateIso(disponibilite.date_fin_effet) >
+        fenetreApplication.date_fin_effet
+      ) {
+        await insererDisponibilitesProfesseurDansFenetre(
+          connection,
+          idProfesseur,
+          [disponibilite],
+          ajouterJours(fenetreApplication.date_fin_effet, 1),
+          disponibilite.date_fin_effet
+        );
+      }
     }
 
+    await insererDisponibilitesProfesseurDansFenetre(
+      connection,
+      idProfesseur,
+      disponibilitesNormalisees,
+      fenetreApplication.date_debut_effet,
+      fenetreApplication.date_fin_effet
+    );
+
+    disponibilitesApres = await recupererDisponibilitesProfesseurAvecExecutor(
+      connection,
+      idProfesseur,
+      {
+        format: "detail",
+        semaine_cible: semaineReference,
+        session_active: sessionActive,
+      }
+    );
+
+    const disponibilitesSession = await recupererDisponibilitesProfesseurAvecExecutor(
+      connection,
+      idProfesseur,
+      {
+        session_active: sessionActive,
+      }
+    );
+
+    const replanification =
+      await replanifierSeancesImpacteesParDisponibilites(
+        idProfesseur,
+        disponibilitesSession,
+        connection,
+        {
+          dateDebutImpact: fenetreApplication.date_debut_effet,
+          dateFinImpact: fenetreApplication.date_fin_effet,
+        }
+      );
+
+    await enregistrerJournalReplanificationDisponibilites(connection, {
+      id_professeur: idProfesseur,
+      statut:
+        replanification?.statut === "succes"
+          ? "SUCCES"
+          : replanification?.statut === "echec"
+            ? "ECHEC"
+            : "AUCUN_IMPACT",
+      disponibilites_avant: disponibilitesAvant,
+      disponibilites_apres: disponibilitesApres,
+      replanification: {
+        ...replanification,
+        fenetre_application: fenetreApplication,
+      },
+      details:
+        replanification?.seances_deplacees?.length > 0
+          ? replanification.seances_deplacees
+          : [],
+    });
+
     await connection.commit();
+
+    return {
+      ...await recupererDisponibilitesProfesseur(idProfesseur, {
+        format: "detail",
+        semaine_cible: semaineReference,
+      }),
+      replanification,
+      synchronisation: {
+        id_professeur: Number(idProfesseur),
+        groupes_impactes: replanification?.groupes_impactes || [],
+        salles_impactees: replanification?.salles_impactees || [],
+        horodatage: new Date().toISOString(),
+      },
+    };
   } catch (error) {
     await connection.rollback();
+
+    try {
+      await enregistrerJournalReplanificationDisponibilites(pool, {
+        id_professeur: idProfesseur,
+        statut: "ECHEC",
+        disponibilites_avant: disponibilitesAvant,
+        disponibilites_apres: disponibilitesApres,
+        replanification: error?.replanification || null,
+        details: Array.isArray(error?.details) ? error.details : [],
+      });
+    } catch {
+      // Le journal ne doit jamais masquer l'erreur metier principale.
+    }
+
     throw error;
   } finally {
     connection.release();
   }
-
-  return recupererDisponibilitesProfesseur(idProfesseur);
 }
 
 export async function remplacerCoursProfesseur(idProfesseur, coursIds) {
@@ -314,11 +1039,19 @@ export async function remplacerCoursProfesseur(idProfesseur, coursIds) {
 
 export async function ajouterProfesseur(nouveauProfesseur) {
   const { matricule, nom, prenom, specialite, cours_ids = [] } = nouveauProfesseur;
+  const matriculeNormalise = String(matricule || "").trim();
+  const nomNormalise = normaliserTexteIdentite(nom);
+  const prenomNormalise = normaliserTexteIdentite(prenom);
 
   const [resultatInsertion] = await pool.query(
     `INSERT INTO professeurs (matricule, nom, prenom, specialite)
      VALUES (?, ?, ?, ?)`,
-    [matricule, nom, prenom, specialite ?? null]
+    [
+      matriculeNormalise,
+      nomNormalise,
+      prenomNormalise,
+      normaliserTexteOptionnel(specialite),
+    ]
   );
 
   const professeurAjoute = await recupererProfesseurParId(resultatInsertion.insertId);
@@ -336,22 +1069,22 @@ export async function modifierProfesseur(idProfesseur, donneesModification) {
 
   if (donneesModification.matricule !== undefined) {
     champsAModifier.push("matricule = ?");
-    valeurs.push(donneesModification.matricule);
+    valeurs.push(String(donneesModification.matricule || "").trim());
   }
 
   if (donneesModification.nom !== undefined) {
     champsAModifier.push("nom = ?");
-    valeurs.push(donneesModification.nom);
+    valeurs.push(normaliserTexteIdentite(donneesModification.nom));
   }
 
   if (donneesModification.prenom !== undefined) {
     champsAModifier.push("prenom = ?");
-    valeurs.push(donneesModification.prenom);
+    valeurs.push(normaliserTexteIdentite(donneesModification.prenom));
   }
 
   if (donneesModification.specialite !== undefined) {
     champsAModifier.push("specialite = ?");
-    valeurs.push(donneesModification.specialite);
+    valeurs.push(normaliserTexteOptionnel(donneesModification.specialite));
   }
 
   if (champsAModifier.length > 0) {
@@ -375,6 +1108,153 @@ export async function modifierProfesseur(idProfesseur, donneesModification) {
   }
 
   return recupererProfesseurParId(idProfesseur);
+}
+
+export async function fusionnerDoublonsProfesseurs(executor = pool) {
+  await assurerTableDisponibilites(executor);
+  await assurerTableProfesseurCours(executor);
+
+  const [professeurs] = await executor.query(
+    `SELECT p.id_professeur,
+            p.matricule,
+            p.nom,
+            p.prenom,
+            p.specialite,
+            COUNT(DISTINCT ac.id_affectation_cours) AS nombre_affectations,
+            COUNT(DISTINCT pc.id_cours) AS nombre_cours
+     FROM professeurs p
+     LEFT JOIN affectation_cours ac
+       ON ac.id_professeur = p.id_professeur
+     LEFT JOIN professeur_cours pc
+       ON pc.id_professeur = p.id_professeur
+     GROUP BY p.id_professeur, p.matricule, p.nom, p.prenom, p.specialite
+     ORDER BY p.id_professeur ASC`
+  );
+
+  const professeursParCle = new Map();
+
+  for (const professeur of professeurs) {
+    const cle = creerCleIdentiteProfesseur(professeur);
+
+    if (!cle || cle === "|") {
+      continue;
+    }
+
+    const groupe = professeursParCle.get(cle) || [];
+    groupe.push(professeur);
+    professeursParCle.set(cle, groupe);
+  }
+
+  const fusion = {
+    groupesFusionnes: 0,
+    professeursFusionnes: 0,
+    details: [],
+  };
+
+  for (const groupe of professeursParCle.values()) {
+    if (groupe.length <= 1) {
+      continue;
+    }
+
+    const [professeurConserve, ...doublons] = [...groupe].sort((professeurA, professeurB) => {
+      const autoA = matriculeEstAuto(professeurA.matricule) ? 1 : 0;
+      const autoB = matriculeEstAuto(professeurB.matricule) ? 1 : 0;
+
+      if (autoA !== autoB) {
+        return autoA - autoB;
+      }
+
+      if (
+        Number(professeurA.nombre_affectations || 0) !==
+        Number(professeurB.nombre_affectations || 0)
+      ) {
+        return (
+          Number(professeurB.nombre_affectations || 0) -
+          Number(professeurA.nombre_affectations || 0)
+        );
+      }
+
+      if (Number(professeurA.nombre_cours || 0) !== Number(professeurB.nombre_cours || 0)) {
+        return Number(professeurB.nombre_cours || 0) - Number(professeurA.nombre_cours || 0);
+      }
+
+      return Number(professeurA.id_professeur) - Number(professeurB.id_professeur);
+    });
+
+    for (const doublon of doublons) {
+      await executor.query(
+        `INSERT IGNORE INTO professeur_cours (id_professeur, id_cours)
+         SELECT ?, id_cours
+         FROM professeur_cours
+         WHERE id_professeur = ?`,
+        [professeurConserve.id_professeur, doublon.id_professeur]
+      );
+
+      await executor.query(
+        `INSERT IGNORE INTO disponibilites_professeurs (
+           id_professeur,
+           jour_semaine,
+           heure_debut,
+           heure_fin,
+           date_debut_effet,
+           date_fin_effet
+         )
+         SELECT ?, jour_semaine, heure_debut, heure_fin, date_debut_effet, date_fin_effet
+         FROM disponibilites_professeurs
+         WHERE id_professeur = ?`,
+        [professeurConserve.id_professeur, doublon.id_professeur]
+      );
+
+      await executor.query(
+        `UPDATE affectation_cours
+         SET id_professeur = ?
+         WHERE id_professeur = ?`,
+        [professeurConserve.id_professeur, doublon.id_professeur]
+      );
+
+      await mettreAJourAbsencesProfesseur(
+        doublon.id_professeur,
+        professeurConserve.id_professeur,
+        executor
+      );
+
+      if (!professeurConserve.specialite && doublon.specialite) {
+        await executor.query(
+          `UPDATE professeurs
+           SET specialite = ?
+           WHERE id_professeur = ?`,
+          [doublon.specialite, professeurConserve.id_professeur]
+        );
+        professeurConserve.specialite = doublon.specialite;
+      }
+
+      await executor.query(
+        `DELETE FROM disponibilites_professeurs
+         WHERE id_professeur = ?`,
+        [doublon.id_professeur]
+      );
+      await executor.query(
+        `DELETE FROM professeur_cours
+         WHERE id_professeur = ?`,
+        [doublon.id_professeur]
+      );
+      await executor.query(
+        `DELETE FROM professeurs
+         WHERE id_professeur = ?
+         LIMIT 1`,
+        [doublon.id_professeur]
+      );
+
+      fusion.professeursFusionnes += 1;
+    }
+
+    fusion.groupesFusionnes += 1;
+    fusion.details.push(
+      `${professeurConserve.prenom} ${professeurConserve.nom} conserve (${groupe.length - 1} doublon(s) fusionne(s)).`
+    );
+  }
+
+  return fusion;
 }
 
 export async function professeurEstDejaAffecte(idProfesseur) {
@@ -428,7 +1308,7 @@ export async function recupererHoraireProfesseur(idProfesseur) {
         s.code AS code_salle,
         s.type AS type_salle,
         ph.id_plage_horaires,
-        ph.date,
+        DATE_FORMAT(ph.date, '%Y-%m-%d') AS date,
         ph.heure_debut,
         ph.heure_fin,
         COALESCE(
@@ -442,11 +1322,18 @@ export async function recupererHoraireProfesseur(idProfesseur) {
        ON s.id_salle = ac.id_salle
      JOIN plages_horaires ph
        ON ph.id_plage_horaires = ac.id_plage_horaires
-     LEFT JOIN affectation_groupes ag
+     JOIN affectation_groupes ag
        ON ag.id_affectation_cours = ac.id_affectation_cours
-     LEFT JOIN groupes_etudiants ge
+     JOIN groupes_etudiants ge
        ON ge.id_groupes_etudiants = ag.id_groupes_etudiants
      WHERE ac.id_professeur = ?
+       AND ge.id_session = (
+         SELECT id_session
+         FROM sessions
+         WHERE active = TRUE
+         ORDER BY id_session DESC
+         LIMIT 1
+       )
      GROUP BY ac.id_affectation_cours,
               c.id_cours,
               c.code,

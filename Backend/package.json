@@ -6,8 +6,8 @@
   "type": "module",
   "scripts": {
     "start": "node src/server.js",
-    "dev": "nodemon src/server.js",
-    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage"
+    "dev": "node scripts/free-dev-port.mjs && nodemon src/server.js",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js"
   },
   "keywords": [],
   "author": "",
@@ -24,6 +24,7 @@
     "mysql2": "^3.18.1",
     "passport": "^0.7.0",
     "passport-local": "^1.0.0",
+    "pdfkit": "^0.18.0",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

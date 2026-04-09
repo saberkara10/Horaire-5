@@ -12,8 +12,15 @@ export async function recupererProfesseurs() {
   return apiRequest(BASE_URL);
 }
 
-export async function recupererDisponibilitesProfesseur(id) {
-  return apiRequest(`${BASE_URL}/${id}/disponibilites`);
+export async function recupererDisponibilitesProfesseur(id, options = {}) {
+  const params = new URLSearchParams();
+
+  if (options.semaine_cible) {
+    params.set("semaine_cible", String(options.semaine_cible));
+  }
+
+  const suffixe = params.toString() ? `?${params.toString()}` : "";
+  return apiRequest(`${BASE_URL}/${id}/disponibilites${suffixe}`);
 }
 
 export async function recupererCoursProfesseur(id) {
@@ -28,11 +35,19 @@ export async function mettreAJourCoursProfesseur(id, coursIds) {
   });
 }
 
-export async function mettreAJourDisponibilitesProfesseur(id, disponibilites) {
+export async function mettreAJourDisponibilitesProfesseur(
+  id,
+  disponibilites,
+  options = {}
+) {
   return apiRequest(`${BASE_URL}/${id}/disponibilites`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ disponibilites }),
+    body: JSON.stringify({
+      disponibilites,
+      semaine_cible: options.semaine_cible,
+      mode_application: options.mode_application,
+    }),
   });
 }
 

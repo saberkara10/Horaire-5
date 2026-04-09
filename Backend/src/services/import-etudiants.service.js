@@ -6,21 +6,40 @@
  * - normaliser les entetes et les cellules ;
  * - valider les colonnes attendues ;
  * - transformer chaque ligne en objet etudiant exploitable ;
+ * - importer optionnellement un onglet de cours echoues/reprises ;
  * - produire des messages d'erreur explicites avant toute ecriture SQL.
  */
 
 import path from "node:path";
 import XLSX from "xlsx";
 import { enregistrerEtudiantsImportes } from "../model/import-etudiants.model.js";
+import { normaliserNomSession } from "../utils/sessions.js";
+import { normaliserNomProgramme } from "../utils/programmes.js";
 
-const COLONNES_OBLIGATOIRES = [
+const COLONNES_ETUDIANTS_OBLIGATOIRES = [
   "matricule",
   "nom",
   "prenom",
-  "groupe",
   "programme",
   "etape",
 ];
+
+const COLONNES_COURS_ECHOUES_OBLIGATOIRES = [
+  "matricule",
+  "code_cours",
+];
+
+const STATUTS_COURS_ECHOUES = new Set([
+  "a_reprendre",
+  "planifie",
+  "reussi",
+  "en_ligne",
+  "groupe_special",
+  "resolution_manuelle",
+]);
+
+const FEUILLES_ETUDIANTS = ["Etudiants"];
+const FEUILLES_COURS_ECHOUES = ["CoursEchoues", "Cours Echoues", "Reprises"];
 
 function normaliserValeurTexte(valeur) {
   return String(valeur ?? "").trim();
@@ -44,23 +63,40 @@ function extraireWorkbookDepuisFichier(fichier) {
   return XLSX.read(fichier.buffer, { type: "buffer" });
 }
 
-function convertirFichierEnLignes(fichier) {
-  try {
-    const workbook = extraireWorkbookDepuisFichier(fichier);
-    const premierNomFeuille = workbook.SheetNames[0];
+function convertirFeuilleEnLignes(workbook, nomFeuille) {
+  const feuille = workbook?.Sheets?.[nomFeuille];
 
-    if (!premierNomFeuille) {
-      return [];
+  if (!feuille) {
+    return [];
+  }
+
+  return XLSX.utils.sheet_to_json(feuille, {
+    header: 1,
+    raw: false,
+    defval: "",
+    blankrows: false,
+  });
+}
+
+function resoudreNomFeuille(workbook, nomsPreferes = [], { fallbackToFirst = true } = {}) {
+  const nomsFeuilles = Array.isArray(workbook?.SheetNames) ? workbook.SheetNames : [];
+
+  for (const nomPrefere of nomsPreferes) {
+    const nomTrouve = nomsFeuilles.find(
+      (nomFeuille) => normaliserEntete(nomFeuille) === normaliserEntete(nomPrefere)
+    );
+
+    if (nomTrouve) {
+      return nomTrouve;
     }
+  }
 
-    const feuille = workbook.Sheets[premierNomFeuille];
+  return fallbackToFirst ? nomsFeuilles[0] || null : null;
+}
 
-    return XLSX.utils.sheet_to_json(feuille, {
-      header: 1,
-      raw: false,
-      defval: "",
-      blankrows: false,
-    });
+function lireWorkbook(fichier) {
+  try {
+    return extraireWorkbookDepuisFichier(fichier);
   } catch (error) {
     throw creerErreurImport("Impossible de lire le fichier.", [
       "Le fichier envoye ne peut pas etre lu comme un document Excel ou CSV valide.",
@@ -68,25 +104,23 @@ function convertirFichierEnLignes(fichier) {
   }
 }
 
-/**
- * Valider la structure minimale du fichier avant d'analyser les lignes.
- *
- * La premiere ligne doit contenir l'entete. On normalise les intitulés pour
- * tolerer les differences de casse et les espaces residuels.
- *
- * @param {Array<Array<string>>} lignes Contenu brut du fichier.
- * @returns {{message: string, erreurs: string[]} | null}
- */
-function validerStructureFichier(lignes) {
+function validerStructureFichier(
+  lignes,
+  colonnesObligatoires,
+  {
+    messageFichierVide = "Fichier vide.",
+    erreurFichierVide = "Le fichier ne contient aucune ligne exploitable.",
+  } = {}
+) {
   if (lignes.length === 0) {
     return {
-      message: "Fichier vide.",
-      erreurs: ["Le fichier ne contient aucune ligne etudiant a importer."],
+      message: messageFichierVide,
+      erreurs: [erreurFichierVide],
     };
   }
 
   const entetes = lignes[0].map(normaliserEntete);
-  const colonnesManquantes = COLONNES_OBLIGATOIRES.filter(
+  const colonnesManquantes = colonnesObligatoires.filter(
     (colonne) => !entetes.includes(colonne)
   );
 
@@ -102,16 +136,6 @@ function validerStructureFichier(lignes) {
   return null;
 }
 
-/**
- * Valider une ligne deja transformee en objet metier.
- *
- * La validation se limite volontairement a des regles deterministes :
- * presence des champs requis, tailles raisonnables et etape numerique.
- * Les controles dependants de la base sont delegues au modele SQL.
- *
- * @param {Object} etudiant Donnees candidates a l'import.
- * @returns {string[]} Liste des erreurs pour cette ligne.
- */
 function validerEtudiantLigne(etudiant) {
   const erreurs = [];
 
@@ -139,14 +163,6 @@ function validerEtudiantLigne(etudiant) {
     );
   }
 
-  if (!etudiant.groupe) {
-    erreurs.push(`Ligne ${etudiant.numeroLigne} : groupe obligatoire.`);
-  } else if (etudiant.groupe.length > 100) {
-    erreurs.push(
-      `Ligne ${etudiant.numeroLigne} : le groupe ${etudiant.groupe} depasse la longueur maximale autorisee.`
-    );
-  }
-
   if (!etudiant.programme) {
     erreurs.push(`Ligne ${etudiant.numeroLigne} : programme obligatoire.`);
   } else if (etudiant.programme.length > 150) {
@@ -163,37 +179,70 @@ function validerEtudiantLigne(etudiant) {
     );
   }
 
+  if (etudiant.session && !normaliserNomSession(etudiant.session)) {
+    erreurs.push(
+      `Ligne ${etudiant.numeroLigne} : session invalide (${etudiant.session}). Les valeurs acceptees sont Automne, Hiver, Printemps ou Ete.`
+    );
+  }
+
   return erreurs;
 }
 
-export class ImportEtudiantsError extends Error {
-  constructor(message, { status = 400, erreurs = [] } = {}) {
-    super(message);
-    this.name = "ImportEtudiantsError";
-    this.status = status;
-    this.erreurs = erreurs;
+function validerCoursEchoueLigne(coursEchoue) {
+  const erreurs = [];
+
+  if (!coursEchoue.matricule) {
+    erreurs.push(`Ligne ${coursEchoue.numeroLigne} : matricule obligatoire.`);
+  } else if (coursEchoue.matricule.length > 50) {
+    erreurs.push(
+      `Ligne ${coursEchoue.numeroLigne} : le matricule ${coursEchoue.matricule} depasse la longueur maximale autorisee.`
+    );
   }
+
+  if (!coursEchoue.code_cours) {
+    erreurs.push(`Ligne ${coursEchoue.numeroLigne} : code_cours obligatoire.`);
+  } else if (coursEchoue.code_cours.length > 50) {
+    erreurs.push(
+      `Ligne ${coursEchoue.numeroLigne} : le code de cours ${coursEchoue.code_cours} depasse la longueur maximale autorisee.`
+    );
+  }
+
+  if (coursEchoue.session && !normaliserNomSession(coursEchoue.session)) {
+    erreurs.push(
+      `Ligne ${coursEchoue.numeroLigne} : session cible invalide (${coursEchoue.session}). Les valeurs acceptees sont Automne, Hiver, Printemps ou Ete.`
+    );
+  }
+
+  if (coursEchoue.noteBrute) {
+    const note = Number(String(coursEchoue.noteBrute).replace(",", "."));
+
+    if (!Number.isFinite(note)) {
+      erreurs.push(
+        `Ligne ${coursEchoue.numeroLigne} : note_echec invalide (${coursEchoue.noteBrute}).`
+      );
+    } else if (note < 0 || note >= 60) {
+      erreurs.push(
+        `Ligne ${coursEchoue.numeroLigne} : note_echec doit etre comprise entre 0 et 59.99.`
+      );
+    }
+  }
+
+  if (
+    coursEchoue.statut &&
+    !STATUTS_COURS_ECHOUES.has(coursEchoue.statut)
+  ) {
+    erreurs.push(
+      `Ligne ${coursEchoue.numeroLigne} : statut invalide (${coursEchoue.statut}).`
+    );
+  }
+
+  return erreurs;
 }
 
-/**
- * Point d'entree principal de l'import.
- *
- * Tant qu'une erreur de structure ou de validation existe, aucune ecriture SQL
- * n'est tentee. Cela permet de renvoyer un diagnostic complet a l'interface
- * avant de toucher a la base de donnees.
- *
- * @param {import("multer").File | undefined} fichier Fichier televerse.
- * @returns {Promise<{message: string, nombre_importes: number}>}
- */
-export async function importerEtudiantsDepuisFichier(fichier) {
-  if (!fichier) {
-    throw creerErreurImport("Aucun fichier fourni.", [
-      "Veuillez selectionner un fichier .xlsx ou .csv avant de lancer l'import.",
-    ]);
-  }
-
-  const lignes = convertirFichierEnLignes(fichier);
-  const erreurStructure = validerStructureFichier(lignes);
+function parserFeuilleEtudiants(lignes) {
+  const erreurStructure = validerStructureFichier(lignes, COLONNES_ETUDIANTS_OBLIGATOIRES, {
+    erreurFichierVide: "Le fichier ne contient aucune ligne etudiant a importer.",
+  });
 
   if (erreurStructure) {
     throw creerErreurImport(erreurStructure.message, erreurStructure.erreurs);
@@ -203,7 +252,6 @@ export async function importerEtudiantsDepuisFichier(fichier) {
   const indexColonnes = Object.fromEntries(
     entetes.map((colonne, index) => [colonne, index])
   );
-
   const etudiants = [];
   const erreurs = [];
   const matriculesVus = new Set();
@@ -212,29 +260,33 @@ export async function importerEtudiantsDepuisFichier(fichier) {
     const ligne = lignes[index];
     const numeroLigne = index + 1;
     const etapeBrute = normaliserValeurTexte(ligne[indexColonnes.etape]);
+    const sessionBrute =
+      indexColonnes.session !== undefined
+        ? normaliserValeurTexte(ligne[indexColonnes.session])
+        : "";
 
     const etudiant = {
       numeroLigne,
       matricule: normaliserValeurTexte(ligne[indexColonnes.matricule]),
       nom: normaliserValeurTexte(ligne[indexColonnes.nom]),
       prenom: normaliserValeurTexte(ligne[indexColonnes.prenom]),
-      groupe: normaliserValeurTexte(ligne[indexColonnes.groupe]),
-      programme: normaliserValeurTexte(ligne[indexColonnes.programme]),
+      programme: normaliserNomProgramme(
+        normaliserValeurTexte(ligne[indexColonnes.programme])
+      ),
       etapeBrute,
       etape: Number(etapeBrute),
+      session: sessionBrute,
     };
 
     const ligneEstVide =
       !etudiant.matricule &&
       !etudiant.nom &&
       !etudiant.prenom &&
-      !etudiant.groupe &&
       !etudiant.programme &&
-      !etapeBrute;
+      !etapeBrute &&
+      !sessionBrute;
 
     if (ligneEstVide) {
-      // Les lignes totalement vides sont ignorees pour permettre l'usage
-      // de fichiers exportes qui contiennent des sauts ou separations visuelles.
       continue;
     }
 
@@ -263,14 +315,178 @@ export async function importerEtudiantsDepuisFichier(fichier) {
     throw creerErreurImport("Import impossible.", erreurs);
   }
 
-  const resultat = await enregistrerEtudiantsImportes(etudiants);
+  return etudiants;
+}
+
+function parserFeuilleCoursEchoues(lignes) {
+  if (!Array.isArray(lignes) || lignes.length === 0) {
+    return [];
+  }
+
+  const erreurStructure = validerStructureFichier(
+    lignes,
+    COLONNES_COURS_ECHOUES_OBLIGATOIRES,
+    {
+      erreurFichierVide:
+        "L'onglet des cours echoues ne contient aucune ligne exploitable.",
+    }
+  );
+
+  if (erreurStructure) {
+    throw creerErreurImport(erreurStructure.message, erreurStructure.erreurs);
+  }
+
+  const entetes = lignes[0].map(normaliserEntete);
+  const indexColonnes = Object.fromEntries(
+    entetes.map((colonne, index) => [colonne, index])
+  );
+  const coursEchoues = [];
+  const erreurs = [];
+  const signaturesVues = new Set();
+
+  for (let index = 1; index < lignes.length; index += 1) {
+    const ligne = lignes[index];
+    const numeroLigne = index + 1;
+    const sessionBrute =
+      indexColonnes.session !== undefined
+        ? normaliserValeurTexte(ligne[indexColonnes.session])
+        : indexColonnes.session_cible !== undefined
+          ? normaliserValeurTexte(ligne[indexColonnes.session_cible])
+          : "";
+    const noteBrute =
+      indexColonnes.note_echec !== undefined
+        ? normaliserValeurTexte(ligne[indexColonnes.note_echec])
+        : "";
+    const statutBrut =
+      indexColonnes.statut !== undefined
+        ? normaliserValeurTexte(ligne[indexColonnes.statut]).toLowerCase()
+        : "";
+
+    const coursEchoue = {
+      numeroLigne,
+      matricule: normaliserValeurTexte(ligne[indexColonnes.matricule]),
+      code_cours: normaliserValeurTexte(ligne[indexColonnes.code_cours]).toUpperCase(),
+      session: sessionBrute,
+      noteBrute,
+      statut: statutBrut || "a_reprendre",
+      note_echec:
+        noteBrute === ""
+          ? null
+          : Number(String(noteBrute).replace(",", ".")),
+    };
+
+    const ligneEstVide =
+      !coursEchoue.matricule &&
+      !coursEchoue.code_cours &&
+      !sessionBrute &&
+      !noteBrute &&
+      !statutBrut;
+
+    if (ligneEstVide) {
+      continue;
+    }
+
+    erreurs.push(...validerCoursEchoueLigne(coursEchoue));
+
+    if (coursEchoue.matricule && coursEchoue.code_cours) {
+      const signature = [
+        coursEchoue.matricule,
+        coursEchoue.code_cours,
+        normaliserNomSession(coursEchoue.session) || "",
+      ].join("|");
+
+      if (signaturesVues.has(signature)) {
+        erreurs.push(
+          `Ligne ${numeroLigne} : la reprise ${coursEchoue.code_cours} pour ${coursEchoue.matricule} est dupliquee dans le fichier.`
+        );
+      } else {
+        signaturesVues.add(signature);
+      }
+    }
+
+    coursEchoues.push(coursEchoue);
+  }
+
+  if (erreurs.length > 0) {
+    throw creerErreurImport("Import impossible.", erreurs);
+  }
+
+  return coursEchoues;
+}
+
+export class ImportEtudiantsError extends Error {
+  constructor(message, { status = 400, erreurs = [] } = {}) {
+    super(message);
+    this.name = "ImportEtudiantsError";
+    this.status = status;
+    this.erreurs = erreurs;
+  }
+}
+
+/**
+ * Point d'entree principal de l'import.
+ *
+ * Tant qu'une erreur de structure ou de validation existe, aucune ecriture SQL
+ * n'est tentee. Cela permet de renvoyer un diagnostic complet a l'interface
+ * avant de toucher a la base de donnees.
+ *
+ * @param {import("multer").File | undefined} fichier Fichier televerse.
+ * @returns {Promise<{message: string, nombre_importes: number}>}
+ */
+export async function importerEtudiantsDepuisFichier(fichier) {
+  if (!fichier) {
+    throw creerErreurImport("Aucun fichier fourni.", [
+      "Veuillez selectionner un fichier .xlsx, .xls ou .csv avant de lancer l'import.",
+    ]);
+  }
+
+  const workbook = lireWorkbook(fichier);
+  const nomFeuilleEtudiants = resoudreNomFeuille(workbook, FEUILLES_ETUDIANTS);
+  const lignesEtudiants = convertirFeuilleEnLignes(workbook, nomFeuilleEtudiants);
+  const nomFeuilleCoursEchoues = resoudreNomFeuille(
+    workbook,
+    FEUILLES_COURS_ECHOUES,
+    { fallbackToFirst: false }
+  );
+  const lignesCoursEchoues = nomFeuilleCoursEchoues
+    ? convertirFeuilleEnLignes(workbook, nomFeuilleCoursEchoues)
+    : [];
+  const etudiants = parserFeuilleEtudiants(lignesEtudiants);
+  const coursEchoues = parserFeuilleCoursEchoues(lignesCoursEchoues);
+  const resultat = await enregistrerEtudiantsImportes(etudiants, {
+    coursEchoues,
+  });
 
   if (resultat.erreurs?.length) {
     throw creerErreurImport("Import impossible.", resultat.erreurs, 409);
   }
 
   return {
-    message: "Import termine avec succes.",
+    message:
+      coursEchoues.length > 0
+        ? "Import des etudiants et des cours echoues termine avec succes."
+        : "Import termine avec succes.",
     nombre_importes: resultat.nombreImportes,
+    ...(resultat.nombreMisAJour
+      ? { nombre_mis_a_jour: resultat.nombreMisAJour }
+      : {}),
+    ...(resultat.nombreCoursEchouesImportes
+      ? {
+          nombre_cours_echoues_importes:
+            resultat.nombreCoursEchouesImportes,
+        }
+      : {}),
+    ...(resultat.nombreEtudiantsIgnores
+      ? { nombre_etudiants_ignores: resultat.nombreEtudiantsIgnores }
+      : {}),
+    ...(resultat.nombreCohortesIgnorees
+      ? { nombre_cohortes_ignorees: resultat.nombreCohortesIgnorees }
+      : {}),
+    ...(resultat.cohortesIgnorees?.length
+      ? { cohortes_ignorees: resultat.cohortesIgnorees }
+      : {}),
+    ...(resultat.cohorteUtilisee
+      ? { cohorte_utilisee: resultat.cohorteUtilisee }
+      : {}),
   };
 }

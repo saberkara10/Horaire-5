@@ -1,8 +1,8 @@
 /**
- * TESTS - Utils Programmes
+ * TESTS - Route Programmes
  *
  * Ce fichier couvre la normalisation
- * et la comparaison des programmes.
+ * et la deduplication retournees par l'API.
  */
 import request from "supertest";
 import { jest, describe, test, expect, beforeEach } from "@jest/globals";
@@ -22,7 +22,7 @@ describe("Tests route Programmes", () => {
     jest.clearAllMocks();
   });
 
-  test("GET /api/programmes retourne les programmes normalises et la reference", async () => {
+  test("GET /api/programmes retourne les programmes canonises et tries", async () => {
     queryMock.mockResolvedValue([[
       { programme: "Commerce" },
       { programme: "Informatique" },
@@ -33,10 +33,6 @@ describe("Tests route Programmes", () => {
     const response = await request(app).get("/api/programmes");
 
     expect(response.statusCode).toBe(200);
-    expect(response.body).toContain("Commerce");
-    expect(response.body).toContain("Informatique");
-    expect(response.body).toContain("Reseaux");
-    expect(response.body).toContain("Design graphique");
     expect(response.body).toEqual([
       "Commerce",
       "Design graphique",
@@ -45,22 +41,24 @@ describe("Tests route Programmes", () => {
     ]);
   });
 
-  test("GET /api/programmes conserve aussi les libelles importes", async () => {
+  test("GET /api/programmes conserve les libelles non reconnus", async () => {
     queryMock.mockResolvedValue([[{ programme: "Developpement Web" }]]);
 
     const response = await request(app).get("/api/programmes");
 
     expect(response.statusCode).toBe(200);
-    expect(response.body).toContain("Developpement Web");
+    expect(response.body).toEqual(["Developpement Web"]);
   });
 
-  test("GET /api/programmes nettoie les valeurs vides et trie les programmes", async () => {
+  test("GET /api/programmes nettoie les valeurs vides et deduplique les alias", async () => {
     queryMock.mockResolvedValue([[
       { programme: "  Reseaux  " },
       { programme: "" },
       { programme: "Commerce" },
       { programme: null },
       { programme: "Analyse de donnees" },
+      { programme: "Programmation informatique" },
+      { programme: "informatique" },
     ]]);
 
     const response = await request(app).get("/api/programmes");
@@ -69,6 +67,8 @@ describe("Tests route Programmes", () => {
     expect(response.body).toEqual([
       "Analyse de donnees",
       "Commerce",
+      "informatique",
+      "Programmation informatique",
       "Reseaux",
     ]);
   });
@@ -84,9 +84,3 @@ describe("Tests route Programmes", () => {
     });
   });
 });
-/**
- * TESTS - Utils Programmes
- *
- * Ce fichier couvre la normalisation
- * et la comparaison des programmes.
- */

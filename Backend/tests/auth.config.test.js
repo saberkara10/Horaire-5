@@ -6,7 +6,7 @@
  */
 import { jest, describe, test, expect } from "@jest/globals";
 
-const compareMock = jest.fn();
+const verifyPasswordMock = jest.fn();
 const findByEmailMock = jest.fn();
 const findByIdMock = jest.fn();
 const findRolesByUserIdMock = jest.fn();
@@ -14,13 +14,6 @@ const findRolesByUserIdMock = jest.fn();
 let verifyCallback;
 let serializeCallback;
 let deserializeCallback;
-
-// mock bcrypt
-jest.unstable_mockModule("bcrypt", () => ({
-  default: {
-    compare: compareMock,
-  },
-}));
 
 // mock passport
 jest.unstable_mockModule("passport", () => ({
@@ -53,6 +46,10 @@ jest.unstable_mockModule("../src/model/utilisateur.js", () => ({
   findRolesByUserId: findRolesByUserIdMock,
 }));
 
+jest.unstable_mockModule("../src/utils/passwords.js", () => ({
+  verifyPassword: verifyPasswordMock,
+}));
+
 // ⚠️ IMPORTANT : importer APRÈS les mocks
 await import("../auth.js");
 
@@ -71,7 +68,7 @@ describe("auth.js (passport config)", () => {
       id: 1,
       mot_de_passe_hash: "hash",
     });
-    compareMock.mockResolvedValue(false);
+    verifyPasswordMock.mockResolvedValue(false);
 
     const done = jest.fn();
 
@@ -84,7 +81,7 @@ describe("auth.js (passport config)", () => {
     const user = { id: 1, mot_de_passe_hash: "hash" };
 
     findByEmailMock.mockResolvedValue(user);
-    compareMock.mockResolvedValue(true);
+    verifyPasswordMock.mockResolvedValue(true);
 
     const done = jest.fn();
 

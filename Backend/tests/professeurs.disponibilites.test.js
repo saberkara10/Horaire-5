@@ -10,7 +10,10 @@ import { jest, describe, test, expect, beforeEach } from "@jest/globals";
 const professeursModelMock = {
   recupererTousLesProfesseurs: jest.fn(),
   recupererProfesseurParId: jest.fn(),
+  recupererProfesseurParNomPrenom: jest.fn(),
   recupererProfesseurParMatricule: jest.fn(),
+  assurerUniciteNomPrenomProfesseurs: jest.fn(),
+  fusionnerDoublonsProfesseurs: jest.fn(),
   recupererCoursProfesseur: jest.fn(),
   recupererIndexCoursProfesseurs: jest.fn(),
   recupererDisponibilitesProfesseur: jest.fn(),
@@ -22,6 +25,8 @@ const professeursModelMock = {
   modifierProfesseur: jest.fn(),
   supprimerProfesseur: jest.fn(),
   professeurEstDejaAffecte: jest.fn(),
+  validerContrainteCoursProfesseur: jest.fn(),
+  nettoyerAffectationsCoursArchivesProfesseurs: jest.fn(),
 };
 
 await jest.unstable_mockModule("../src/model/professeurs.model.js", () => professeursModelMock);
@@ -54,6 +59,8 @@ const { default: app } = await import("../src/app.js");
 describe("Tests routes Professeurs disponibilites", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    professeursModelMock.recupererProfesseurParNomPrenom.mockResolvedValue(null);
+    professeursModelMock.validerContrainteCoursProfesseur.mockResolvedValue("");
   });
 
   test("GET /api/professeurs/:id/disponibilites retourne 400 si l'identifiant est invalide", async () => {
@@ -126,9 +133,19 @@ describe("Tests routes Professeurs disponibilites", () => {
       id_professeur: 1,
       matricule: "INF01",
     });
-    professeursModelMock.remplacerDisponibilitesProfesseur.mockResolvedValue([
-      { jour_semaine: 7, heure_debut: "09:00:00", heure_fin: "12:00:00" },
-    ]);
+    professeursModelMock.remplacerDisponibilitesProfesseur.mockResolvedValue({
+      disponibilites: [
+        { jour_semaine: 7, heure_debut: "09:00:00", heure_fin: "12:00:00" },
+      ],
+      session_active: {
+        id_session: 1,
+        nom: "Automne 2026",
+      },
+      semaine_reference: {
+        numero_semaine: 1,
+      },
+      variations: [],
+    });
 
     const response = await request(app)
       .put("/api/professeurs/1/disponibilites")
@@ -139,7 +156,10 @@ describe("Tests routes Professeurs disponibilites", () => {
     expect(response.statusCode).toBe(200);
     expect(professeursModelMock.remplacerDisponibilitesProfesseur).toHaveBeenCalledWith(1, [
       { jour_semaine: 7, heure_debut: "09:00", heure_fin: "12:00" },
-    ]);
+    ], {
+      semaine_cible: undefined,
+      mode_application: undefined,
+    });
   });
 
   test("PUT /api/professeurs/:id/disponibilites retourne 400 si l'heure de fin precede l'heure de debut", async () => {
@@ -197,7 +217,7 @@ describe("Tests routes Professeurs disponibilites", () => {
       });
 
     expect(response.statusCode).toBe(500);
-    expect(response.body).toEqual({ message: "Erreur serveur." });
+    expect(response.body).toEqual({ message: "DB error", details: [] });
   });
 });
 /**

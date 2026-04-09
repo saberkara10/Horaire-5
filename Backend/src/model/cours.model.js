@@ -7,6 +7,12 @@
  */
 
 import pool from "../../db.js";
+import { assurerProgrammeReference } from "./programmes.model.js";
+import { normaliserNomProgramme } from "../utils/programmes.js";
+
+function normaliserCodeCours(codeCours) {
+  return String(codeCours || "").trim().toUpperCase();
+}
 
 async function recupererSalleParId(idSalle, executor = pool) {
   const [salles] = await executor.query(
@@ -108,9 +114,9 @@ export async function recupererCoursParCode(codeCours) {
      FROM cours c
      LEFT JOIN salles s
        ON s.id_salle = c.id_salle_reference
-     WHERE c.code = ?
+     WHERE UPPER(TRIM(c.code)) = ?
      LIMIT 1`,
-    [codeCours]
+    [normaliserCodeCours(codeCours)]
   );
 
   return coursTrouve.length ? coursTrouve[0] : null;
@@ -126,6 +132,8 @@ export async function ajouterCours(nouveauCours) {
   const { code, nom, duree, programme, etape_etude, id_salle_reference } =
     nouveauCours;
   const salleReference = await recupererSalleParId(id_salle_reference);
+  const codeNormalise = normaliserCodeCours(code);
+  const programmeNormalise = await assurerProgrammeReference(programme);
 
   if (!salleReference) {
     throw new Error("Salle de reference introuvable.");
@@ -143,11 +151,11 @@ export async function ajouterCours(nouveauCours) {
     )
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
     [
-      code,
-      nom,
+      codeNormalise,
+      String(nom || "").trim(),
       duree,
-      programme,
-      etape_etude,
+      programmeNormalise || normaliserNomProgramme(programme),
+      String(etape_etude).trim(),
       salleReference.type,
       salleReference.id_salle,
     ]
@@ -169,12 +177,12 @@ export async function modifierCours(idCours, donneesModification) {
 
   if (donneesModification.code !== undefined) {
     champsAModifier.push("code = ?");
-    valeurs.push(donneesModification.code);
+    valeurs.push(normaliserCodeCours(donneesModification.code));
   }
 
   if (donneesModification.nom !== undefined) {
     champsAModifier.push("nom = ?");
-    valeurs.push(donneesModification.nom);
+    valeurs.push(String(donneesModification.nom || "").trim());
   }
 
   if (donneesModification.duree !== undefined) {
@@ -183,13 +191,19 @@ export async function modifierCours(idCours, donneesModification) {
   }
 
   if (donneesModification.programme !== undefined) {
+    const programmeNormalise = await assurerProgrammeReference(
+      donneesModification.programme
+    );
     champsAModifier.push("programme = ?");
-    valeurs.push(donneesModification.programme);
+    valeurs.push(
+      programmeNormalise ||
+        normaliserNomProgramme(donneesModification.programme)
+    );
   }
 
   if (donneesModification.etape_etude !== undefined) {
     champsAModifier.push("etape_etude = ?");
-    valeurs.push(donneesModification.etape_etude);
+    valeurs.push(String(donneesModification.etape_etude).trim());
   }
 
   if (donneesModification.id_salle_reference !== undefined) {

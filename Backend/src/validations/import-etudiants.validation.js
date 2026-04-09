@@ -17,7 +17,11 @@ const upload = multer({
 
 function extensionFichierValide(nomFichier) {
   const nom = String(nomFichier ?? "").toLowerCase();
-  return nom.endsWith(".xlsx") || nom.endsWith(".csv");
+  return (
+    nom.endsWith(".xlsx") ||
+    nom.endsWith(".xls") ||
+    nom.endsWith(".csv")
+  );
 }
 
 function reponseErreur(response, message, erreurs = []) {
@@ -55,7 +59,7 @@ export function televerserFichierImportEtudiants(request, response, next) {
 
     if (!request.files || request.files.length === 0) {
       return reponseErreur(response, "Aucun fichier fourni.", [
-        "Veuillez selectionner un fichier .xlsx ou .csv avant de lancer l'import.",
+        "Veuillez selectionner un fichier .xlsx, .xls ou .csv avant de lancer l'import.",
       ]);
     }
 
@@ -63,7 +67,7 @@ export function televerserFichierImportEtudiants(request, response, next) {
 
     if (!extensionFichierValide(request.file.originalname)) {
       return reponseErreur(response, "Format de fichier non supporte.", [
-        "Le fichier doit etre au format .xlsx ou .csv.",
+        "Le fichier doit etre au format .xlsx, .xls ou .csv.",
       ]);
     }
 

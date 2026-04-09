@@ -8,14 +8,38 @@ import { apiRequest } from "./api.js";
 
 const API_URL = "/api/horaires";
 
-export async function recupererHoraires() {
-  return apiRequest(API_URL, {
+function construireUrlHoraires(options = {}) {
+  const params = new URLSearchParams();
+
+  if (options.sessionActive) {
+    params.set("session_active", "1");
+  }
+
+  if (options.deleteStudents) {
+    params.set("delete_students", "1");
+  }
+
+  const suffixe = params.toString() ? `?${params.toString()}` : "";
+  return `${API_URL}${suffixe}`;
+}
+
+export async function recupererHoraires(options = {}) {
+  return apiRequest(construireUrlHoraires(options), {
     credentials: "include",
   });
 }
 
 export async function recupererAffectation(idAffectation) {
   return apiRequest(`${API_URL}/${idAffectation}`, {
+    credentials: "include",
+  });
+}
+
+export async function creerAffectation(affectation) {
+  return apiRequest(API_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(affectation),
     credentials: "include",
   });
 }
@@ -45,8 +69,8 @@ export async function supprimerAffectation(idAffectation) {
   });
 }
 
-export async function resetHoraires() {
-  return apiRequest(API_URL, {
+export async function resetHoraires(options = {}) {
+  return apiRequest(construireUrlHoraires(options), {
     method: "DELETE",
     credentials: "include",
   });

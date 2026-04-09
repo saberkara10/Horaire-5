@@ -82,6 +82,8 @@
 
 .affectations-page__panel {
   padding: 1.25rem;
+  content-visibility: auto;
+  contain-intrinsic-size: 540px;
 }
 
 .affectations-page__panel-header {
@@ -118,6 +120,10 @@
   gap: 1rem;
 }
 
+.affectations-page__row--triple {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .affectations-page__row > * {
   min-width: 0;
 }
@@ -137,6 +143,31 @@
 }
 
 .affectations-page__cohort-preview small {
+  color: var(--muted);
+}
+
+.affectations-page__selection-stats,
+.affectations-page__generation-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.affectations-page__selection-stat {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.9rem 1rem;
+  border-radius: 18px;
+  border: 1px solid rgba(178, 197, 217, 0.38);
+  background: rgba(248, 251, 255, 0.96);
+}
+
+.affectations-page__selection-stat strong {
+  color: var(--text);
+  font-size: 1.1rem;
+}
+
+.affectations-page__selection-stat span {
   color: var(--muted);
 }
 
@@ -168,6 +199,276 @@
   gap: 0.8rem;
   flex-wrap: wrap;
 }
+
+.affectations-page__option {
+  grid-column: 1 / -1;
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  color: #355574;
+  font-weight: 600;
+}
+
+.affectations-page__option input {
+  margin-top: 0.15rem;
+  accent-color: #6b6cf6;
+}
+
+.affectations-page__option span {
+  line-height: 1.5;
+}
+
+.affectations-page__manual-summary {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.95rem 1rem;
+  border-radius: 18px;
+  border: 1px solid rgba(178, 197, 217, 0.42);
+  background: rgba(248, 251, 255, 0.96);
+}
+
+.affectations-page__manual-summary strong {
+  color: var(--text);
+}
+
+.affectations-page__manual-summary span {
+  color: var(--muted);
+}
+
+.affectations-page__rooms-panel {
+  display: grid;
+  gap: 0.85rem;
+  padding: 1rem;
+  border-radius: 18px;
+  border: 1px solid rgba(178, 197, 217, 0.42);
+  background: rgba(248, 251, 255, 0.96);
+  content-visibility: auto;
+  contain-intrinsic-size: 520px;
+}
+
+.affectations-page__rooms-panel-header h3 {
+  margin: 0;
+  color: var(--text);
+}
+
+.affectations-page__rooms-panel-header p {
+  margin: 0.25rem 0 0;
+  color: var(--muted);
+}
+
+.affectations-page__rooms-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.75rem;
+}
+
+.affectations-page__room-card {
+  display: grid;
+  gap: 0.3rem;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  padding: 0.95rem 1rem;
+  border-radius: 18px;
+  border: 1px solid rgba(178, 197, 217, 0.42);
+  background: #fff;
+  transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+}
+
+.affectations-page__room-card:disabled {
+  cursor: not-allowed;
+}
+
+.affectations-page__room-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.affectations-page__room-card strong {
+  color: var(--text);
+  font-size: 1rem;
+}
+
+.affectations-page__room-type {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.affectations-page__room-reason {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.4;
+  display: block;
+}
+
+/* —— Badge de statut —— */
+.affectations-page__room-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.affectations-page__room-badge--available {
+  background: rgba(16, 185, 129, 0.12);
+  color: #065f46;
+}
+
+.affectations-page__room-badge--busy {
+  background: rgba(239, 68, 68, 0.12);
+  color: #b42318;
+}
+
+.affectations-page__room-badge--incompatible {
+  background: rgba(245, 158, 11, 0.14);
+  color: #92400e;
+}
+
+.affectations-page__room-badge--small {
+  background: rgba(107, 114, 128, 0.12);
+  color: #374151;
+}
+
+/* —— Cartes par statut —— */
+.affectations-page__room-card--available {
+  border-color: rgba(16, 185, 129, 0.32);
+  background: rgba(236, 253, 245, 0.96);
+}
+
+.affectations-page__room-card--available:not(:disabled):hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px rgba(16, 185, 129, 0.14);
+  border-color: rgba(16, 185, 129, 0.55);
+}
+
+.affectations-page__room-card--busy {
+  border-color: rgba(239, 68, 68, 0.24);
+  background: rgba(254, 242, 242, 0.98);
+  opacity: 0.88;
+}
+
+.affectations-page__room-card--busy .affectations-page__room-card-header strong {
+  color: #b42318;
+}
+
+.affectations-page__room-card--incompatible {
+  border-color: rgba(245, 158, 11, 0.28);
+  background: rgba(255, 251, 235, 0.98);
+  opacity: 0.82;
+}
+
+.affectations-page__room-card--incompatible .affectations-page__room-card-header strong {
+  color: #92400e;
+}
+
+.affectations-page__room-card--small {
+  border-color: rgba(107, 114, 128, 0.22);
+  background: rgba(249, 250, 251, 0.98);
+  opacity: 0.78;
+}
+
+.affectations-page__room-card--small .affectations-page__room-card-header strong {
+  color: #374151;
+}
+
+.affectations-page__room-card--selected {
+  border-width: 2px;
+  border-color: #2563eb !important;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
+  background: rgba(239, 246, 255, 0.98) !important;
+  opacity: 1 !important;
+}
+
+.affectations-page__room-selected-indicator {
+  display: inline-flex;
+  margin-top: 0.2rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #1d4ed8;
+}
+
+/* —— Légende des statuts —— */
+.affectations-page__room-status-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  margin-top: 0.3rem;
+}
+
+.affectations-page__room-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.affectations-page__room-legend-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.affectations-page__room-legend-item--available {
+  color: #065f46;
+}
+.affectations-page__room-legend-item--available .affectations-page__room-legend-dot {
+  background: #10b981;
+}
+
+.affectations-page__room-legend-item--occupied {
+  color: #b42318;
+}
+.affectations-page__room-legend-item--occupied .affectations-page__room-legend-dot {
+  background: #ef4444;
+}
+
+.affectations-page__room-legend-item--incompatible {
+  color: #92400e;
+}
+.affectations-page__room-legend-item--incompatible .affectations-page__room-legend-dot {
+  background: #f59e0b;
+}
+
+.affectations-page__room-legend-item--small {
+  color: #374151;
+}
+.affectations-page__room-legend-item--small .affectations-page__room-legend-dot {
+  background: #9ca3af;
+}
+
+/* —— Info salle sélectionnée —— */
+.affectations-page__room-selected-info {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.affectations-page__room-selected-info--ok {
+  background: rgba(16, 185, 129, 0.1);
+  color: #065f46;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.affectations-page__room-selected-info--error {
+  background: rgba(239, 68, 68, 0.08);
+  color: #b42318;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
 
 .affectations-page__group-list {
   display: grid;
@@ -239,6 +540,50 @@
   margin-bottom: 1rem;
 }
 
+.affectations-page__table-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.affectations-page__table-meta {
+  display: grid;
+  gap: 0.2rem;
+  color: var(--muted);
+}
+
+.affectations-page__table-meta strong {
+  color: var(--text);
+}
+
+.affectations-page__pagination {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  flex-wrap: wrap;
+}
+
+.affectations-page__pagination-size {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  color: var(--muted);
+}
+
+.affectations-page__pagination-size select {
+  min-width: 88px;
+}
+
+.affectations-page__pagination-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
 .affectations-page__filter-actions {
   grid-column: 1 / -1;
   display: flex;
@@ -255,7 +600,10 @@
 @media (max-width: 760px) {
   .affectations-page__stats,
   .affectations-page__row,
-  .affectations-page__filters {
+  .affectations-page__row--triple,
+  .affectations-page__filters,
+  .affectations-page__selection-stats,
+  .affectations-page__generation-summary {
     grid-template-columns: 1fr;
   }
 

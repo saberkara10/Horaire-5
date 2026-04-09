@@ -10,7 +10,10 @@ import { jest, describe, test, expect, beforeEach } from "@jest/globals";
 const professeursModelMock = {
   recupererTousLesProfesseurs: jest.fn(),
   recupererProfesseurParId: jest.fn(),
+  recupererProfesseurParNomPrenom: jest.fn(),
   recupererProfesseurParMatricule: jest.fn(),
+  assurerUniciteNomPrenomProfesseurs: jest.fn(),
+  fusionnerDoublonsProfesseurs: jest.fn(),
   recupererCoursProfesseur: jest.fn(),
   recupererIndexCoursProfesseurs: jest.fn(),
   recupererDisponibilitesProfesseur: jest.fn(),
@@ -22,6 +25,8 @@ const professeursModelMock = {
   modifierProfesseur: jest.fn(),
   supprimerProfesseur: jest.fn(),
   professeurEstDejaAffecte: jest.fn(),
+  validerContrainteCoursProfesseur: jest.fn(),
+  nettoyerAffectationsCoursArchivesProfesseurs: jest.fn(),
 };
 
 await jest.unstable_mockModule("../src/model/professeurs.model.js", () => professeursModelMock);
@@ -54,6 +59,8 @@ const { default: app } = await import("../src/app.js");
 describe("Tests routes Professeurs", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    professeursModelMock.recupererProfesseurParNomPrenom.mockResolvedValue(null);
+    professeursModelMock.validerContrainteCoursProfesseur.mockResolvedValue("");
   });
 
   test("GET /api/professeurs retourne 200 avec la liste", async () => {
@@ -104,6 +111,22 @@ describe("Tests routes Professeurs", () => {
     expect(professeursModelMock.remplacerCoursProfesseur).toHaveBeenCalledWith(1, [1, 2]);
   });
 
+  test("PUT /api/professeurs/1/cours retourne 400 si la contrainte de charge est depassee", async () => {
+    professeursModelMock.recupererProfesseurParId.mockResolvedValue({
+      id_professeur: 1,
+    });
+    professeursModelMock.validerContrainteCoursProfesseur.mockResolvedValue(
+      "Un professeur ne peut pas avoir plus de 2 cours dans le meme programme."
+    );
+
+    const response = await request(app)
+      .put("/api/professeurs/1/cours")
+      .send({ cours_ids: [4, 5, 6] });
+
+    expect(response.statusCode).toBe(400);
+    expect(professeursModelMock.remplacerCoursProfesseur).not.toHaveBeenCalled();
+  });
+
   test("GET /api/professeurs/1/horaire retourne 200 avec les seances triees", async () => {
     professeursModelMock.recupererProfesseurParId.mockResolvedValue({
       id_professeur: 1,
@@ -152,6 +175,59 @@ describe("Tests routes Professeurs", () => {
       });
 
     expect(response.statusCode).toBe(400);
+  });
+
+  test("PUT /api/professeurs/1/disponibilites remonte un 409 metier avec details", async () => {
+    professeursModelMock.recupererProfesseurParId.mockResolvedValue({
+      id_professeur: 1,
+      matricule: "MAT001",
+      nom: "Dupont",
+      prenom: "Ali",
+      specialite: "Programmation informatique",
+    });
+    professeursModelMock.remplacerDisponibilitesProfesseur.mockRejectedValue({
+      statusCode: 409,
+      message:
+        "Impossible de finaliser automatiquement la mise a jour des disponibilites: 1 seance(s) reste(nt) sans creneau compatible dans la fenetre de rattrapage automatique.",
+      details: [{ id_affectation_cours: 12 }],
+      replanification: {
+        statut: "echec",
+        message:
+          "Certains cours n'ont pas pu etre replanifies automatiquement. Une intervention manuelle est requise pour finaliser l'ajustement de l'horaire.",
+        seances_concernees: 1,
+        seances_deplacees: [],
+        seances_non_replanifiees: [{ id_affectation_cours: 12 }],
+        resume: {
+          seances_concernees: 1,
+          seances_replanifiees: 0,
+          seances_replanifiees_meme_semaine: 0,
+          seances_reportees_semaines_suivantes: 0,
+          seances_non_replanifiees: 1,
+        },
+      },
+    });
+
+    const response = await request(app)
+      .put("/api/professeurs/1/disponibilites")
+      .send({
+        disponibilites: [
+          {
+            jour_semaine: 2,
+            heure_debut: "11:00",
+            heure_fin: "19:00",
+          },
+        ],
+      });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.body.message).toContain(
+      "Impossible de finaliser automatiquement"
+    );
+    expect(response.body.details).toEqual([{ id_affectation_cours: 12 }]);
+    expect(response.body.replanification).toMatchObject({
+      statut: "echec",
+      seances_concernees: 1,
+    });
   });
 
   test("POST /api/professeurs retourne 201 quand les donnees sont valides", async () => {

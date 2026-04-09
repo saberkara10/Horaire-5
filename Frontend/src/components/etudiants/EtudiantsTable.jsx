@@ -77,6 +77,14 @@ export function EtudiantsTable({
               const estSelectionne = etudiant.id_etudiant === etudiantSelectionneId;
               const estEnConsultation =
                 actionEnCours === `consultation-${etudiant.id_etudiant}`;
+              const groupeLibelle = etudiant.groupe || "Sans groupe";
+              const nbReprises = Number(etudiant.nb_reprises || 0);
+              const chargeCible = Number(etudiant.charge_cible || 0);
+              const statut = !etudiant.groupe
+                ? "Sans groupe"
+                : nbReprises > 0
+                  ? `${chargeCible} cours (${nbReprises} reprise${nbReprises > 1 ? "s" : ""})`
+                  : `${chargeCible || 0} cours`;
 
               return (
                 <tr
@@ -98,11 +106,11 @@ export function EtudiantsTable({
                     </div>
                   </td>
                   <td data-label="Matricule">{etudiant.matricule}</td>
-                  <td data-label="Groupe">{etudiant.groupe}</td>
+                  <td data-label="Groupe">{groupeLibelle}</td>
                   <td data-label="Programme">{etudiant.programme}</td>
                   <td data-label="Statut">
                     <span className={`status-pill ${estEnConsultation ? "status-pill--busy" : ""}`}>
-                      {estEnConsultation ? "Chargement..." : "Importe"}
+                      {estEnConsultation ? "Chargement..." : statut}
                     </span>
                   </td>
                 </tr>

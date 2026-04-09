@@ -22,16 +22,19 @@ export async function apiRequest(url, options = {}) {
   const data = await lireReponse(response);
 
   if (!response.ok) {
-    throw new Error(
+    const error = new Error(
       data?.message || data?.error || "Une erreur est survenue."
     );
+
+    error.status = response.status;
+    error.details = data?.erreurs || data?.details || [];
+    error.replanification = data?.replanification || null;
+    error.synchronisation = data?.synchronisation || null;
+    error.payload = data || null;
+    throw error;
   }
 
   return data;
 }
-/**
- * SERVICE - API Core
- *
- * Ce service centralise les appels HTTP
- * generiques de l'application.
- */
+
+export const requeteApi = apiRequest;

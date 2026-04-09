@@ -323,6 +323,28 @@
   background: rgba(248, 251, 255, 0.92);
 }
 
+.professeurs-page__course-summary {
+  min-height: 52px;
+  padding: 0.95rem 1rem;
+  border-radius: 16px;
+  border: 1px solid rgba(178, 197, 217, 0.36);
+  background: rgba(248, 251, 255, 0.92);
+  color: var(--text);
+  line-height: 1.55;
+}
+
+.professeurs-page__course-group {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.professeurs-page__course-group-title {
+  padding: 0 0.2rem;
+  color: var(--text);
+  font-size: 0.92rem;
+  font-weight: 800;
+}
+
 .professeurs-page__course-option {
   display: flex;
   align-items: flex-start;

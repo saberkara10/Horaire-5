@@ -13,11 +13,10 @@ import {
   modifierProfesseur,
   supprimerProfesseur,
 } from "../services/professeurs.api.js";
-import { recupererProgrammes } from "../services/programmes.api.js";
 import { recupererCours } from "../services/cours.api.js";
+import { getLibelleProgrammesProfesseur, getProgrammesProfesseur } from "../utils/professeurs.js";
 import "../styles/CrudPages.css";
 import "../styles/ProfesseursPage.css";
-import { programmesCorrespondent } from "../utils/programmes.js";
 
 function extraireCoursIds(valeur) {
   if (Array.isArray(valeur)) {
@@ -32,9 +31,41 @@ function extraireCoursIds(valeur) {
     .filter((idCours) => Number.isInteger(idCours) && idCours > 0);
 }
 
+function regrouperCoursParProgramme(cours) {
+  const coursParProgramme = new Map();
+
+  for (const coursItem of cours) {
+    const programme = String(coursItem.programme || "Sans programme").trim();
+    const listeProgramme = coursParProgramme.get(programme) || [];
+    listeProgramme.push(coursItem);
+    coursParProgramme.set(programme, listeProgramme);
+  }
+
+  return [...coursParProgramme.entries()]
+    .map(([programme, listeCours]) => ({
+      programme,
+      cours: [...listeCours].sort((coursA, coursB) =>
+        String(coursA.code || "").localeCompare(String(coursB.code || ""), "fr")
+      ),
+    }))
+    .sort((programmeA, programmeB) =>
+      programmeA.programme.localeCompare(programmeB.programme, "fr")
+    );
+}
+
+function extraireProgrammesDepuisCours(cours, coursIds) {
+  const idsSelectionnes = new Set(extraireCoursIds(coursIds));
+
+  return [...new Set(
+    cours
+      .filter((coursItem) => idsSelectionnes.has(Number(coursItem.id_cours)))
+      .map((coursItem) => String(coursItem.programme || "").trim())
+      .filter(Boolean)
+  )].sort((programmeA, programmeB) => programmeA.localeCompare(programmeB, "fr"));
+}
+
 export function ProfesseursPage({ utilisateur, onLogout }) {
   const [professeurs, setProfesseurs] = useState([]);
-  const [programmes, setProgrammes] = useState([]);
   const [cours, setCours] = useState([]);
   const [chargement, setChargement] = useState(true);
   const [erreurFormulaire, setErreurFormulaire] = useState("");
@@ -63,15 +94,6 @@ export function ProfesseursPage({ utilisateur, onLogout }) {
     }
   }
 
-  async function chargerProgrammes() {
-    try {
-      const data = await recupererProgrammes();
-      setProgrammes(Array.isArray(data) ? data : []);
-    } catch {
-      setProgrammes([]);
-    }
-  }
-
   async function chargerCours() {
     try {
       const data = await recupererCours();
@@ -83,7 +105,6 @@ export function ProfesseursPage({ utilisateur, onLogout }) {
 
   useEffect(() => {
     chargerProfesseurs();
-    chargerProgrammes();
     chargerCours();
   }, []);
 
@@ -99,31 +120,18 @@ export function ProfesseursPage({ utilisateur, onLogout }) {
         String(professeur.matricule || "").toLowerCase().includes(terme) ||
         String(professeur.prenom || "").toLowerCase().includes(terme) ||
         String(professeur.nom || "").toLowerCase().includes(terme) ||
-        String(professeur.specialite || "").toLowerCase().includes(terme) ||
+        getProgrammesProfesseur(professeur).toLowerCase().includes(terme) ||
         String(professeur.cours_assignes || "").toLowerCase().includes(terme)
       );
     });
   }, [professeurs, recherche]);
 
-  const programmesDisponibles = useMemo(() => {
-    return [...new Set([...programmes, formulaire.specialite].filter(Boolean))].sort(
-      (programmeA, programmeB) => programmeA.localeCompare(programmeB, "fr")
-    );
-  }, [programmes, formulaire.specialite]);
+  const coursParProgramme = useMemo(() => regrouperCoursParProgramme(cours), [cours]);
 
-  const coursCompatibles = useMemo(() => {
-    if (!formulaire.specialite) {
-      return [];
-    }
-
-    return [...cours]
-      .filter((coursItem) =>
-        programmesCorrespondent(coursItem.programme, formulaire.specialite)
-      )
-      .sort((coursA, coursB) =>
-        String(coursA.code || "").localeCompare(String(coursB.code || ""), "fr")
-      );
-  }, [cours, formulaire.specialite]);
+  const programmesSelectionnes = useMemo(
+    () => extraireProgrammesDepuisCours(cours, formulaire.cours_ids),
+    [cours, formulaire.cours_ids]
+  );
 
   function ouvrirModal(professeur = null) {
     setEdition(professeur);
@@ -166,28 +174,10 @@ export function ProfesseursPage({ utilisateur, onLogout }) {
   function handleChangerChamp(event) {
     const { name, value } = event.target;
 
-    setFormulaire((valeurActuelle) => {
-      if (name === "specialite") {
-        const coursCompatiblesProgramme = cours
-          .filter((coursItem) =>
-            programmesCorrespondent(coursItem.programme, value)
-          )
-          .map((coursItem) => Number(coursItem.id_cours));
-
-        return {
-          ...valeurActuelle,
-          specialite: value,
-          cours_ids: valeurActuelle.cours_ids.filter((idCours) =>
-            coursCompatiblesProgramme.includes(Number(idCours))
-          ),
-        };
-      }
-
-      return {
-        ...valeurActuelle,
-        [name]: value,
-      };
-    });
+    setFormulaire((valeurActuelle) => ({
+      ...valeurActuelle,
+      [name]: value,
+    }));
   }
 
   function handleBasculerCours(idCours) {
@@ -209,16 +199,24 @@ export function ProfesseursPage({ utilisateur, onLogout }) {
     setErreurFormulaire("");
 
     try {
+      const payload = {
+        matricule: formulaire.matricule.trim(),
+        prenom: formulaire.prenom.trim(),
+        nom: formulaire.nom.trim(),
+        specialite: formulaire.specialite.trim(),
+        cours_ids: extraireCoursIds(formulaire.cours_ids),
+      };
+
       if (edition) {
-        await modifierProfesseur(edition.id_professeur, formulaire);
+        await modifierProfesseur(edition.id_professeur, payload);
         showSuccess("Professeur modifie avec succes.");
       } else {
-        await creerProfesseur(formulaire);
+        await creerProfesseur(payload);
         showSuccess("Professeur ajoute avec succes.");
       }
 
       fermerModal();
-      await Promise.all([chargerProfesseurs(), chargerProgrammes(), chargerCours()]);
+      await Promise.all([chargerProfesseurs(), chargerCours()]);
     } catch (error) {
       setErreurFormulaire(error.message || "Erreur lors de la sauvegarde.");
     }
@@ -239,7 +237,7 @@ export function ProfesseursPage({ utilisateur, onLogout }) {
     try {
       await supprimerProfesseur(idProfesseur);
       showSuccess("Professeur supprime avec succes.");
-      await Promise.all([chargerProfesseurs(), chargerProgrammes(), chargerCours()]);
+      await Promise.all([chargerProfesseurs(), chargerCours()]);
     } catch (error) {
       showError(error.message || "Erreur lors de la suppression.");
     }
@@ -250,7 +248,7 @@ export function ProfesseursPage({ utilisateur, onLogout }) {
       utilisateur={utilisateur}
       onLogout={onLogout}
       title="Professeurs"
-      subtitle="Rattachez chaque enseignant a un programme puis a ses cours autorises."
+      subtitle="Rattachez chaque enseignant a ses cours autorises. Les programmes sont deduits automatiquement."
     >
       <div className="crud-page">
         <div className="crud-page__header">
@@ -283,7 +281,7 @@ export function ProfesseursPage({ utilisateur, onLogout }) {
                   <th>Matricule</th>
                   <th>Prenom</th>
                   <th>Nom</th>
-                  <th>Programme</th>
+                  <th>Programmes</th>
                   <th>Cours assignes</th>
                   <th>Actions</th>
                 </tr>
@@ -302,7 +300,7 @@ export function ProfesseursPage({ utilisateur, onLogout }) {
                       <td>{professeur.matricule}</td>
                       <td>{professeur.prenom}</td>
                       <td>{professeur.nom}</td>
-                      <td>{professeur.specialite || "-"}</td>
+                      <td>{getLibelleProgrammesProfesseur(professeur, "-")}</td>
                       <td>{professeur.cours_assignes || "Aucun cours assigne"}</td>
                       <td>
                         <div className="crud-page__actions">
@@ -397,66 +395,74 @@ export function ProfesseursPage({ utilisateur, onLogout }) {
                 </label>
 
                 <label className="crud-page__field">
-                  <span>Programme</span>
-                  <select
+                  <span>Specialite / note interne (optionnel)</span>
+                  <input
+                    type="text"
+                    placeholder="ex: Multidisciplinaire"
                     value={formulaire.specialite}
                     onChange={(event) =>
                       handleChangerChamp({
                         target: { name: "specialite", value: event.target.value },
                       })
                     }
-                    required
-                  >
-                    <option value="">Choisir un programme</option>
-                    {programmesDisponibles.map((programme) => (
-                      <option key={programme} value={programme}>
-                        {programme}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </label>
+
+                <div className="crud-page__field">
+                  <span>Programmes deduits des cours</span>
+                  <div className="professeurs-page__course-summary">
+                    {programmesSelectionnes.length === 0
+                      ? "Aucun programme deduit pour le moment."
+                      : programmesSelectionnes.join(", ")}
+                  </div>
+                </div>
 
                 <div className="crud-page__field">
                   <span>Cours autorises</span>
                   <div className="professeurs-page__course-picker">
-                    {formulaire.specialite ? (
-                      coursCompatibles.length > 0 ? (
-                        coursCompatibles.map((coursItem) => {
-                          const estSelectionne = formulaire.cours_ids.includes(
-                            Number(coursItem.id_cours)
-                          );
+                    {coursParProgramme.length > 0 ? (
+                      coursParProgramme.map(({ programme, cours: coursProgramme }) => (
+                        <div
+                          key={programme}
+                          className="professeurs-page__course-group"
+                        >
+                          <div className="professeurs-page__course-group-title">
+                            {programme}
+                          </div>
 
-                          return (
-                            <label
-                              key={coursItem.id_cours}
-                              className={`professeurs-page__course-option ${
-                                estSelectionne
-                                  ? "professeurs-page__course-option--active"
-                                  : ""
-                              }`}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={estSelectionne}
-                                onChange={() => handleBasculerCours(coursItem.id_cours)}
-                              />
-                              <div>
-                                <strong>{coursItem.code}</strong>
-                                <span>
-                                  {coursItem.nom} - Etape {coursItem.etape_etude}
-                                </span>
-                              </div>
-                            </label>
-                          );
-                        })
-                      ) : (
-                        <p className="professeurs-page__course-empty">
-                          Aucun cours disponible pour ce programme.
-                        </p>
-                      )
+                          {coursProgramme.map((coursItem) => {
+                            const estSelectionne = formulaire.cours_ids.includes(
+                              Number(coursItem.id_cours)
+                            );
+
+                            return (
+                              <label
+                                key={coursItem.id_cours}
+                                className={`professeurs-page__course-option ${
+                                  estSelectionne
+                                    ? "professeurs-page__course-option--active"
+                                    : ""
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={estSelectionne}
+                                  onChange={() => handleBasculerCours(coursItem.id_cours)}
+                                />
+                                <div>
+                                  <strong>{coursItem.code}</strong>
+                                  <span>
+                                    {coursItem.nom} - Etape {coursItem.etape_etude}
+                                  </span>
+                                </div>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      ))
                     ) : (
                       <p className="professeurs-page__course-empty">
-                        Choisissez d'abord un programme.
+                        Aucun cours disponible pour le moment.
                       </p>
                     )}
                   </div>

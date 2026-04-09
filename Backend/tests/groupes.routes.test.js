@@ -37,7 +37,12 @@ describe("Routes groupes", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.body).toEqual([{ id_groupes_etudiants: 1, nom_groupe: "G1" }]);
-    expect(recupererGroupesMock).toHaveBeenCalledWith(false);
+    expect(recupererGroupesMock).toHaveBeenCalledWith(false, {
+      sessionActive: false,
+      seulementAvecEffectif: false,
+      seulementAvecPlanning: false,
+      inclureGroupesSpeciaux: false,
+    });
   });
 
   test("GET /api/groupes accepte details=1", async () => {
@@ -46,7 +51,12 @@ describe("Routes groupes", () => {
     const response = await request(creerAppTest()).get("/api/groupes?details=1");
 
     expect(response.statusCode).toBe(200);
-    expect(recupererGroupesMock).toHaveBeenCalledWith(true);
+    expect(recupererGroupesMock).toHaveBeenCalledWith(true, {
+      sessionActive: false,
+      seulementAvecEffectif: false,
+      seulementAvecPlanning: false,
+      inclureGroupesSpeciaux: false,
+    });
   });
 
   test("GET /api/groupes retourne 500 si lecture impossible", async () => {

@@ -1,67 +1,58 @@
 /**
- * Configuration de la stratégie d'authentification Passport.
+ * Configuration de la strategie d'authentification Passport.
  *
- * Ce module définit la stratégie locale (email/password),
- * la sérialisation et la désérialisation de l'utilisateur.
+ * Ce module definit la strategie locale (email/password),
+ * la serialisation et la deserialisation de l'utilisateur.
  */
 
-import bcrypt from "bcrypt";
 import passport from "passport";
 import { Strategy } from "passport-local";
-import { findByEmail, findById, findRolesByUserId } from "./src/model/utilisateur.js";
+import {
+  findByEmail,
+  findById,
+  findRolesByUserId,
+} from "./src/model/utilisateur.js";
+import { verifyPassword } from "./src/utils/passwords.js";
 
-// Configuration générale de la stratégie.
 const config = {
-    usernameField: "email",
-    passwordField: "password"
+  usernameField: "email",
+  passwordField: "password",
 };
 
-// Configuration de la stratégie d'authentification locale
 passport.use(new Strategy(config, async (email, password, done) => {
-    try {
-        const user = await findByEmail(email);
-        if (!user) {
-            return done(null, false, { error: "wrong_user" });
-        }
+  try {
+    const user = await findByEmail(email);
 
-        const storedPassword = user.mot_de_passe_hash;
-        let isValid = false;
-
-        if (typeof storedPassword === "string" && storedPassword.length > 0) {
-            isValid = await bcrypt.compare(password, storedPassword);
-
-            // Compatibilite avec l'ancien schema ou le mot de passe pouvait etre stocke en clair.
-            if (!isValid && storedPassword === password) {
-                isValid = true;
-            }
-        }
-
-        if (!isValid) {
-            return done(null, false, { error: "wrong_password" });
-        }
-
-        return done(null, user);
+    if (!user) {
+      return done(null, false, { error: "wrong_user" });
     }
-    catch (error) {
-        return done(error);
+
+    const isValid = await verifyPassword(password, user.mot_de_passe_hash);
+
+    if (!isValid) {
+      return done(null, false, { error: "wrong_password" });
     }
+
+    return done(null, user);
+  } catch (error) {
+    return done(error);
+  }
 }));
 
-// Sérialise l'identifiant de l'utilisateur dans la session
 passport.serializeUser((user, done) => {
-    done(null, user.id);
+  done(null, user.id);
 });
 
-// Désérialise l'utilisateur en allant le chercher dans la base de données
 passport.deserializeUser(async (id, done) => {
-    try {
-        const user = await findById(id);
-        if (user) {
-            user.roles = await findRolesByUserId(id);
-        }
-        done(null, user);
+  try {
+    const user = await findById(id);
+
+    if (user) {
+      user.roles = await findRolesByUserId(id);
     }
-    catch (error) {
-        done(error);
-    }
+
+    done(null, user);
+  } catch (error) {
+    done(error);
+  }
 });

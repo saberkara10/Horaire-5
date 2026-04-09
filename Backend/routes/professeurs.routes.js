@@ -13,6 +13,7 @@ import {
   remplacerCoursProfesseur,
   remplacerDisponibilitesProfesseur,
   supprimerProfesseur,
+  validerContrainteCoursProfesseur,
 } from "../src/model/professeurs.model.js";
 import {
   validerCreateProfesseur,
@@ -71,6 +72,35 @@ function validerDisponibilitesPayload(disponibilites) {
     }
 
     clesVues.add(cle);
+  }
+
+  return "";
+}
+
+function validerSemaineCible(valeur) {
+  if (valeur === undefined || valeur === null || valeur === "") {
+    return "";
+  }
+
+  const semaineCible = Number(valeur);
+
+  if (!Number.isInteger(semaineCible) || semaineCible < 1) {
+    return "La semaine_cible doit etre un entier positif.";
+  }
+
+  return "";
+}
+
+function validerModeApplicationDisponibilites(mode) {
+  if (mode === undefined || mode === null || mode === "") {
+    return "";
+  }
+
+  if (
+    mode !== "semaine_unique" &&
+    mode !== "semaine_et_suivantes"
+  ) {
+    return "Le mode_application doit valoir semaine_unique ou semaine_et_suivantes.";
   }
 
   return "";
@@ -148,6 +178,14 @@ export default function professeursRoutes(app) {
           return response.status(400).json({ message: messageErreur });
         }
 
+        const messageErreurContraintes = await validerContrainteCoursProfesseur(
+          request.body.cours_ids
+        );
+
+        if (messageErreurContraintes) {
+          return response.status(400).json({ message: messageErreurContraintes });
+        }
+
         const cours = await remplacerCoursProfesseur(
           Number(request.params.id),
           request.body.cours_ids
@@ -167,8 +205,20 @@ export default function professeursRoutes(app) {
     verifierProfesseurExiste,
     async (request, response) => {
       try {
+        const messageErreurSemaine = validerSemaineCible(
+          request.query?.semaine_cible
+        );
+
+        if (messageErreurSemaine) {
+          return response.status(400).json({ message: messageErreurSemaine });
+        }
+
         const disponibilites = await recupererDisponibilitesProfesseur(
-          Number(request.params.id)
+          Number(request.params.id),
+          {
+            format: "detail",
+            semaine_cible: request.query?.semaine_cible,
+          }
         );
 
         response.status(200).json(disponibilites);
@@ -188,19 +238,46 @@ export default function professeursRoutes(app) {
         const messageErreur = validerDisponibilitesPayload(
           request.body?.disponibilites
         );
+        const messageErreurSemaine = validerSemaineCible(
+          request.body?.semaine_cible
+        );
+        const messageErreurMode = validerModeApplicationDisponibilites(
+          request.body?.mode_application
+        );
 
         if (messageErreur) {
           return response.status(400).json({ message: messageErreur });
         }
 
+        if (messageErreurSemaine) {
+          return response.status(400).json({ message: messageErreurSemaine });
+        }
+
+        if (messageErreurMode) {
+          return response.status(400).json({ message: messageErreurMode });
+        }
+
         const disponibilites = await remplacerDisponibilitesProfesseur(
           Number(request.params.id),
-          request.body.disponibilites
+          request.body.disponibilites,
+          {
+            semaine_cible: request.body?.semaine_cible,
+            mode_application: request.body?.mode_application,
+          }
         );
 
         return response.status(200).json(disponibilites);
       } catch (error) {
-        return response.status(500).json({ message: "Erreur serveur." });
+        const payload = {
+          message: error.message || "Erreur serveur.",
+          details: Array.isArray(error.details) ? error.details : [],
+        };
+
+        if (error.replanification) {
+          payload.replanification = error.replanification;
+        }
+
+        return response.status(error.statusCode || 500).json(payload);
       }
     }
   );

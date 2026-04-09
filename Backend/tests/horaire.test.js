@@ -78,6 +78,20 @@ describe("Tests routes Horaires", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.body).toHaveLength(1);
+    expect(horaireModelMock.getAllAffectations).toHaveBeenCalledWith({
+      sessionActive: false,
+    });
+  });
+
+  test("GET /api/horaires accepte session_active=1", async () => {
+    horaireModelMock.getAllAffectations.mockResolvedValue([]);
+
+    const response = await request(app).get("/api/horaires?session_active=1");
+
+    expect(response.statusCode).toBe(200);
+    expect(horaireModelMock.getAllAffectations).toHaveBeenCalledWith({
+      sessionActive: true,
+    });
   });
 
   test("GET /api/horaires retourne 500 si lecture impossible", async () => {
@@ -145,6 +159,7 @@ describe("Tests routes Horaires", () => {
         id_cours: 1,
         id_professeur: 2,
         id_salle: 3,
+        id_groupes_etudiants: 4,
         date: "2026-03-23",
         heure_debut: "08:00",
         heure_fin: "10:00",
@@ -155,6 +170,7 @@ describe("Tests routes Horaires", () => {
       idCours: 1,
       idProfesseur: 2,
       idSalle: 3,
+      idGroupeEtudiants: 4,
       date: "2026-03-23",
       heureDebut: "08:00",
       heureFin: "10:00",
@@ -173,6 +189,7 @@ describe("Tests routes Horaires", () => {
         id_cours: 1,
         id_professeur: 2,
         id_salle: 3,
+        id_groupes_etudiants: 4,
         date: "2026-03-23",
         heure_debut: "08:00",
         heure_fin: "10:00",
@@ -180,6 +197,30 @@ describe("Tests routes Horaires", () => {
 
     expect(response.statusCode).toBe(409);
     expect(response.body).toEqual({ message: "Conflit detecte." });
+  });
+
+  test("POST /api/horaires retourne 409 si le groupe a deja un cours sur ce creneau", async () => {
+    horaireModelMock.creerAffectationValidee.mockRejectedValue({
+      statusCode: 409,
+      message: "Groupe deja occupe sur ce creneau.",
+    });
+
+    const response = await request(app)
+      .post("/api/horaires")
+      .send({
+        id_cours: 1,
+        id_professeur: 2,
+        id_salle: 3,
+        id_groupes_etudiants: 4,
+        date: "2026-03-23",
+        heure_debut: "08:00",
+        heure_fin: "10:00",
+      });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.body).toEqual({
+      message: "Groupe deja occupe sur ce creneau.",
+    });
   });
 
   test("PUT /api/horaires/:id retourne 400 si identifiant invalide", async () => {
@@ -208,6 +249,7 @@ describe("Tests routes Horaires", () => {
       id_cours: 1,
       id_professeur: 2,
       id_salle: 8,
+      id_groupes_etudiants: 6,
       date: "2026-03-24",
       heure_debut: "09:00",
       heure_fin: "11:00",
@@ -218,6 +260,7 @@ describe("Tests routes Horaires", () => {
       idCours: 1,
       idProfesseur: 2,
       idSalle: 8,
+      idGroupeEtudiants: 6,
       date: "2026-03-24",
       heureDebut: "09:00",
       heureFin: "11:00",
@@ -234,6 +277,7 @@ describe("Tests routes Horaires", () => {
       id_cours: 1,
       id_professeur: 2,
       id_salle: 8,
+      id_groupes_etudiants: 6,
       date: "2026-03-24",
       heure_debut: "09:00",
       heure_fin: "11:00",
@@ -254,7 +298,6 @@ describe("Tests routes Horaires", () => {
       programme: "Informatique",
       etape: "1",
       session: "Automne",
-      annee: 2026,
       date_debut: "2026-03-23",
     });
 
@@ -263,7 +306,6 @@ describe("Tests routes Horaires", () => {
       programme: "Informatique",
       etape: "1",
       session: "Automne",
-      annee: 2026,
       dateDebut: "2026-03-23",
     });
   });
@@ -274,7 +316,7 @@ describe("Tests routes Horaires", () => {
     expect(response.statusCode).toBe(400);
     expect(response.body).toEqual({
       message:
-        "Le programme, l'etape, la session et l'annee sont obligatoires pour generer l'horaire.",
+        "Le programme, l'etape et la session sont obligatoires pour generer l'horaire.",
     });
   });
 
@@ -283,24 +325,11 @@ describe("Tests routes Horaires", () => {
       programme: "Informatique",
       etape: "1",
       session: "Automne",
-      annee: 2026,
       date_debut: "23-03-2026",
     });
 
     expect(response.statusCode).toBe(400);
     expect(response.body).toEqual({ message: "La date de debut est invalide." });
-  });
-
-  test("POST /api/horaires/generer retourne 400 si l'annee est invalide", async () => {
-    const response = await request(app).post("/api/horaires/generer").send({
-      programme: "Informatique",
-      etape: "1",
-      session: "Automne",
-      annee: 1800,
-    });
-
-    expect(response.statusCode).toBe(400);
-    expect(response.body).toEqual({ message: "L'annee est invalide." });
   });
 
   test("POST /api/horaires/generer retourne le statusCode du modele en cas d'echec", async () => {
@@ -313,7 +342,6 @@ describe("Tests routes Horaires", () => {
       programme: "Informatique",
       etape: "1",
       session: "Automne",
-      annee: 2026,
     });
 
     expect(response.statusCode).toBe(422);
@@ -364,6 +392,36 @@ describe("Tests routes Horaires", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.body).toEqual({ message: "Horaires reinitialises." });
+    expect(horaireModelMock.deleteAllAffectations).toHaveBeenCalledWith({
+      deleteStudents: false,
+      sessionActive: false,
+    });
+  });
+
+  test("DELETE /api/horaires accepte session_active=1", async () => {
+    horaireModelMock.deleteAllAffectations.mockResolvedValue(undefined);
+
+    const response = await request(app).delete("/api/horaires?session_active=1");
+
+    expect(response.statusCode).toBe(200);
+    expect(horaireModelMock.deleteAllAffectations).toHaveBeenCalledWith({
+      deleteStudents: false,
+      sessionActive: true,
+    });
+  });
+
+  test("DELETE /api/horaires accepte delete_students=1 sur la session active", async () => {
+    horaireModelMock.deleteAllAffectations.mockResolvedValue(undefined);
+
+    const response = await request(app).delete(
+      "/api/horaires?session_active=1&delete_students=1"
+    );
+
+    expect(response.statusCode).toBe(200);
+    expect(horaireModelMock.deleteAllAffectations).toHaveBeenCalledWith({
+      deleteStudents: true,
+      sessionActive: true,
+    });
   });
 
   test("DELETE /api/horaires retourne 500 si le reset echoue", async () => {

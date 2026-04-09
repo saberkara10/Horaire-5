@@ -33,7 +33,7 @@ export function normaliserTexte(texte) {
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[â€“â€”]/g, "-")
+    .replace(/[\u2013\u2014]/g, "-")
     .replace(/\s+/g, " ")
     .trim();
 }

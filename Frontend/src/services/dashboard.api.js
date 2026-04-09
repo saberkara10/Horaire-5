@@ -1,39 +1,11 @@
 /**
  * SERVICE - Dashboard API
  *
- * Ce service centralise les appels HTTP
- * utilises par le dashboard.
+ * Charge la synthese metier du tableau de bord.
  */
-const API_BASE = "http://localhost:3000/api";
 
-export async function recupererStatistiques() {
-  const options = { credentials: "include" };
+import { apiRequest } from "./api.js";
 
-  const [sallesRes, professeursRes, coursRes] = await Promise.allSettled([
-    fetch(`${API_BASE}/salles`, options),
-    fetch(`${API_BASE}/professeurs`, options),
-    fetch(`${API_BASE}/cours`, options),
-  ]);
-
-  const salles = sallesRes.status === "fulfilled" && sallesRes.value.ok
-    ? await sallesRes.value.json() : [];
-
-  const professeurs = professeursRes.status === "fulfilled" && professeursRes.value.ok
-    ? await professeursRes.value.json() : [];
-
-  const cours = coursRes.status === "fulfilled" && coursRes.value.ok
-    ? await coursRes.value.json() : [];
-
-  return {
-    salles: salles.length,
-    professeurs: professeurs.length,
-    cours: cours.length,
-    etudiants: 0,
-  };
+export async function recupererDashboardOverview() {
+  return apiRequest("/api/dashboard/overview");
 }
-/**
- * SERVICE - Dashboard API
- *
- * Ce service centralise les appels HTTP
- * utilises par le dashboard.
- */

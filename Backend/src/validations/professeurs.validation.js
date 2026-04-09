@@ -4,8 +4,10 @@
 
 import {
   recupererProfesseurParId,
+  recupererProfesseurParNomPrenom,
   recupererProfesseurParMatricule,
   professeurEstDejaAffecte,
+  validerContrainteCoursProfesseur,
 } from "../model/professeurs.model.js";
 
 function envoyerErreur(response, status, message) {
@@ -66,10 +68,6 @@ export async function validerCreateProfesseur(request, response, next) {
     return envoyerErreur(response, 400, "Prenom invalide.");
   }
 
-  if (!specialite || String(specialite).trim() === "") {
-    return envoyerErreur(response, 400, "Programme obligatoire.");
-  }
-
   if (String(matricule).trim().length > 50) {
     return envoyerErreur(response, 400, "Matricule trop long (max 50).");
   }
@@ -82,17 +80,38 @@ export async function validerCreateProfesseur(request, response, next) {
     return envoyerErreur(response, 400, "Prenom trop long (max 100).");
   }
 
-  if (String(specialite).trim().length > 150) {
-    return envoyerErreur(response, 400, "Programme trop long (max 150).");
+  if (
+    specialite !== undefined &&
+    specialite !== null &&
+    String(specialite).trim().length > 150
+  ) {
+    return envoyerErreur(response, 400, "Specialite trop longue (max 150).");
   }
 
   if (cours_ids !== undefined && !coursIdsValides(cours_ids)) {
     return envoyerErreur(response, 400, "La liste des cours est invalide.");
   }
 
+  if (cours_ids !== undefined) {
+    const messageErreurCours = await validerContrainteCoursProfesseur(cours_ids);
+
+    if (messageErreurCours) {
+      return envoyerErreur(response, 400, messageErreurCours);
+    }
+  }
+
   const dejaExiste = await recupererProfesseurParMatricule(String(matricule).trim());
   if (dejaExiste) {
     return envoyerErreur(response, 409, "Matricule deja utilise.");
+  }
+
+  const dejaExisteMemeNom = await recupererProfesseurParNomPrenom(nom, prenom);
+  if (dejaExisteMemeNom) {
+    return envoyerErreur(
+      response,
+      409,
+      "Un professeur avec ce nom et prenom existe deja."
+    );
   }
 
   next();
@@ -155,17 +174,37 @@ export async function validerUpdateProfesseur(request, response, next) {
   }
 
   if (specialite !== undefined) {
-    if (!specialite || String(specialite).trim() === "") {
-      return envoyerErreur(response, 400, "Programme invalide.");
-    }
-
-    if (String(specialite).trim().length > 150) {
-      return envoyerErreur(response, 400, "Programme trop long (max 150).");
+    if (
+      specialite !== null &&
+      String(specialite).trim().length > 150
+    ) {
+      return envoyerErreur(response, 400, "Specialite trop longue (max 150).");
     }
   }
 
   if (cours_ids !== undefined && !coursIdsValides(cours_ids)) {
     return envoyerErreur(response, 400, "La liste des cours est invalide.");
+  }
+
+  if (cours_ids !== undefined) {
+    const messageErreurCours = await validerContrainteCoursProfesseur(cours_ids);
+
+    if (messageErreurCours) {
+      return envoyerErreur(response, 400, messageErreurCours);
+    }
+  }
+
+  const idProfesseur = Number(request.params.id);
+  const nomCible = nom !== undefined ? nom : request.professeur?.nom;
+  const prenomCible = prenom !== undefined ? prenom : request.professeur?.prenom;
+  const dejaExisteMemeNom = await recupererProfesseurParNomPrenom(nomCible, prenomCible);
+
+  if (dejaExisteMemeNom && dejaExisteMemeNom.id_professeur !== idProfesseur) {
+    return envoyerErreur(
+      response,
+      409,
+      "Un professeur avec ce nom et prenom existe deja."
+    );
   }
 
   next();

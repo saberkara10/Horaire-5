@@ -1,10 +1,66 @@
 import { useEffect, useState } from "react";
 import {
   importerEtudiants,
-  recupererEtudiant,
   recupererEtudiants,
   recupererHoraireEtudiant,
 } from "../services/etudiants.api.js";
+
+const OPTIONS_ETUDIANTS_SESSION_ACTIVE = {
+  sessionActive: true,
+};
+
+function aChamp(objet, champ) {
+  return Boolean(objet) && Object.prototype.hasOwnProperty.call(objet, champ);
+}
+
+function verifierStructureListeEtudiants(listeEtudiants) {
+  if (!Array.isArray(listeEtudiants) || listeEtudiants.length === 0) {
+    return listeEtudiants;
+  }
+
+  const premierEtudiant = listeEtudiants[0];
+  if (
+    !aChamp(premierEtudiant, "nb_reprises") ||
+    !aChamp(premierEtudiant, "nb_cours_normaux") ||
+    !aChamp(premierEtudiant, "charge_cible")
+  ) {
+    const erreur = new Error(
+      "Le backend actif n'est pas a jour pour les horaires etudiants. Redemarrez le serveur backend puis rechargez la page."
+    );
+    erreur.details = [
+      "La liste etudiants recue ne contient pas les champs de charge academique attendus.",
+    ];
+    throw erreur;
+  }
+
+  return listeEtudiants;
+}
+
+function verifierStructureConsultationEtudiant(consultationHoraire) {
+  const etudiant = consultationHoraire?.etudiant;
+
+  if (!etudiant || !aChamp(etudiant, "charge_cible") || !aChamp(etudiant, "nb_reprises")) {
+    const erreur = new Error(
+      "Le backend actif n'est pas a jour pour l'horaire etudiant. Redemarrez le serveur backend puis rechargez la page."
+    );
+    erreur.details = [
+      "La fiche etudiant recue ne contient pas les metadonnees de charge cible attendues.",
+    ];
+    throw erreur;
+  }
+
+  if (!aChamp(consultationHoraire, "resume")) {
+    const erreur = new Error(
+      "Le backend actif n'est pas a jour pour l'horaire etudiant. Redemarrez le serveur backend puis rechargez la page."
+    );
+    erreur.details = [
+      "La reponse horaire recue ne contient pas le resume fusionne attendu.",
+    ];
+    throw erreur;
+  }
+
+  return consultationHoraire;
+}
 
 // Le tri par matricule est centralise ici pour garantir le meme ordre
 // d'affichage apres un chargement initial, un import ou une actualisation.
@@ -40,7 +96,9 @@ export function useEtudiants() {
     setDetailsErreur([]);
 
     try {
-      const listeEtudiants = await recupererEtudiants();
+      const listeEtudiants = verifierStructureListeEtudiants(
+        await recupererEtudiants(OPTIONS_ETUDIANTS_SESSION_ACTIVE)
+      );
       setEtudiants(trierEtudiantsParMatricule(listeEtudiants));
       setEtatChargement("success");
       return listeEtudiants;
@@ -57,7 +115,9 @@ export function useEtudiants() {
 
     async function chargerAuMontage() {
       try {
-        const listeEtudiants = await recupererEtudiants();
+        const listeEtudiants = verifierStructureListeEtudiants(
+          await recupererEtudiants(OPTIONS_ETUDIANTS_SESSION_ACTIVE)
+        );
 
         if (!estActif) {
           return;
@@ -98,14 +158,18 @@ export function useEtudiants() {
     setDetailsErreur([]);
 
     try {
-      const [etudiant, consultationHoraire] = await Promise.all([
-        recupererEtudiant(idEtudiant),
-        recupererHoraireEtudiant(idEtudiant),
-      ]);
+      const consultationHoraire = verifierStructureConsultationEtudiant(
+        await recupererHoraireEtudiant(idEtudiant)
+      );
 
       const consultation = {
-        etudiant,
+        etudiant: consultationHoraire.etudiant ?? null,
         horaire: consultationHoraire.horaire ?? [],
+        horaireGroupe: consultationHoraire.horaire_groupe ?? [],
+        horaireReprises: consultationHoraire.horaire_reprises ?? [],
+        reprises: consultationHoraire.reprises ?? [],
+        diagnosticReprises: consultationHoraire.diagnostic_reprises ?? [],
+        resume: consultationHoraire.resume ?? null,
       };
 
       setConsultationsParId((consultationsActuelles) => ({
@@ -130,7 +194,9 @@ export function useEtudiants() {
 
     try {
       const resultat = await importerEtudiants(fichier);
-      const listeEtudiants = await recupererEtudiants();
+      const listeEtudiants = verifierStructureListeEtudiants(
+        await recupererEtudiants(OPTIONS_ETUDIANTS_SESSION_ACTIVE)
+      );
 
       // Apres un import reussi, on recharge la liste complete afin que
       // l'interface reflète l'etat reel de la base et les nouveaux groupes.
@@ -174,7 +240,7 @@ function construireMessageErreurImport(error) {
   }
 
   if (error.message === "Format de fichier non supporte.") {
-    return "Import impossible : le fichier doit etre au format .xlsx ou .csv.";
+    return "Import impossible : le fichier doit etre au format .xls, .xlsx ou .csv.";
   }
 
   if (error.message === "Fichier vide.") {

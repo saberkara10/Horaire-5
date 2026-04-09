@@ -12,10 +12,10 @@ export const SESSIONS_ACADEMIQUES = [
   "Ete",
 ];
 
-export function formaterLibelleCohorte(session, annee) {
-  if (!session || !annee) {
+export function formaterLibelleCohorte(session) {
+  if (!session) {
     return "-";
   }
 
-  return `${session} ${annee}`;
+  return String(session);
 }

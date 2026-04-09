@@ -29,6 +29,7 @@ const {
   genererHoraireAutomatiquement,
   professeurEstCompatibleAvecCours,
   salleEstCompatibleAvecCours,
+  updateAffectationValidee,
   verifierDisponibiliteProfesseur,
 } = await import("../src/model/horaire.js");
 
@@ -175,34 +176,46 @@ describe("Tests modele Horaire", () => {
   });
 
   test("creerAffectationValidee rejette un professeur non compatible", async () => {
-    queryMock
-      .mockResolvedValueOnce([[
-        {
-          id_cours: 1,
-          code: "INF101",
-          nom: "Programmation",
-          programme: "Programmation informatique",
-          type_salle: "Laboratoire",
-          id_salle_reference: 3,
-        },
-      ]])
-      .mockResolvedValueOnce([[
-        {
-          id_professeur: 2,
-          matricule: "MAT002",
-          nom: "Martin",
-          prenom: "Lea",
-          specialite: "Comptabilite et gestion",
-        },
-      ]])
-      .mockResolvedValueOnce([[
-        {
-          id_salle: 3,
-          code: "LAB-01",
-          type: "Laboratoire",
-          capacite: 24,
-        },
-      ]]);
+    connectionMock.query.mockImplementation(async (sql) => {
+      if (sql.includes("FROM cours")) {
+        return [[
+          {
+            id_cours: 1,
+            code: "INF101",
+            nom: "Programmation",
+            programme: "Programmation informatique",
+            etape_etude: "1",
+            type_salle: "Laboratoire",
+            id_salle_reference: 3,
+          },
+        ]];
+      }
+
+      if (sql.includes("FROM professeurs")) {
+        return [[
+          {
+            id_professeur: 2,
+            matricule: "MAT002",
+            nom: "Martin",
+            prenom: "Lea",
+            specialite: "Comptabilite et gestion",
+          },
+        ]];
+      }
+
+      if (sql.includes("FROM salles")) {
+        return [[
+          {
+            id_salle: 3,
+            code: "LAB-01",
+            type: "Laboratoire",
+            capacite: 24,
+          },
+        ]];
+      }
+
+      return [[]];
+    });
     recupererIndexCoursProfesseursMock.mockResolvedValue(new Map());
 
     await expect(
@@ -220,39 +233,84 @@ describe("Tests modele Horaire", () => {
     });
   });
 
-  test("creerAffectationValidee cree une affectation quand le contexte est valide", async () => {
-    queryMock
-      .mockResolvedValueOnce([[
-        {
-          id_cours: 1,
-          code: "INF101",
-          nom: "Programmation",
-          programme: "Programmation informatique",
-          type_salle: "Laboratoire",
-          id_salle_reference: 3,
-        },
-      ]])
-      .mockResolvedValueOnce([[
-        {
-          id_professeur: 2,
-          matricule: "MAT002",
-          nom: "Martin",
-          prenom: "Lea",
-          specialite: "Programmation informatique",
-        },
-      ]])
-      .mockResolvedValueOnce([[
-        {
-          id_salle: 3,
-          code: "LAB-01",
-          type: "Laboratoire",
-          capacite: 24,
-        },
-      ]])
-      .mockResolvedValueOnce([[{ conflits: 0 }]])
-      .mockResolvedValueOnce([[{ conflits: 0 }]])
-      .mockResolvedValueOnce([{ insertId: 11 }])
-      .mockResolvedValueOnce([{ insertId: 22 }]);
+  test("creerAffectationValidee cree une affectation et lie le groupe quand le contexte est valide", async () => {
+    connectionMock.query.mockImplementation(async (sql) => {
+      if (sql.includes("FROM cours")) {
+        return [[
+          {
+            id_cours: 1,
+            code: "INF101",
+            nom: "Programmation",
+            programme: "Programmation informatique",
+            etape_etude: "1",
+            type_salle: "Laboratoire",
+            id_salle_reference: 3,
+          },
+        ]];
+      }
+
+      if (sql.includes("FROM professeurs")) {
+        return [[
+          {
+            id_professeur: 2,
+            matricule: "MAT002",
+            nom: "Martin",
+            prenom: "Lea",
+            specialite: "Programmation informatique",
+          },
+        ]];
+      }
+
+      if (sql.includes("FROM salles")) {
+        return [[
+          {
+            id_salle: 3,
+            code: "LAB-01",
+            type: "Laboratoire",
+            capacite: 24,
+          },
+        ]];
+      }
+
+      if (sql.includes("FROM groupes_etudiants ge")) {
+        return [[
+          {
+            id_groupes_etudiants: 4,
+            nom_groupe: "Programmation informatique - E1 - Automne - G1",
+            programme: "Programmation informatique",
+            etape: "1",
+            session: "Automne",
+            effectif: 24,
+          },
+        ]];
+      }
+
+      if (sql.includes("FROM affectation_groupes ag")) {
+        return [[{ conflits: 0 }]];
+      }
+
+      if (sql.includes("WHERE ac.id_salle = ?")) {
+        return [[{ conflits: 0 }]];
+      }
+
+      if (sql.includes("WHERE ac.id_professeur = ?")) {
+        return [[{ conflits: 0 }]];
+      }
+
+      if (sql.includes("INSERT INTO plages_horaires")) {
+        return [{ insertId: 11 }];
+      }
+
+      if (sql.includes("INSERT INTO affectation_cours")) {
+        return [{ insertId: 22 }];
+      }
+
+      if (sql.includes("INSERT INTO affectation_groupes")) {
+        return [{ insertId: 33 }];
+      }
+
+      return [[]];
+    });
 
     recupererIndexCoursProfesseursMock.mockResolvedValue(
       new Map([[2, new Set([1])]])
@@ -260,17 +318,357 @@ describe("Tests modele Horaire", () => {
     recupererDisponibilitesProfesseursMock.mockResolvedValue(new Map());
 
     const resultat = await creerAffectationValidee({
-      idCours: 1,
-      idProfesseur: 2,
-      idSalle: 3,
-      date: "2026-03-23",
-      heureDebut: "08:00",
-      heureFin: "10:00",
-    });
+        idCours: 1,
+        idProfesseur: 2,
+        idSalle: 3,
+        idGroupeEtudiants: 4,
+        date: "2026-03-23",
+        heureDebut: "08:00",
+        heureFin: "10:00",
+      });
 
     expect(resultat).toEqual({
       id_affectation_cours: 22,
       id_plage_horaires: 11,
+    });
+    expect(connectionMock.commit).toHaveBeenCalledTimes(1);
+    expect(connectionMock.query).toHaveBeenCalledWith(
+      expect.stringContaining("INSERT INTO affectation_groupes"),
+      [4, 22]
+    );
+  });
+
+  test("creerAffectationValidee rejette un groupe deja occupe sur le meme creneau", async () => {
+    connectionMock.query.mockImplementation(async (sql) => {
+      if (sql.includes("FROM cours")) {
+        return [[
+          {
+            id_cours: 1,
+            code: "INF101",
+            nom: "Programmation",
+            programme: "Programmation informatique",
+            etape_etude: "1",
+            type_salle: "Laboratoire",
+            id_salle_reference: 3,
+          },
+        ]];
+      }
+
+      if (sql.includes("FROM professeurs")) {
+        return [[
+          {
+            id_professeur: 2,
+            matricule: "MAT002",
+            nom: "Martin",
+            prenom: "Lea",
+            specialite: "Programmation informatique",
+          },
+        ]];
+      }
+
+      if (sql.includes("FROM salles")) {
+        return [[
+          {
+            id_salle: 3,
+            code: "LAB-01",
+            type: "Laboratoire",
+            capacite: 24,
+          },
+        ]];
+      }
+
+      if (sql.includes("FROM groupes_etudiants ge")) {
+        return [[
+          {
+            id_groupes_etudiants: 4,
+            nom_groupe: "Programmation informatique - E1 - Automne - G1",
+            programme: "Programmation informatique",
+            etape: "1",
+            session: "Automne",
+            effectif: 24,
+          },
+        ]];
+      }
+
+      if (sql.includes("FROM affectation_groupes ag")) {
+        return [[{ conflits: 1 }]];
+      }
+
+      if (sql.includes("WHERE ac.id_salle = ?")) {
+        return [[{ conflits: 0 }]];
+      }
+
+      if (sql.includes("WHERE ac.id_professeur = ?")) {
+        return [[{ conflits: 0 }]];
+      }
+
+      return [[]];
+    });
+
+    recupererIndexCoursProfesseursMock.mockResolvedValue(
+      new Map([[2, new Set([1])]])
+    );
+    recupererDisponibilitesProfesseursMock.mockResolvedValue(new Map());
+
+    await expect(
+      creerAffectationValidee({
+        idCours: 1,
+        idProfesseur: 2,
+        idSalle: 3,
+        idGroupeEtudiants: 4,
+        date: "2026-03-23",
+        heureDebut: "08:00",
+        heureFin: "10:00",
+      })
+    ).rejects.toMatchObject({
+      message: "Groupe deja occupe sur ce creneau.",
+      statusCode: 409,
+    });
+  });
+
+  test("updateAffectationValidee remplace le groupe et met a jour l'affectation", async () => {
+    let groupeActuel = 4;
+    let libelleGroupeActuel = "Programmation informatique - E1 - Automne - G1";
+
+    connectionMock.query.mockImplementation(async (sql, params = []) => {
+      if (
+        sql.includes("WHERE ac.id_affectation_cours = ?") &&
+        sql.includes("GROUP_CONCAT")
+      ) {
+        return [[
+          {
+            id_affectation_cours: 9,
+            id_cours: 1,
+            id_professeur: 2,
+            id_salle: 3,
+            id_plage_horaires: 11,
+            date: "2026-03-23",
+            heure_debut: "08:00:00",
+            heure_fin: "10:00:00",
+            id_groupes_etudiants: groupeActuel,
+            groupes: libelleGroupeActuel,
+          },
+        ]];
+      }
+
+      if (sql.includes("FROM cours")) {
+        return [[
+          {
+            id_cours: 1,
+            code: "INF101",
+            nom: "Programmation",
+            programme: "Programmation informatique",
+            etape_etude: "1",
+            type_salle: "Laboratoire",
+            id_salle_reference: 3,
+          },
+        ]];
+      }
+
+      if (sql.includes("FROM professeurs")) {
+        return [[
+          {
+            id_professeur: 2,
+            matricule: "MAT002",
+            nom: "Martin",
+            prenom: "Lea",
+            specialite: "Programmation informatique",
+          },
+        ]];
+      }
+
+      if (sql.includes("FROM salles")) {
+        return [[
+          {
+            id_salle: 3,
+            code: "LAB-01",
+            type: "Laboratoire",
+            capacite: 30,
+          },
+        ]];
+      }
+
+      if (sql.includes("FROM groupes_etudiants ge")) {
+        return [[
+          {
+            id_groupes_etudiants: 6,
+            nom_groupe: "Programmation informatique - E1 - Automne - G2",
+            programme: "Programmation informatique",
+            etape: "1",
+            session: "Automne",
+            effectif: 22,
+          },
+        ]];
+      }
+
+      if (sql.includes("WHERE ac.id_salle = ?")) {
+        return [[{ conflits: 0 }]];
+      }
+
+      if (sql.includes("WHERE ac.id_professeur = ?")) {
+        return [[{ conflits: 0 }]];
+      }
+
+      if (sql.includes("FROM affectation_groupes ag")) {
+        return [[{ conflits: 0 }]];
+      }
+
+      if (sql.includes("UPDATE plages_horaires")) {
+        return [{ affectedRows: 1 }];
+      }
+
+      if (sql.includes("UPDATE affectation_cours")) {
+        return [{ affectedRows: 1 }];
+      }
+
+      if (sql.includes("DELETE FROM affectation_groupes")) {
+        return [{ affectedRows: 1 }];
+      }
+
+      if (sql.includes("INSERT INTO affectation_groupes")) {
+        groupeActuel = 6;
+        libelleGroupeActuel = "Programmation informatique - E1 - Automne - G2";
+        return [{ insertId: 44 }];
+      }
+
+      throw new Error(`SQL non simule: ${sql} / ${JSON.stringify(params)}`);
+    });
+
+    recupererIndexCoursProfesseursMock.mockResolvedValue(
+      new Map([[2, new Set([1])]])
+    );
+    recupererDisponibilitesProfesseursMock.mockResolvedValue(new Map());
+
+    const resultat = await updateAffectationValidee(9, {
+      idCours: 1,
+      idProfesseur: 2,
+      idSalle: 3,
+      idGroupeEtudiants: 6,
+      date: "2026-03-24",
+      heureDebut: "10:00",
+      heureFin: "12:00",
+    });
+
+    expect(resultat).toMatchObject({
+      id_affectation_cours: 9,
+      id_groupes_etudiants: 6,
+      groupes: "Programmation informatique - E1 - Automne - G2",
+    });
+    expect(connectionMock.query).toHaveBeenCalledWith(
+      expect.stringContaining("DELETE FROM affectation_groupes"),
+      [9]
+    );
+    expect(connectionMock.query).toHaveBeenCalledWith(
+      expect.stringContaining("INSERT INTO affectation_groupes"),
+      [6, 9]
+    );
+  });
+
+  test("updateAffectationValidee rejette un groupe deja occupe sur le meme creneau", async () => {
+    connectionMock.query.mockImplementation(async (sql, params = []) => {
+      if (
+        sql.includes("WHERE ac.id_affectation_cours = ?") &&
+        sql.includes("GROUP_CONCAT")
+      ) {
+        return [[
+          {
+            id_affectation_cours: 9,
+            id_cours: 1,
+            id_professeur: 2,
+            id_salle: 3,
+            id_plage_horaires: 11,
+            date: "2026-03-23",
+            heure_debut: "08:00:00",
+            heure_fin: "10:00:00",
+            id_groupes_etudiants: 4,
+            groupes: "Programmation informatique - E1 - Automne - G1",
+          },
+        ]];
+      }
+
+      if (sql.includes("FROM cours")) {
+        return [[
+          {
+            id_cours: 1,
+            code: "INF101",
+            nom: "Programmation",
+            programme: "Programmation informatique",
+            etape_etude: "1",
+            type_salle: "Laboratoire",
+            id_salle_reference: 3,
+          },
+        ]];
+      }
+
+      if (sql.includes("FROM professeurs")) {
+        return [[
+          {
+            id_professeur: 2,
+            matricule: "MAT002",
+            nom: "Martin",
+            prenom: "Lea",
+            specialite: "Programmation informatique",
+          },
+        ]];
+      }
+
+      if (sql.includes("FROM salles")) {
+        return [[
+          {
+            id_salle: 3,
+            code: "LAB-01",
+            type: "Laboratoire",
+            capacite: 30,
+          },
+        ]];
+      }
+
+      if (sql.includes("FROM groupes_etudiants ge")) {
+        return [[
+          {
+            id_groupes_etudiants: 6,
+            nom_groupe: "Programmation informatique - E1 - Automne - G2",
+            programme: "Programmation informatique",
+            etape: "1",
+            session: "Automne",
+            effectif: 22,
+          },
+        ]];
+      }
+
+      if (sql.includes("WHERE ac.id_salle = ?")) {
+        return [[{ conflits: 0 }]];
+      }
+
+      if (sql.includes("WHERE ac.id_professeur = ?")) {
+        return [[{ conflits: 0 }]];
+      }
+
+      if (sql.includes("FROM affectation_groupes ag")) {
+        return [[{ conflits: 1 }]];
+      }
+
+      throw new Error(`SQL non simule: ${sql} / ${JSON.stringify(params)}`);
+    });
+
+    recupererIndexCoursProfesseursMock.mockResolvedValue(
+      new Map([[2, new Set([1])]])
+    );
+    recupererDisponibilitesProfesseursMock.mockResolvedValue(new Map());
+
+    await expect(
+      updateAffectationValidee(9, {
+        idCours: 1,
+        idProfesseur: 2,
+        idSalle: 3,
+        idGroupeEtudiants: 6,
+        date: "2026-03-24",
+        heureDebut: "10:00",
+        heureFin: "12:00",
+      })
+    ).rejects.toMatchObject({
+      message: "Groupe deja occupe sur ce creneau.",
+      statusCode: 409,
     });
   });
 
@@ -316,7 +714,7 @@ describe("Tests modele Horaire", () => {
 
       if (
         sql.includes(
-          "SELECT id_etudiant, id_groupes_etudiants, programme, etape, session, annee"
+          "SELECT id_etudiant, id_groupes_etudiants, programme, etape, session"
         )
       ) {
         return [[
@@ -326,7 +724,6 @@ describe("Tests modele Horaire", () => {
             programme: "Programmation informatique",
             etape: 1,
             session: "Automne",
-            annee: 2026,
           },
         ]];
       }
@@ -375,13 +772,12 @@ describe("Tests modele Horaire", () => {
       programme: "Programmation informatique",
       etape: "1",
       session: "Automne",
-      annee: 2026,
     });
 
     expect(resultat.affectations).toHaveLength(1);
     expect(resultat.affectations[0]).toMatchObject({
       id_affectation_cours: 22,
-      groupes: "Programmation informatique - E1 - Automne 2026 - G1",
+      groupes: "Programmation informatique - E1 - Automne - G1",
       effectif: 1,
     });
     expect(connectionMock.commit).toHaveBeenCalledTimes(1);
@@ -429,7 +825,7 @@ describe("Tests modele Horaire", () => {
 
       if (
         sql.includes(
-          "SELECT id_etudiant, id_groupes_etudiants, programme, etape, session, annee"
+          "SELECT id_etudiant, id_groupes_etudiants, programme, etape, session"
         )
       ) {
         return [[
@@ -439,7 +835,6 @@ describe("Tests modele Horaire", () => {
             programme: "Programmation informatique",
             etape: 1,
             session: "Automne",
-            annee: 2026,
           },
         ]];
       }
@@ -488,7 +883,6 @@ describe("Tests modele Horaire", () => {
       programme: "Programmation informatique",
       etape: "1",
       session: "Automne",
-      annee: 2026,
       dateDebut: "2026-03-28",
     });
 

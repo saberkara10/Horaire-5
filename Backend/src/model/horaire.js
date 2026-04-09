@@ -13,15 +13,25 @@ import {
   normaliserNomProgramme,
   programmesCorrespondent,
 } from "../utils/programmes.js";
+import { normaliserNomSession, sessionsCorrespondent } from "../utils/sessions.js";
 import {
-  anneeSessionValide,
-  normaliserNomSession,
-  sessionsCorrespondent,
-} from "../utils/sessions.js";
+  calculerTaillesGroupesEquilibres,
+  determinerCapaciteMaximaleGroupeCohorte,
+  recupererSallesCompatiblesPourCours,
+} from "../utils/groupes.js";
+import { MAX_WEEKLY_SESSIONS_PER_PROFESSOR } from "../services/scheduler/AcademicCatalog.js";
+import { disponibiliteCouvreDate } from "../services/professeurs/availability-temporal.js";
+import { assurerSchemaSchedulerAcademique } from "../services/academic-scheduler-schema.js";
 
 const CRENEAUX_DEBUT = ["08:00:00", "10:00:00", "13:00:00", "15:00:00"];
 const NOMBRE_JOURS_GENERATION = 10;
-const CAPACITE_MAX_GROUPE = 25;
+const SESSION_ACTIVE_SQL = `(
+  SELECT id_session
+  FROM sessions
+  WHERE active = TRUE
+  ORDER BY id_session DESC
+  LIMIT 1
+)`;
 
 function normaliserHeure(heure) {
   const valeur = String(heure || "").trim();
@@ -106,7 +116,9 @@ function trierProfesseursPourCours(
 ) {
   return professeurs
     .filter((professeur) =>
-      professeurEstCompatibleAvecCours(professeur, cours, coursParProfesseur)
+      professeurEstCompatibleAvecCours(professeur, cours, coursParProfesseur) &&
+      (compteurAffectations.get(professeur.id_professeur) || 0) <
+        MAX_WEEKLY_SESSIONS_PER_PROFESSOR
     )
     .sort((professeurA, professeurB) => {
     const scoreA = calculerScoreProfesseur(
@@ -128,7 +140,7 @@ function trierProfesseursPourCours(
     const nombreB = compteurAffectations.get(professeurB.id_professeur) || 0;
 
     if (nombreA !== nombreB) {
-      return nombreA - nombreB;
+      return nombreB - nombreA;
     }
 
     return `${professeurA.prenom} ${professeurA.nom}`.localeCompare(
@@ -186,64 +198,30 @@ function totaliserEffectifGroupes(groupes) {
   );
 }
 
-function repartirEffectifEquitablement(effectifTotal, capaciteMaximale = CAPACITE_MAX_GROUPE) {
-  if (effectifTotal <= 0) {
-    return [];
-  }
-
-  const nombreGroupes = Math.max(1, Math.ceil(effectifTotal / capaciteMaximale));
-  const base = Math.floor(effectifTotal / nombreGroupes);
-  const reste = effectifTotal % nombreGroupes;
-
-  return Array.from({ length: nombreGroupes }, (_, index) =>
-    base + (index < reste ? 1 : 0)
-  );
-}
-
-function construireNomGroupeAutomatique(programme, etape, session, annee, index) {
+function construireNomGroupeAutomatique(programme, etape, session, index) {
   const programmeNettoye = String(programme || "Programme")
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, 70);
 
-  return `${programmeNettoye} - E${etape} - ${session} ${annee} - G${index}`;
+  return `${programmeNettoye} - E${etape} - ${session} - G${index}`;
 }
 
 function trierSallesCompatibles(cours, salles, capaciteMinimale = 0) {
-  const idSalleReference = Number(cours.id_salle_reference);
-  const typeSalleCours = normaliserTexte(cours.type_salle);
+  const seuilCapacite = Number(capaciteMinimale) || 0;
+  const sallesCompatibles = recupererSallesCompatiblesPourCours(cours, salles);
+  const sallesAssezGrandes =
+    seuilCapacite > 0
+      ? sallesCompatibles.filter((salle) => Number(salle.capacite) >= seuilCapacite)
+      : sallesCompatibles;
 
-  return salles
-    .filter((salle) => {
-      if (Number.isInteger(idSalleReference) && idSalleReference > 0) {
-        return Number(salle.id_salle) === idSalleReference;
-      }
+  return sallesAssezGrandes.sort((salleA, salleB) => {
+    if (salleA.capacite !== salleB.capacite) {
+      return salleA.capacite - salleB.capacite;
+    }
 
-      return normaliserTexte(salle.type) === typeSalleCours;
-    })
-    .sort((salleA, salleB) => {
-      const salleAAdequate = Number(salleA.capacite) >= capaciteMinimale;
-      const salleBAdequate = Number(salleB.capacite) >= capaciteMinimale;
-
-      if (salleAAdequate !== salleBAdequate) {
-        return salleAAdequate ? -1 : 1;
-      }
-
-      if (salleAAdequate && salleBAdequate) {
-        const margeA = Number(salleA.capacite) - capaciteMinimale;
-        const margeB = Number(salleB.capacite) - capaciteMinimale;
-
-        if (margeA !== margeB) {
-          return margeA - margeB;
-        }
-      }
-
-      if (salleA.capacite !== salleB.capacite) {
-        return salleA.capacite - salleB.capacite;
-      }
-
-      return String(salleA.code).localeCompare(String(salleB.code), "fr");
-    });
+    return String(salleA.code).localeCompare(String(salleB.code), "fr");
+  });
 }
 
 function genererJoursCalendaires(nombreJours, dateDebut = null) {
@@ -290,6 +268,10 @@ function professeurEstDisponible(
       return false;
     }
 
+    if (!disponibiliteCouvreDate(disponibilite, date)) {
+      return false;
+    }
+
     const debutDisponibilite = heureVersMinutes(disponibilite.heure_debut);
     const finDisponibilite = heureVersMinutes(disponibilite.heure_fin);
 
@@ -301,6 +283,82 @@ function creerErreurHoraire(message, statusCode = 400) {
   const erreur = new Error(message);
   erreur.statusCode = statusCode;
   return erreur;
+}
+
+async function executerDansTransactionSiNecessaire(
+  operation,
+  executor = pool
+) {
+  const doitOuvrirTransaction =
+    executor &&
+    typeof executor.getConnection === "function" &&
+    typeof executor.query === "function";
+  const connexion = doitOuvrirTransaction
+    ? await executor.getConnection()
+    : executor;
+
+  if (doitOuvrirTransaction) {
+    await connexion.beginTransaction();
+  }
+
+  try {
+    const resultat = await operation(connexion);
+
+    if (doitOuvrirTransaction) {
+      await connexion.commit();
+    }
+
+    return resultat;
+  } catch (error) {
+    if (doitOuvrirTransaction) {
+      await connexion.rollback();
+    }
+
+    throw error;
+  } finally {
+    if (doitOuvrirTransaction) {
+      connexion.release();
+    }
+  }
+}
+
+async function recupererSessionActive(executor = pool) {
+  const [rows] = await executor.query(
+    `SELECT id_session, nom
+     FROM sessions
+     WHERE active = TRUE
+     ORDER BY id_session DESC
+     LIMIT 1`
+  );
+
+  return rows[0] || null;
+}
+
+async function supprimerGroupesVidesSession(idSession, executor = pool) {
+  if (!Number.isInteger(Number(idSession)) || Number(idSession) <= 0) {
+    return;
+  }
+
+  await executor.query(
+    `DELETE FROM groupes_etudiants
+     WHERE id_groupes_etudiants IN (
+       SELECT id_groupes_etudiants
+       FROM (
+         SELECT ge.id_groupes_etudiants
+         FROM groupes_etudiants ge
+         LEFT JOIN etudiants e
+           ON e.id_groupes_etudiants = ge.id_groupes_etudiants
+         LEFT JOIN affectation_etudiants ae
+           ON ae.id_groupes_etudiants = ge.id_groupes_etudiants
+          AND ae.id_session = ge.id_session
+         WHERE ge.id_session = ?
+         GROUP BY ge.id_groupes_etudiants
+         HAVING COUNT(DISTINCT e.id_etudiant) = 0
+            AND COUNT(DISTINCT ae.id_etudiant) = 0
+       ) groupes_vides
+     )`,
+    [Number(idSession)]
+  );
 }
 
 function construireFiltreAffectationExclue(idAffectationExclue) {
@@ -320,7 +378,7 @@ function construireFiltreAffectationExclue(idAffectationExclue) {
 async function recupererContexteAffectation(idCours, idProfesseur, idSalle, executor = pool) {
   const [[coursRows], [professeurRows], [salleRows]] = await Promise.all([
     executor.query(
-      `SELECT id_cours, code, nom, programme, type_salle, id_salle_reference
+      `SELECT id_cours, code, nom, programme, etape_etude, type_salle, id_salle_reference
        FROM cours
        WHERE id_cours = ?
        LIMIT 1`,
@@ -349,6 +407,61 @@ async function recupererContexteAffectation(idCours, idProfesseur, idSalle, exec
   };
 }
 
+async function recupererContexteGroupe(idGroupeEtudiants, executor = pool) {
+  const [rows] = await executor.query(
+    `SELECT ge.id_groupes_etudiants,
+            ge.nom_groupe,
+            ge.est_groupe_special,
+            COALESCE(MAX(e.programme), ge.programme) AS programme,
+            COALESCE(MAX(e.etape), ge.etape) AS etape,
+            MAX(e.session) AS session,
+            CASE
+              WHEN COALESCE(ge.est_groupe_special, 0) = 1
+                THEN COUNT(DISTINCT ae.id_etudiant)
+              ELSE COUNT(DISTINCT e.id_etudiant)
+            END AS effectif
+     FROM groupes_etudiants ge
+     LEFT JOIN etudiants e
+       ON e.id_groupes_etudiants = ge.id_groupes_etudiants
+     LEFT JOIN affectation_etudiants ae
+       ON ae.id_groupes_etudiants = ge.id_groupes_etudiants
+      AND ae.id_session = ge.id_session
+      AND ae.source_type = 'reprise'
+     WHERE ge.id_groupes_etudiants = ?
+     GROUP BY ge.id_groupes_etudiants,
+              ge.nom_groupe,
+              ge.est_groupe_special,
+              ge.programme,
+              ge.etape
+     LIMIT 1`,
+    [idGroupeEtudiants]
+  );
+
+  return rows[0] || null;
+}
+
+function groupeEstCompatibleAvecCours(groupe, cours) {
+  if (!groupe || !cours) {
+    return false;
+  }
+
+  return (
+    programmesCorrespondent(groupe.programme, cours.programme) &&
+    etapesCorrespondent(groupe.etape, cours.etape_etude)
+  );
+}
+
+function sallePeutAccueillirGroupe(salle, groupe) {
+  const effectif = Number(groupe?.effectif) || 0;
+  const capacite = Number(salle?.capacite) || 0;
+
+  if (effectif <= 0) {
+    return true;
+  }
+
+  return capacite >= effectif;
+}
+
 export async function verifierDisponibiliteProfesseur(
   idProfesseur,
   date,
@@ -367,13 +480,147 @@ export async function verifierDisponibiliteProfesseur(
   );
 }
 
+async function recupererEtudiantsAffectesIndividuellementAuGroupe(
+  idGroupeEtudiants,
+  executor = pool
+) {
+  const [rows] = await executor.query(
+    `SELECT DISTINCT ae.id_etudiant
+     FROM affectation_etudiants ae
+     WHERE ae.id_groupes_etudiants = ?
+       AND ae.source_type = 'reprise'`,
+    [idGroupeEtudiants]
+  );
+
+  return rows
+    .map((row) => Number(row.id_etudiant))
+    .filter((idEtudiant) => Number.isInteger(idEtudiant) && idEtudiant > 0);
+}
+
+async function verifierConflitEtudiantPlanifie(
+  idEtudiant,
+  date,
+  heureDebut,
+  heureFin,
+  idAffectationExclue = null,
+  executor = pool
+) {
+  const filtreExclusion = construireFiltreAffectationExclue(idAffectationExclue);
+  const [rows] = await executor.query(
+    `SELECT COUNT(*) AS conflits
+     FROM (
+       SELECT DISTINCT ac.id_affectation_cours
+       FROM etudiants e
+       JOIN affectation_groupes ag
+         ON ag.id_groupes_etudiants = e.id_groupes_etudiants
+       JOIN affectation_cours ac
+         ON ac.id_affectation_cours = ag.id_affectation_cours
+       JOIN plages_horaires ph
+         ON ph.id_plage_horaires = ac.id_plage_horaires
+       WHERE e.id_etudiant = ?
+         AND ph.date = ?
+         AND ph.heure_debut < ?
+         AND ph.heure_fin > ?${filtreExclusion.clause}
+
+       UNION
+
+       SELECT DISTINCT ac.id_affectation_cours
+       FROM affectation_etudiants ae
+       JOIN affectation_groupes ag
+         ON ag.id_groupes_etudiants = ae.id_groupes_etudiants
+       JOIN affectation_cours ac
+         ON ac.id_affectation_cours = ag.id_affectation_cours
+        AND ac.id_cours = ae.id_cours
+       JOIN plages_horaires ph
+         ON ph.id_plage_horaires = ac.id_plage_horaires
+       WHERE ae.id_etudiant = ?
+         AND ae.source_type = 'reprise'
+         AND ph.date = ?
+         AND ph.heure_debut < ?
+         AND ph.heure_fin > ?${filtreExclusion.clause}
+     ) conflits_etudiant`,
+    [
+      idEtudiant,
+      date,
+      normaliserHeure(heureFin),
+      normaliserHeure(heureDebut),
+      ...filtreExclusion.valeurs,
+      idEtudiant,
+      date,
+      normaliserHeure(heureFin),
+      normaliserHeure(heureDebut),
+      ...filtreExclusion.valeurs,
+    ]
+  );
+
+  return Number(rows[0]?.conflits || 0);
+}
+
+async function verifierConflitEtudiantsAffectesAuGroupeSpecial(
+  idGroupeEtudiants,
+  date,
+  heureDebut,
+  heureFin,
+  idAffectationExclue = null,
+  executor = pool
+) {
+  const idsEtudiants = await recupererEtudiantsAffectesIndividuellementAuGroupe(
+    idGroupeEtudiants,
+    executor
+  );
+
+  for (const idEtudiant of idsEtudiants) {
+    const conflits = await verifierConflitEtudiantPlanifie(
+      idEtudiant,
+      date,
+      heureDebut,
+      heureFin,
+      idAffectationExclue,
+      executor
+    );
+
+    if (conflits > 0) {
+      return {
+        conflits,
+        idEtudiant,
+      };
+    }
+  }
+
+  return {
+    conflits: 0,
+    idEtudiant: null,
+  };
+}
+
 /**
  * Retourne toutes les affectations de cours avec les details.
  * @returns {Promise<Array<Object>>} La liste de toutes les affectations.
  */
-export async function getAllAffectations() {
-  const [rows] = await pool.query(
+export async function getAllAffectations(options = {}, executor = pool) {
+  const sessionActive = Boolean(options?.sessionActive);
+  const clauses = [];
+
+  if (sessionActive) {
+    clauses.push(
+      `EXISTS (
+         SELECT 1
+         FROM affectation_groupes ag2
+         JOIN groupes_etudiants ge2
+           ON ge2.id_groupes_etudiants = ag2.id_groupes_etudiants
+         WHERE ag2.id_affectation_cours = ac.id_affectation_cours
+           AND ge2.id_session = ${SESSION_ACTIVE_SQL}
+       )`
+    );
+  }
+
+  const clauseWhere = clauses.length > 0 ? `WHERE ${clauses.join(" AND ")}` : "";
+
+  const [rows] = await executor.query(
     `SELECT ac.id_affectation_cours,
+            ac.id_cours,
+            ac.id_professeur,
+            ac.id_salle,
             c.code AS cours_code,
             c.nom AS cours_nom,
             c.duree AS cours_duree,
@@ -381,9 +628,10 @@ export async function getAllAffectations() {
             p.prenom AS professeur_prenom,
             s.code AS salle_code,
             s.capacite AS salle_capacite,
-            ph.date,
+            DATE_FORMAT(ph.date, '%Y-%m-%d') AS date,
             ph.heure_debut,
             ph.heure_fin,
+            MIN(ag.id_groupes_etudiants) AS id_groupes_etudiants,
             COALESCE(
               GROUP_CONCAT(DISTINCT ge.nom_groupe ORDER BY ge.nom_groupe SEPARATOR ', '),
               ''
@@ -391,11 +639,15 @@ export async function getAllAffectations() {
      FROM affectation_cours ac
      JOIN cours c ON ac.id_cours = c.id_cours
      JOIN professeurs p ON ac.id_professeur = p.id_professeur
-     JOIN salles s ON ac.id_salle = s.id_salle
+     LEFT JOIN salles s ON ac.id_salle = s.id_salle
      JOIN plages_horaires ph ON ac.id_plage_horaires = ph.id_plage_horaires
      LEFT JOIN affectation_groupes ag ON ag.id_affectation_cours = ac.id_affectation_cours
      LEFT JOIN groupes_etudiants ge ON ge.id_groupes_etudiants = ag.id_groupes_etudiants
+     ${clauseWhere}
      GROUP BY ac.id_affectation_cours,
+              ac.id_cours,
+              ac.id_professeur,
+              ac.id_salle,
               c.code,
               c.nom,
               c.duree,
@@ -417,8 +669,8 @@ export async function getAllAffectations() {
  * @param {number} idAffectation L'identifiant de l'affectation.
  * @returns {Promise<Object|undefined>} L'affectation correspondante ou undefined.
  */
-export async function getAffectationById(idAffectation) {
-  const [rows] = await pool.query(
+export async function getAffectationById(idAffectation, executor = pool) {
+  const [rows] = await executor.query(
     `SELECT ac.id_affectation_cours,
             ac.id_cours,
             ac.id_professeur,
@@ -429,9 +681,10 @@ export async function getAffectationById(idAffectation) {
             p.nom AS professeur_nom,
             p.prenom AS professeur_prenom,
             s.code AS salle_code,
-            ph.date,
+            DATE_FORMAT(ph.date, '%Y-%m-%d') AS date,
             ph.heure_debut,
             ph.heure_fin,
+            MIN(ag.id_groupes_etudiants) AS id_groupes_etudiants,
             COALESCE(
               GROUP_CONCAT(DISTINCT ge.nom_groupe ORDER BY ge.nom_groupe SEPARATOR ', '),
               ''
@@ -439,7 +692,7 @@ export async function getAffectationById(idAffectation) {
      FROM affectation_cours ac
      JOIN cours c ON ac.id_cours = c.id_cours
      JOIN professeurs p ON ac.id_professeur = p.id_professeur
-     JOIN salles s ON ac.id_salle = s.id_salle
+     LEFT JOIN salles s ON ac.id_salle = s.id_salle
      JOIN plages_horaires ph ON ac.id_plage_horaires = ph.id_plage_horaires
      LEFT JOIN affectation_groupes ag ON ag.id_affectation_cours = ac.id_affectation_cours
      LEFT JOIN groupes_etudiants ge ON ge.id_groupes_etudiants = ag.id_groupes_etudiants
@@ -532,10 +785,83 @@ export async function deleteAffectation(idAffectation, executor = pool) {
  * Supprime toutes les affectations (reset horaire).
  * @param {import("mysql2/promise").Pool | import("mysql2/promise").PoolConnection} executor
  */
-export async function deleteAllAffectations(executor = pool) {
-  await executor.query(`DELETE FROM affectation_groupes;`);
-  await executor.query(`DELETE FROM affectation_cours;`);
-  await executor.query(`DELETE FROM plages_horaires;`);
+export async function deleteAllAffectations(options = {}, executor = pool) {
+  return executerDansTransactionSiNecessaire(async (transactionExecutor) => {
+    await assurerSchemaSchedulerAcademique(transactionExecutor);
+
+    if (options?.sessionActive) {
+      const sessionActive = await recupererSessionActive(transactionExecutor);
+
+      if (!sessionActive?.id_session) {
+        return;
+      }
+
+      await transactionExecutor.query(
+        `DELETE FROM affectation_etudiants
+         WHERE id_session = ${SESSION_ACTIVE_SQL}`
+      );
+
+      await transactionExecutor.query(
+        `DELETE ag
+         FROM affectation_groupes ag
+         INNER JOIN groupes_etudiants ge
+           ON ge.id_groupes_etudiants = ag.id_groupes_etudiants
+         WHERE ge.id_session = ${SESSION_ACTIVE_SQL}`
+      );
+
+      await transactionExecutor.query(
+        `DELETE ac
+         FROM affectation_cours ac
+         LEFT JOIN affectation_groupes ag
+           ON ag.id_affectation_cours = ac.id_affectation_cours
+         WHERE ag.id_affectation_cours IS NULL`
+      );
+
+      await transactionExecutor.query(
+        `DELETE ph
+         FROM plages_horaires ph
+         LEFT JOIN affectation_cours ac
+           ON ac.id_plage_horaires = ph.id_plage_horaires
+         WHERE ac.id_plage_horaires IS NULL`
+      );
+
+      await transactionExecutor.query(
+        `UPDATE cours_echoues
+         SET statut = 'a_reprendre',
+             id_groupe_reprise = NULL,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id_session = ${SESSION_ACTIVE_SQL}
+           AND statut <> 'reussi'`
+      );
+
+      if (options?.deleteStudents) {
+        await transactionExecutor.query(
+          `DELETE e
+           FROM etudiants e
+           INNER JOIN groupes_etudiants ge
+             ON ge.id_groupes_etudiants = e.id_groupes_etudiants
+           WHERE ge.id_session = ?`,
+          [Number(sessionActive.id_session)]
+        );
+
+        await supprimerGroupesVidesSession(sessionActive.id_session, transactionExecutor);
+      }
+
+      return;
+    }
+
+    await transactionExecutor.query(`DELETE FROM affectation_etudiants;`);
+    await transactionExecutor.query(`DELETE FROM affectation_groupes;`);
+    await transactionExecutor.query(`DELETE FROM affectation_cours;`);
+    await transactionExecutor.query(`DELETE FROM plages_horaires;`);
+    await transactionExecutor.query(
+      `UPDATE cours_echoues
+       SET statut = 'a_reprendre',
+           id_groupe_reprise = NULL,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE statut <> 'reussi'`
+    );
+  }, executor);
 }
 
 async function deleteAffectationsPourGroupes(idsGroupes, executor = pool) {
@@ -617,11 +943,10 @@ async function supprimerGroupesCohorte(
   programmeCible,
   etapeCible,
   sessionCible,
-  anneeCible,
   executor = pool
 ) {
   const [etudiantsCohorte] = await executor.query(
-    `SELECT id_etudiant, id_groupes_etudiants, programme, etape, session, annee
+    `SELECT id_etudiant, id_groupes_etudiants, programme, etape, session
      FROM etudiants
      ORDER BY matricule ASC`
   );
@@ -630,8 +955,7 @@ async function supprimerGroupesCohorte(
     (etudiant) =>
       programmesCorrespondent(etudiant.programme, programmeCible) &&
       etapesCorrespondent(etudiant.etape, etapeCible) &&
-      sessionsCorrespondent(etudiant.session, sessionCible) &&
-      Number(etudiant.annee) === Number(anneeCible)
+      sessionsCorrespondent(etudiant.session, sessionCible)
   );
 
   const idsGroupes = [
@@ -671,27 +995,34 @@ async function creerGroupesAutomatiquesPourCohorte(
   programmeCible,
   etapeCible,
   sessionCible,
-  anneeCible,
   programmeAffichage,
   sessionAffichage,
+  coursCohorte,
+  sallesDisponibles,
   executor = pool
 ) {
   const etudiantsSelectionnes = await supprimerGroupesCohorte(
     programmeCible,
     etapeCible,
     sessionCible,
-    anneeCible,
     executor
   );
 
   if (etudiantsSelectionnes.length === 0) {
     throw creerErreurHoraire(
-      "Aucun etudiant ne correspond a ce programme, cette etape, cette session et cette annee.",
+      "Aucun etudiant ne correspond a ce programme, cette etape et cette session.",
       400
     );
   }
 
-  const taillesGroupes = repartirEffectifEquitablement(etudiantsSelectionnes.length);
+  const capaciteMaximaleCohorte = determinerCapaciteMaximaleGroupeCohorte(
+    coursCohorte,
+    sallesDisponibles
+  );
+  const taillesGroupes = calculerTaillesGroupesEquilibres(
+    etudiantsSelectionnes.length,
+    capaciteMaximaleCohorte
+  );
   const groupes = [];
   let positionCourante = 0;
 
@@ -701,7 +1032,6 @@ async function creerGroupesAutomatiquesPourCohorte(
       programmeAffichage,
       etapeCible,
       sessionAffichage,
-      anneeCible,
       index + 1
     );
     const [resultatGroupe] = await executor.query(
@@ -733,8 +1063,8 @@ async function creerGroupesAutomatiquesPourCohorte(
       programme: programmeAffichage,
       etape: etapeCible,
       session: sessionAffichage,
-      annee: anneeCible,
       effectif: etudiantsDuGroupe.length,
+      taille_max: capaciteMaximaleCohorte,
     });
   }
 
@@ -760,6 +1090,20 @@ export async function addAffectationGroupe(
   );
 
   return result;
+}
+
+async function remplacerAffectationGroupe(
+  idAffectationCours,
+  idGroupeEtudiants,
+  executor = pool
+) {
+  await executor.query(
+    `DELETE FROM affectation_groupes
+     WHERE id_affectation_cours = ?`,
+    [idAffectationCours]
+  );
+
+  return addAffectationGroupe(idGroupeEtudiants, idAffectationCours, executor);
 }
 
 /**
@@ -895,101 +1239,172 @@ export async function verifierConflitProfesseur(
  * @returns {Promise<Object>} Le resultat de creation.
  */
 export async function creerAffectationValidee(affectation, executor = pool) {
-  const {
-    idCours,
-    idProfesseur,
-    idSalle,
-    date,
-    heureDebut,
-    heureFin,
-  } = affectation;
+  return executerDansTransactionSiNecessaire(async (transactionExecutor) => {
+    await assurerSchemaSchedulerAcademique(transactionExecutor);
 
-  const { cours, professeur, salle } = await recupererContexteAffectation(
-    idCours,
-    idProfesseur,
-    idSalle,
-    executor
-  );
+    const {
+      idCours,
+      idProfesseur,
+      idSalle,
+      idGroupeEtudiants,
+      date,
+      heureDebut,
+      heureFin,
+    } = affectation;
+    const idGroupeNumerique = Number(idGroupeEtudiants);
 
-  const coursParProfesseur = await recupererIndexCoursProfesseurs(executor);
-
-  if (!cours) {
-    throw creerErreurHoraire("Cours introuvable.", 404);
-  }
-
-  if (!professeur) {
-    throw creerErreurHoraire("Professeur introuvable.", 404);
-  }
-
-  if (!salle) {
-    throw creerErreurHoraire("Salle introuvable.", 404);
-  }
-
-  if (!professeurEstCompatibleAvecCours(professeur, cours, coursParProfesseur)) {
-    throw creerErreurHoraire(
-      "Professeur non compatible avec ce cours.",
-      409
+    const { cours, professeur, salle } = await recupererContexteAffectation(
+      idCours,
+      idProfesseur,
+      idSalle,
+      transactionExecutor
     );
-  }
 
-  if (!salleEstCompatibleAvecCours(salle, cours)) {
-    throw creerErreurHoraire("Salle non compatible avec ce cours.", 409);
-  }
+    const coursParProfesseur =
+      await recupererIndexCoursProfesseurs(transactionExecutor);
 
-  const professeurDisponible = await verifierDisponibiliteProfesseur(
-    idProfesseur,
-    date,
-    heureDebut,
-    heureFin,
-    executor
-  );
+    if (!cours) {
+      throw creerErreurHoraire("Cours introuvable.", 404);
+    }
 
-  if (!professeurDisponible) {
-    throw creerErreurHoraire(
-      "Professeur indisponible sur ce creneau.",
-      409
+    if (!professeur) {
+      throw creerErreurHoraire("Professeur introuvable.", 404);
+    }
+
+    if (!salle) {
+      throw creerErreurHoraire("Salle introuvable.", 404);
+    }
+
+    let groupe = null;
+
+    if (Number.isInteger(idGroupeNumerique) && idGroupeNumerique > 0) {
+      groupe = await recupererContexteGroupe(idGroupeNumerique, transactionExecutor);
+
+      if (!groupe) {
+        throw creerErreurHoraire("Groupe introuvable.", 404);
+      }
+
+      if (!groupeEstCompatibleAvecCours(groupe, cours)) {
+        throw creerErreurHoraire(
+          "Le groupe ne correspond pas au programme ou a l'etape du cours.",
+          409
+        );
+      }
+
+      if (!sallePeutAccueillirGroupe(salle, groupe)) {
+        throw creerErreurHoraire(
+          "La salle ne peut pas accueillir l'effectif de ce groupe.",
+          409
+        );
+      }
+    }
+
+    if (!professeurEstCompatibleAvecCours(professeur, cours, coursParProfesseur)) {
+      throw creerErreurHoraire("Professeur non compatible avec ce cours.", 409);
+    }
+
+    if (!salleEstCompatibleAvecCours(salle, cours)) {
+      throw creerErreurHoraire("Salle non compatible avec ce cours.", 409);
+    }
+
+    const professeurDisponible = await verifierDisponibiliteProfesseur(
+      idProfesseur,
+      date,
+      heureDebut,
+      heureFin,
+      transactionExecutor
     );
-  }
 
-  const conflitSalle = await verifierConflitSalle(
-    idSalle,
-    date,
-    heureDebut,
-    heureFin,
-    null,
-    executor
-  );
+    if (!professeurDisponible) {
+      throw creerErreurHoraire("Professeur indisponible sur ce creneau.", 409);
+    }
 
-  if (conflitSalle > 0) {
-    throw creerErreurHoraire("Salle deja occupee sur ce creneau.", 409);
-  }
+    if (groupe) {
+      const conflitGroupe = await verifierConflitGroupe(
+        idGroupeNumerique,
+        date,
+        heureDebut,
+        heureFin,
+        null,
+        transactionExecutor
+      );
 
-  const conflitProfesseur = await verifierConflitProfesseur(
-    idProfesseur,
-    date,
-    heureDebut,
-    heureFin,
-    null,
-    executor
-  );
+      if (conflitGroupe > 0) {
+        throw creerErreurHoraire("Groupe deja occupe sur ce creneau.", 409);
+      }
 
-  if (conflitProfesseur > 0) {
-    throw creerErreurHoraire("Professeur deja assigne sur ce creneau.", 409);
-  }
+      if (Number(groupe.est_groupe_special || 0) === 1) {
+        const conflitEtudiants = await verifierConflitEtudiantsAffectesAuGroupeSpecial(
+          idGroupeNumerique,
+          date,
+          heureDebut,
+          heureFin,
+          null,
+          transactionExecutor
+        );
 
-  const plageResultat = await addPlageHoraire(date, heureDebut, heureFin, executor);
-  const affectationResultat = await addAffectation(
-    idCours,
-    idProfesseur,
-    idSalle,
-    plageResultat.insertId,
-    executor
-  );
+        if (conflitEtudiants.conflits > 0) {
+          throw creerErreurHoraire(
+            `Conflit etudiant detecte sur ce creneau pour la section speciale ${groupe.nom_groupe}.`,
+            409
+          );
+        }
+      }
+    }
 
-  return {
-    id_affectation_cours: affectationResultat.insertId,
-    id_plage_horaires: plageResultat.insertId,
-  };
+    const conflitSalle = await verifierConflitSalle(
+      idSalle,
+      date,
+      heureDebut,
+      heureFin,
+      null,
+      transactionExecutor
+    );
+
+    if (conflitSalle > 0) {
+      throw creerErreurHoraire("Salle deja occupee sur ce creneau.", 409);
+    }
+
+    const conflitProfesseur = await verifierConflitProfesseur(
+      idProfesseur,
+      date,
+      heureDebut,
+      heureFin,
+      null,
+      transactionExecutor
+    );
+
+    if (conflitProfesseur > 0) {
+      throw creerErreurHoraire("Professeur deja assigne sur ce creneau.", 409);
+    }
+
+    const plageResultat = await addPlageHoraire(
+      date,
+      heureDebut,
+      heureFin,
+      transactionExecutor
+    );
+    const affectationResultat = await addAffectation(
+      idCours,
+      idProfesseur,
+      idSalle,
+      plageResultat.insertId,
+      transactionExecutor
+    );
+
+    if (groupe) {
+      await addAffectationGroupe(
+        idGroupeNumerique,
+        affectationResultat.insertId,
+        transactionExecutor
+      );
+    }
+
+    return {
+      id_affectation_cours: affectationResultat.insertId,
+      id_plage_horaires: plageResultat.insertId,
+    };
+  }, executor);
 }
 
 export async function updateAffectationValidee(
@@ -997,135 +1412,213 @@ export async function updateAffectationValidee(
   affectation,
   executor = pool
 ) {
-  const idAffectationNumerique = Number(idAffectation);
+  return executerDansTransactionSiNecessaire(async (transactionExecutor) => {
+    await assurerSchemaSchedulerAcademique(transactionExecutor);
 
-  if (!Number.isInteger(idAffectationNumerique) || idAffectationNumerique <= 0) {
-    throw creerErreurHoraire("Affectation introuvable.", 404);
-  }
+    const idAffectationNumerique = Number(idAffectation);
 
-  const affectationExistante = await getAffectationById(idAffectationNumerique);
+    if (!Number.isInteger(idAffectationNumerique) || idAffectationNumerique <= 0) {
+      throw creerErreurHoraire("Affectation introuvable.", 404);
+    }
 
-  if (!affectationExistante) {
-    throw creerErreurHoraire("Affectation introuvable.", 404);
-  }
+    const affectationExistante = await getAffectationById(
+      idAffectationNumerique,
+      transactionExecutor
+    );
 
-  const {
-    idCours,
-    idProfesseur,
-    idSalle,
-    date,
-    heureDebut,
-    heureFin,
-  } = affectation;
+    if (!affectationExistante) {
+      throw creerErreurHoraire("Affectation introuvable.", 404);
+    }
 
-  const { cours, professeur, salle } = await recupererContexteAffectation(
-    idCours,
-    idProfesseur,
-    idSalle,
-    executor
-  );
-  const coursParProfesseur = await recupererIndexCoursProfesseurs(executor);
+    const {
+      idCours,
+      idProfesseur,
+      idSalle,
+      idGroupeEtudiants,
+      date,
+      heureDebut,
+      heureFin,
+    } = affectation;
+    const idGroupeNumerique = Number(idGroupeEtudiants);
 
-  if (!cours) {
-    throw creerErreurHoraire("Cours introuvable.", 404);
-  }
+    const { cours, professeur, salle } = await recupererContexteAffectation(
+      idCours,
+      idProfesseur,
+      idSalle,
+      transactionExecutor
+    );
+    const coursParProfesseur =
+      await recupererIndexCoursProfesseurs(transactionExecutor);
 
-  if (!professeur) {
-    throw creerErreurHoraire("Professeur introuvable.", 404);
-  }
+    if (!cours) {
+      throw creerErreurHoraire("Cours introuvable.", 404);
+    }
 
-  if (!salle) {
-    throw creerErreurHoraire("Salle introuvable.", 404);
-  }
+    if (!professeur) {
+      throw creerErreurHoraire("Professeur introuvable.", 404);
+    }
 
-  if (!professeurEstCompatibleAvecCours(professeur, cours, coursParProfesseur)) {
-    throw creerErreurHoraire("Professeur non compatible avec ce cours.", 409);
-  }
+    if (!salle) {
+      throw creerErreurHoraire("Salle introuvable.", 404);
+    }
 
-  if (!salleEstCompatibleAvecCours(salle, cours)) {
-    throw creerErreurHoraire("Salle non compatible avec ce cours.", 409);
-  }
+    let groupe = null;
 
-  const professeurDisponible = await verifierDisponibiliteProfesseur(
-    idProfesseur,
-    date,
-    heureDebut,
-    heureFin,
-    executor
-  );
+    if (Number.isInteger(idGroupeNumerique) && idGroupeNumerique > 0) {
+      groupe = await recupererContexteGroupe(idGroupeNumerique, transactionExecutor);
 
-  if (!professeurDisponible) {
-    throw creerErreurHoraire("Professeur indisponible sur ce creneau.", 409);
-  }
+      if (!groupe) {
+        throw creerErreurHoraire("Groupe introuvable.", 404);
+      }
 
-  const conflitSalle = await verifierConflitSalle(
-    idSalle,
-    date,
-    heureDebut,
-    heureFin,
-    idAffectationNumerique,
-    executor
-  );
+      if (!groupeEstCompatibleAvecCours(groupe, cours)) {
+        throw creerErreurHoraire(
+          "Le groupe ne correspond pas au programme ou a l'etape du cours.",
+          409
+        );
+      }
 
-  if (conflitSalle > 0) {
-    throw creerErreurHoraire("Salle deja occupee sur ce creneau.", 409);
-  }
+      if (!sallePeutAccueillirGroupe(salle, groupe)) {
+        throw creerErreurHoraire(
+          "La salle ne peut pas accueillir l'effectif de ce groupe.",
+          409
+        );
+      }
+    }
 
-  const conflitProfesseur = await verifierConflitProfesseur(
-    idProfesseur,
-    date,
-    heureDebut,
-    heureFin,
-    idAffectationNumerique,
-    executor
-  );
+    if (!professeurEstCompatibleAvecCours(professeur, cours, coursParProfesseur)) {
+      throw creerErreurHoraire("Professeur non compatible avec ce cours.", 409);
+    }
 
-  if (conflitProfesseur > 0) {
-    throw creerErreurHoraire("Professeur deja assigne sur ce creneau.", 409);
-  }
+    if (!salleEstCompatibleAvecCours(salle, cours)) {
+      throw creerErreurHoraire("Salle non compatible avec ce cours.", 409);
+    }
 
-  const [groupesAssocies] = await executor.query(
-    `SELECT id_groupes_etudiants
-     FROM affectation_groupes
-     WHERE id_affectation_cours = ?`,
-    [idAffectationNumerique]
-  );
+    const professeurDisponible = await verifierDisponibiliteProfesseur(
+      idProfesseur,
+      date,
+      heureDebut,
+      heureFin,
+      transactionExecutor
+    );
 
-  for (const groupe of groupesAssocies) {
-    const conflitGroupe = await verifierConflitGroupe(
-      groupe.id_groupes_etudiants,
+    if (!professeurDisponible) {
+      throw creerErreurHoraire("Professeur indisponible sur ce creneau.", 409);
+    }
+
+    const conflitSalle = await verifierConflitSalle(
+      idSalle,
       date,
       heureDebut,
       heureFin,
       idAffectationNumerique,
-      executor
+      transactionExecutor
     );
 
-    if (conflitGroupe > 0) {
-      throw creerErreurHoraire("Un groupe lie a cette affectation est deja occupe.", 409);
+    if (conflitSalle > 0) {
+      throw creerErreurHoraire("Salle deja occupee sur ce creneau.", 409);
     }
-  }
 
-  await executor.query(
-    `UPDATE plages_horaires
-     SET date = ?, heure_debut = ?, heure_fin = ?
-     WHERE id_plage_horaires = ?`,
-    [
+    const conflitProfesseur = await verifierConflitProfesseur(
+      idProfesseur,
       date,
-      normaliserHeure(heureDebut),
-      normaliserHeure(heureFin),
-      affectationExistante.id_plage_horaires,
-    ]
-  );
+      heureDebut,
+      heureFin,
+      idAffectationNumerique,
+      transactionExecutor
+    );
 
-  await executor.query(
-    `UPDATE affectation_cours
-     SET id_cours = ?, id_professeur = ?, id_salle = ?
-     WHERE id_affectation_cours = ?`,
-    [idCours, idProfesseur, idSalle, idAffectationNumerique]
-  );
+    if (conflitProfesseur > 0) {
+      throw creerErreurHoraire("Professeur deja assigne sur ce creneau.", 409);
+    }
 
-  return getAffectationById(idAffectationNumerique);
+    if (groupe) {
+      const conflitGroupe = await verifierConflitGroupe(
+        idGroupeNumerique,
+        date,
+        heureDebut,
+        heureFin,
+        idAffectationNumerique,
+        transactionExecutor
+      );
+
+      if (conflitGroupe > 0) {
+        throw creerErreurHoraire("Groupe deja occupe sur ce creneau.", 409);
+      }
+
+      if (Number(groupe.est_groupe_special || 0) === 1) {
+        const conflitEtudiants = await verifierConflitEtudiantsAffectesAuGroupeSpecial(
+          idGroupeNumerique,
+          date,
+          heureDebut,
+          heureFin,
+          idAffectationNumerique,
+          transactionExecutor
+        );
+
+        if (conflitEtudiants.conflits > 0) {
+          throw creerErreurHoraire(
+            `Conflit etudiant detecte sur ce creneau pour la section speciale ${groupe.nom_groupe}.`,
+            409
+          );
+        }
+      }
+    } else {
+      const [groupesAssocies] = await transactionExecutor.query(
+        `SELECT id_groupes_etudiants
+         FROM affectation_groupes
+         WHERE id_affectation_cours = ?`,
+        [idAffectationNumerique]
+      );
+
+      for (const groupeAssocie of groupesAssocies) {
+        const conflitGroupe = await verifierConflitGroupe(
+          groupeAssocie.id_groupes_etudiants,
+          date,
+          heureDebut,
+          heureFin,
+          idAffectationNumerique,
+          transactionExecutor
+        );
+
+        if (conflitGroupe > 0) {
+          throw creerErreurHoraire(
+            "Un groupe lie a cette affectation est deja occupe.",
+            409
+          );
+        }
+      }
+    }
+
+    await transactionExecutor.query(
+      `UPDATE plages_horaires
+       SET date = ?, heure_debut = ?, heure_fin = ?
+       WHERE id_plage_horaires = ?`,
+      [
+        date,
+        normaliserHeure(heureDebut),
+        normaliserHeure(heureFin),
+        affectationExistante.id_plage_horaires,
+      ]
+    );
+
+    await transactionExecutor.query(
+      `UPDATE affectation_cours
+       SET id_cours = ?, id_professeur = ?, id_salle = ?
+       WHERE id_affectation_cours = ?`,
+      [idCours, idProfesseur, idSalle, idAffectationNumerique]
+    );
+
+    if (groupe) {
+      await remplacerAffectationGroupe(
+        idAffectationNumerique,
+        idGroupeNumerique,
+        transactionExecutor
+      );
+    }
+
+    return getAffectationById(idAffectationNumerique, transactionExecutor);
+  }, executor);
 }
 
 /**
@@ -1142,14 +1635,13 @@ export async function genererHoraireAutomatiquement(options = {}) {
     const programmeCible = normaliserNomProgramme(options.programme);
     const etapeCible = normaliserEtape(options.etape);
     const sessionCible = normaliserNomSession(options.session);
-    const anneeCible = Number(options.annee);
     const programmeAffichage = String(options.programme || "").trim();
     const sessionAffichage = normaliserNomSession(options.session);
     const dateDebut = String(options.dateDebut || "").trim() || null;
 
-    if (!programmeCible || !etapeCible || !sessionCible || !anneeSessionValide(anneeCible)) {
+    if (!programmeCible || !etapeCible || !sessionCible) {
       throw creerErreurHoraire(
-        "Le programme, l'etape, la session et l'annee sont obligatoires pour generer l'horaire.",
+        "Le programme, l'etape et la session sont obligatoires pour generer l'horaire.",
         400
       );
     }
@@ -1188,16 +1680,6 @@ export async function genererHoraireAutomatiquement(options = {}) {
     const disponibilitesParProfesseur =
       await recupererDisponibilitesProfesseurs(connection);
     const coursParProfesseur = await recupererIndexCoursProfesseurs(connection);
-    const groupesSelectionnes = await creerGroupesAutomatiquesPourCohorte(
-      programmeCible,
-      etapeCible,
-      sessionCible,
-      anneeCible,
-      programmeAffichage || options.programme || "Programme",
-      sessionAffichage || options.session || "",
-      connection
-    );
-
     const coursSelectionnes = cours.filter((coursActuel) => {
       if (!programmesCorrespondent(coursActuel.programme, programmeCible)) {
         return false;
@@ -1216,6 +1698,17 @@ export async function genererHoraireAutomatiquement(options = {}) {
         400
       );
     }
+
+    const groupesSelectionnes = await creerGroupesAutomatiquesPourCohorte(
+      programmeCible,
+      etapeCible,
+      sessionCible,
+      programmeAffichage || options.programme || "Programme",
+      sessionAffichage || options.session || "",
+      coursSelectionnes,
+      salles,
+      connection
+    );
 
     const jours = genererJoursCalendaires(NOMBRE_JOURS_GENERATION, dateDebut);
     const compteurAffectations = new Map();
@@ -1283,7 +1776,7 @@ export async function genererHoraireAutomatiquement(options = {}) {
             id_cours: coursActuel.id_cours,
             code_cours: coursActuel.code,
             groupe: groupe.nom_groupe,
-            raison: `Aucune salle compatible pour le type ${coursActuel.type_salle}.`,
+            raison: `Aucune salle compatible ne peut accueillir ${Number(groupe.effectif) || 0} etudiants pour le type ${coursActuel.type_salle}.`,
           });
           continue;
         }
@@ -1307,6 +1800,13 @@ export async function genererHoraireAutomatiquement(options = {}) {
             }
 
             for (const professeur of professeursCompatibles) {
+              if (
+                (compteurAffectations.get(professeur.id_professeur) || 0) >=
+                MAX_WEEKLY_SESSIONS_PER_PROFESSOR
+              ) {
+                continue;
+              }
+
               const disponible = professeurEstDisponible(
                 professeur,
                 date,
@@ -1419,7 +1919,6 @@ export async function genererHoraireAutomatiquement(options = {}) {
         programme: options.programme || "",
         etape: options.etape || "",
         session: sessionAffichage || "",
-        annee: anneeCible,
       },
       groupes_generes: groupesSelectionnes,
       periode: {

@@ -34,11 +34,11 @@ describe("Modele groupes", () => {
     queryMock.mockResolvedValueOnce([[
       {
         id_groupes_etudiants: 2,
-        nom_groupe: "INFO-E1-AUT-2026-G1",
+        nom_groupe: "INFO-E1-AUT-G1",
+        est_groupe_special: 0,
         programme: "Programmation informatique",
         etape: 1,
         session: "Automne",
-        annee: 2026,
         effectif: 24,
       },
     ]]);
@@ -46,7 +46,8 @@ describe("Modele groupes", () => {
     const result = await groupesModel.recupererGroupes(true);
 
     expect(result[0].programme).toBe("Programmation informatique");
-    expect(queryMock.mock.calls[0][0]).toContain("COUNT(e.id_etudiant) AS effectif");
+    expect(queryMock.mock.calls[0][0]).toContain("COUNT(DISTINCT e.id_etudiant)");
+    expect(queryMock.mock.calls[0][0]).toContain("COALESCE(ge.est_groupe_special, 0) = 0");
   });
 
   test("recupererGroupeParId retourne le groupe trouve", async () => {
