@@ -4,7 +4,8 @@ Ce dossier regroupe les documents utiles du projet **Gestion des horaires**.
 
 ## Guides principaux
 
-- [Guide d'installation](guide-installation.md)
+- [Guide collaborateur - Git prive et codebase](guide-collaborateur-git-code.md)
+- [Guide d'installation](guide-d'installation.md)
 - [Guide des tests](guide-tests.md)
 
 ## Conception
