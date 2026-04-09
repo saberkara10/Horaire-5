@@ -17,6 +17,7 @@ const professeursModelMock = {
   recupererCoursProfesseur: jest.fn(),
   recupererIndexCoursProfesseurs: jest.fn(),
   recupererDisponibilitesProfesseur: jest.fn(),
+  recupererJournalDisponibilitesProfesseur: jest.fn(),
   recupererDisponibilitesProfesseurs: jest.fn(),
   recupererHoraireProfesseur: jest.fn(),
   remplacerCoursProfesseur: jest.fn(),
@@ -177,7 +178,7 @@ describe("Tests routes Professeurs", () => {
     expect(response.statusCode).toBe(400);
   });
 
-  test("PUT /api/professeurs/1/disponibilites remonte un 409 metier avec details", async () => {
+  test("GET /api/professeurs/1/disponibilites/journal retourne 200 avec le journal", async () => {
     professeursModelMock.recupererProfesseurParId.mockResolvedValue({
       id_professeur: 1,
       matricule: "MAT001",
@@ -185,25 +186,66 @@ describe("Tests routes Professeurs", () => {
       prenom: "Ali",
       specialite: "Programmation informatique",
     });
-    professeursModelMock.remplacerDisponibilitesProfesseur.mockRejectedValue({
-      statusCode: 409,
-      message:
-        "Impossible de finaliser automatiquement la mise a jour des disponibilites: 1 seance(s) reste(nt) sans creneau compatible dans la fenetre de rattrapage automatique.",
-      details: [{ id_affectation_cours: 12 }],
+    professeursModelMock.recupererJournalDisponibilitesProfesseur.mockResolvedValue([
+      {
+        id_journal_replanification: 8,
+        statut: "PARTIEL",
+      },
+    ]);
+
+    const response = await request(app).get(
+      "/api/professeurs/1/disponibilites/journal?limit=5"
+    );
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toEqual([
+      {
+        id_journal_replanification: 8,
+        statut: "PARTIEL",
+      },
+    ]);
+    expect(
+      professeursModelMock.recupererJournalDisponibilitesProfesseur
+    ).toHaveBeenCalledWith(1, { limit: "5" });
+  });
+
+  test("PUT /api/professeurs/1/disponibilites retourne 200 avec un recalcul partiel explicite", async () => {
+    professeursModelMock.recupererProfesseurParId.mockResolvedValue({
+      id_professeur: 1,
+      matricule: "MAT001",
+      nom: "Dupont",
+      prenom: "Ali",
+      specialite: "Programmation informatique",
+    });
+    professeursModelMock.remplacerDisponibilitesProfesseur.mockResolvedValue({
+      disponibilites: [
+        {
+          jour_semaine: 2,
+          heure_debut: "11:00:00",
+          heure_fin: "19:00:00",
+        },
+      ],
       replanification: {
-        statut: "echec",
+        statut: "partiel",
         message:
-          "Certains cours n'ont pas pu etre replanifies automatiquement. Une intervention manuelle est requise pour finaliser l'ajustement de l'horaire.",
-        seances_concernees: 1,
-        seances_deplacees: [],
-        seances_non_replanifiees: [{ id_affectation_cours: 12 }],
+          "1 seance a ete deplacee et 1 seance reste en conflit explicite.",
+        seances_concernees: 2,
+        seances_deplacees: [{ id_affectation_cours: 12 }],
+        seances_non_replanifiees: [{ id_affectation_cours: 13 }],
         resume: {
-          seances_concernees: 1,
-          seances_replanifiees: 0,
-          seances_replanifiees_meme_semaine: 0,
+          seances_concernees: 2,
+          seances_replanifiees: 1,
+          seances_replanifiees_meme_semaine: 1,
           seances_reportees_semaines_suivantes: 0,
           seances_non_replanifiees: 1,
         },
+      },
+      synchronisation: {
+        id_professeur: 1,
+        professeurs_impactes: [1],
+        groupes_impactes: [4],
+        etudiants_impactes: [10],
+        etudiants_reprises_impactes: [11],
       },
     });
 
@@ -219,14 +261,15 @@ describe("Tests routes Professeurs", () => {
         ],
       });
 
-    expect(response.statusCode).toBe(409);
-    expect(response.body.message).toContain(
-      "Impossible de finaliser automatiquement"
-    );
-    expect(response.body.details).toEqual([{ id_affectation_cours: 12 }]);
+    expect(response.statusCode).toBe(200);
     expect(response.body.replanification).toMatchObject({
-      statut: "echec",
-      seances_concernees: 1,
+      statut: "partiel",
+      seances_concernees: 2,
+    });
+    expect(response.body.synchronisation).toMatchObject({
+      groupes_impactes: [4],
+      etudiants_impactes: [10],
+      etudiants_reprises_impactes: [11],
     });
   });
 

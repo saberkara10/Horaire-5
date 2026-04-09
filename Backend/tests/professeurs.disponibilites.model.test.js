@@ -16,6 +16,7 @@ const connectionMock = {
 };
 const replanifierSeancesImpacteesParDisponibilitesMock = jest.fn();
 const enregistrerJournalReplanificationDisponibilitesMock = jest.fn();
+const recupererJournalReplanificationDisponibilitesMock = jest.fn();
 const sessionActiveMock = {
   id_session: 1,
   nom: "Automne 2026",
@@ -43,12 +44,15 @@ await jest.unstable_mockModule(
   () => ({
     enregistrerJournalReplanificationDisponibilites:
       enregistrerJournalReplanificationDisponibilitesMock,
+    recupererJournalReplanificationDisponibilites:
+      recupererJournalReplanificationDisponibilitesMock,
   })
 );
 
 const {
   recupererDisponibilitesProfesseur,
   recupererDisponibilitesProfesseurs,
+  recupererJournalDisponibilitesProfesseur,
   remplacerDisponibilitesProfesseur,
 } = await import("../src/model/professeurs.model.js");
 
@@ -91,6 +95,7 @@ describe("Model professeurs disponibilites", () => {
       salles_impactees: [],
     });
     enregistrerJournalReplanificationDisponibilitesMock.mockResolvedValue(undefined);
+    recupererJournalReplanificationDisponibilitesMock.mockResolvedValue([]);
   });
 
   test("recupererDisponibilitesProfesseur retourne les disponibilites du professeur", async () => {
@@ -164,6 +169,36 @@ describe("Model professeurs disponibilites", () => {
 
     expect(resultat.get(2)).toHaveLength(2);
     expect(resultat.get(5)).toHaveLength(1);
+  });
+
+  test("recupererJournalDisponibilitesProfesseur relit le journal structure du professeur", async () => {
+    recupererJournalReplanificationDisponibilitesMock.mockResolvedValue([
+      {
+        id_journal_replanification: 15,
+        id_professeur: 3,
+        statut: "PARTIEL",
+      },
+    ]);
+
+    const resultat = await recupererJournalDisponibilitesProfesseur(3, {
+      limit: 5,
+    });
+
+    expect(recupererJournalReplanificationDisponibilitesMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        query: expect.any(Function),
+        getConnection: expect.any(Function),
+      }),
+      3,
+      { limit: 5 }
+    );
+    expect(resultat).toEqual([
+      {
+        id_journal_replanification: 15,
+        id_professeur: 3,
+        statut: "PARTIEL",
+      },
+    ]);
   });
 
   test("remplacerDisponibilitesProfesseur remplace et normalise les heures", async () => {
@@ -247,6 +282,7 @@ describe("Model professeurs disponibilites", () => {
       {
         dateDebutImpact: "2026-08-24",
         dateFinImpact: "2026-12-18",
+        modeApplication: "semaine_et_suivantes",
       }
     );
     expect(connectionMock.commit).toHaveBeenCalledTimes(1);
@@ -262,6 +298,198 @@ describe("Model professeurs disponibilites", () => {
     expect(resultat.semaine_reference.numero_semaine).toBe(1);
     expect(resultat.replanification.seances_concernees).toBe(0);
     expect(resultat.synchronisation.id_professeur).toBe(3);
+  });
+
+  test("remplacerDisponibilitesProfesseur applique une portee permanente et recalcule toute la session active", async () => {
+    let disponibilitesInserees = [];
+
+    connectionMock.query.mockImplementation(async (sql) => {
+      if (String(sql).includes("FROM sessions")) {
+        return [[sessionActiveMock]];
+      }
+
+      if (String(sql).includes("SELECT id_disponibilite_professeur")) {
+        return [disponibilitesInserees];
+      }
+
+      if (String(sql).includes("INSERT INTO disponibilites_professeurs")) {
+        disponibilitesInserees = [
+          {
+            id_disponibilite_professeur: 11,
+            id_professeur: 3,
+            jour_semaine: 1,
+            heure_debut: "08:00:00",
+            heure_fin: "12:00:00",
+            date_debut_effet: "2000-01-01",
+            date_fin_effet: "2099-12-31",
+          },
+        ];
+        return [[]];
+      }
+
+      return [[]];
+    });
+
+    queryMock.mockImplementation(async (sql) => {
+      if (String(sql).includes("FROM sessions")) {
+        return [[sessionActiveMock]];
+      }
+
+      if (String(sql).includes("SELECT id_disponibilite_professeur")) {
+        return [[
+          {
+            id_disponibilite_professeur: 11,
+            id_professeur: 3,
+            jour_semaine: 1,
+            heure_debut: "08:00:00",
+            heure_fin: "12:00:00",
+            date_debut_effet: "2000-01-01",
+            date_fin_effet: "2099-12-31",
+          },
+        ]];
+      }
+
+      return [[]];
+    });
+
+    const resultat = await remplacerDisponibilitesProfesseur(3, [
+      {
+        jour_semaine: 1,
+        heure_debut: "08:00",
+        heure_fin: "12:00",
+      },
+    ], {
+      semaine_cible: 4,
+      mode_application: "permanente",
+    });
+
+    expect(connectionMock.query).toHaveBeenCalledWith(
+      expect.stringContaining("INSERT INTO disponibilites_professeurs"),
+      [3, 1, "08:00:00", "12:00:00", "2000-01-01", "2099-12-31"]
+    );
+    expect(replanifierSeancesImpacteesParDisponibilitesMock).toHaveBeenCalledWith(
+      3,
+      expect.any(Array),
+      connectionMock,
+      {
+        dateDebutImpact: "2026-08-24",
+        dateFinImpact: "2026-12-18",
+        modeApplication: "permanente",
+      }
+    );
+    expect(resultat.semaine_reference.numero_semaine).toBe(4);
+  });
+
+  test("remplacerDisponibilitesProfesseur conserve la sauvegarde si la replanification est partielle", async () => {
+    let disponibilitesInserees = [];
+
+    connectionMock.query.mockImplementation(async (sql) => {
+      if (String(sql).includes("FROM sessions")) {
+        return [[sessionActiveMock]];
+      }
+
+      if (String(sql).includes("SELECT id_disponibilite_professeur")) {
+        return [disponibilitesInserees];
+      }
+
+      if (String(sql).includes("INSERT INTO disponibilites_professeurs")) {
+        disponibilitesInserees = [
+          {
+            id_disponibilite_professeur: 12,
+            id_professeur: 3,
+            jour_semaine: 2,
+            heure_debut: "13:00:00",
+            heure_fin: "17:00:00",
+            date_debut_effet: "2026-09-07",
+            date_fin_effet: "2026-09-13",
+          },
+        ];
+        return [[]];
+      }
+
+      return [[]];
+    });
+
+    queryMock.mockImplementation(async (sql) => {
+      if (String(sql).includes("FROM sessions")) {
+        return [[sessionActiveMock]];
+      }
+
+      if (String(sql).includes("SELECT id_disponibilite_professeur")) {
+        return [[
+          {
+            id_disponibilite_professeur: 12,
+            id_professeur: 3,
+            jour_semaine: 2,
+            heure_debut: "13:00:00",
+            heure_fin: "17:00:00",
+            date_debut_effet: "2026-09-07",
+            date_fin_effet: "2026-09-13",
+          },
+        ]];
+      }
+
+      return [[]];
+    });
+
+    replanifierSeancesImpacteesParDisponibilitesMock.mockResolvedValue({
+      statut: "partiel",
+      message:
+        "1 seance a ete deplacee et 1 seance sans solution a ete retiree de l'horaire valide.",
+      seances_concernees: 2,
+      seances_deplacees: [
+        {
+          id_affectation_cours: 44,
+        },
+      ],
+      seances_non_replanifiees: [
+        {
+          id_affectation_cours: 45,
+          action_finale: "retiree_de_l_horaire",
+        },
+      ],
+      resume: {
+        seances_concernees: 2,
+        seances_replanifiees: 1,
+        seances_replanifiees_meme_semaine: 1,
+        seances_reportees_semaines_suivantes: 0,
+        seances_non_replanifiees: 1,
+      },
+      groupes_impactes: [7],
+      salles_impactees: [9],
+      professeurs_impactes: [3],
+      etudiants_impactes: [{ id_etudiant: 90 }],
+      etudiants_reprises_impactes: [{ id_etudiant: 91 }],
+      fenetre_impact: {
+        date_debut: "2026-09-07",
+        date_fin: "2026-09-13",
+      },
+    });
+
+    const resultat = await remplacerDisponibilitesProfesseur(3, [
+      {
+        jour_semaine: 2,
+        heure_debut: "13:00",
+        heure_fin: "17:00",
+      },
+    ], {
+      semaine_cible: 3,
+      mode_application: "semaine_unique",
+    });
+
+    expect(connectionMock.commit).toHaveBeenCalledTimes(1);
+    expect(connectionMock.rollback).not.toHaveBeenCalled();
+    expect(resultat.replanification.statut).toBe("partiel");
+    expect(resultat.synchronisation.groupes_impactes).toEqual([7]);
+    expect(resultat.synchronisation.etudiants_impactes).toEqual([90]);
+    expect(resultat.synchronisation.etudiants_reprises_impactes).toEqual([91]);
+    expect(enregistrerJournalReplanificationDisponibilitesMock).toHaveBeenCalledWith(
+      connectionMock,
+      expect.objectContaining({
+        id_professeur: 3,
+        statut: "PARTIEL",
+      })
+    );
   });
 
   test("remplacerDisponibilitesProfesseur rollback si une insertion echoue", async () => {

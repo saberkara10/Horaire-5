@@ -9,6 +9,7 @@ import { AppShell } from "../components/layout/AppShell.jsx";
 import {
   recupererProfesseurs,
   recupererDisponibilitesProfesseur,
+  recupererJournalDisponibilitesProfesseur,
   recupererHoraireProfesseur,
   mettreAJourDisponibilitesProfesseur,
 } from "../services/professeurs.api.js";
@@ -96,6 +97,18 @@ function formaterDateLonguePlanning(dateString) {
     month: "long",
     day: "numeric",
   });
+}
+
+function formaterHorodatageJournal(dateString) {
+  if (!dateString) {
+    return "Horodatage indisponible";
+  }
+
+  return creerDateLocale(String(dateString).slice(0, 10)).toLocaleDateString("fr-CA", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  }) + ` • ${String(dateString).slice(11, 16)}`;
 }
 
 function calculerNombreSemainesSession(session) {
@@ -251,6 +264,83 @@ function seanceEstCouverteParDisponibilites(seance, disponibilites) {
   });
 }
 
+function modeUtiliseSemaineReference(mode) {
+  return mode === "semaine_unique" || mode === "semaine_et_suivantes";
+}
+
+function modeUtiliseDateDebut(mode) {
+  return mode === "a_partir_date" || mode === "plage_dates";
+}
+
+function modeUtiliseDateFin(mode) {
+  return mode === "plage_dates";
+}
+
+function getLibelleModeApplication(mode) {
+  switch (mode) {
+    case "semaine_unique":
+      return "Semaine unique";
+    case "semaine_et_suivantes":
+      return "A partir de la semaine de reference";
+    case "a_partir_date":
+      return "A partir d'une date";
+    case "plage_dates":
+      return "Sur une plage de dates";
+    case "permanente":
+      return "Disponibilite standard permanente";
+    default:
+      return "Portee non definie";
+  }
+}
+
+function decrirePorteeSauvegarde({
+  modeApplication,
+  dateDebutApplication,
+  dateFinApplication,
+  fenetreSemaineAffichee,
+  sessionActive,
+}) {
+  switch (modeApplication) {
+    case "semaine_unique":
+      return fenetreSemaineAffichee?.date_debut && fenetreSemaineAffichee?.date_fin
+        ? `Semaine ${fenetreSemaineAffichee.numero_semaine} uniquement (${fenetreSemaineAffichee.date_debut} - ${fenetreSemaineAffichee.date_fin})`
+        : "Semaine de reference uniquement";
+    case "semaine_et_suivantes":
+      return fenetreSemaineAffichee?.date_debut
+        ? `A partir du ${fenetreSemaineAffichee.date_debut} jusqu'a la fin de session`
+        : "A partir de la semaine de reference";
+    case "a_partir_date":
+      return dateDebutApplication
+        ? `A partir du ${dateDebutApplication} jusqu'a la fin de session`
+        : "Date de debut a definir";
+    case "plage_dates":
+      return dateDebutApplication && dateFinApplication
+        ? `Du ${dateDebutApplication} au ${dateFinApplication}`
+        : "Plage de dates a definir";
+    case "permanente":
+      return sessionActive?.date_debut && sessionActive?.date_fin
+        ? `Regle standard permanente, appliquee sur toute la session active (${sessionActive.date_debut} - ${sessionActive.date_fin})`
+        : "Regle standard permanente";
+    default:
+      return "Portee de sauvegarde non definie";
+  }
+}
+
+function formaterStatutJournal(statut) {
+  switch (String(statut || "").trim().toUpperCase()) {
+    case "SUCCES":
+      return "Succes";
+    case "PARTIEL":
+      return "Partiel";
+    case "ECHEC":
+      return "Conflit";
+    case "AUCUN_IMPACT":
+      return "Aucun impact";
+    default:
+      return "Statut inconnu";
+  }
+}
+
 export function DisponibilitesProfesseursPage({ utilisateur, onLogout }) {
   const [professeurs, setProfesseurs] = useState([]);
   const [sessions, setSessions] = useState([]);
@@ -263,10 +353,13 @@ export function DisponibilitesProfesseursPage({ utilisateur, onLogout }) {
   const [variationsDisponibilites, setVariationsDisponibilites] = useState([]);
   const [horaireProfesseur, setHoraireProfesseur] = useState([]);
   const [resumeReplanification, setResumeReplanification] = useState(null);
+  const [journalReplanifications, setJournalReplanifications] = useState([]);
   const [contexteDisponibilites, setContexteDisponibilites] = useState(null);
   const [indexEditionDisponibilite, setIndexEditionDisponibilite] = useState(null);
   const [semaineCible, setSemaineCible] = useState(null);
   const [modeApplication, setModeApplication] = useState("semaine_et_suivantes");
+  const [dateDebutApplication, setDateDebutApplication] = useState("");
+  const [dateFinApplication, setDateFinApplication] = useState("");
   const [formulaireDisponibilite, setFormulaireDisponibilite] = useState({
     jour_semaine: "1",
     heure_debut: "08:00",
@@ -286,17 +379,21 @@ export function DisponibilitesProfesseursPage({ utilisateur, onLogout }) {
       mettreAJourSemaine = true,
     } = options;
 
-    const [disponibilitesData, horaireData] = await Promise.all([
+    const [disponibilitesData, horaireData, journalData] = await Promise.all([
       recupererDisponibilitesProfesseur(idProfesseur, {
         semaine_cible: semaine,
       }),
       recupererHoraireProfesseur(idProfesseur),
+      recupererJournalDisponibilitesProfesseur(idProfesseur, {
+        limit: 8,
+      }),
     ]);
 
     setDisponibilites(trierDisponibilites(disponibilitesData?.disponibilites || []));
     setVariationsDisponibilites(disponibilitesData?.variations || []);
     setContexteDisponibilites(disponibilitesData || null);
     setHoraireProfesseur(Array.isArray(horaireData) ? horaireData : []);
+    setJournalReplanifications(Array.isArray(journalData) ? journalData : []);
 
     if (
       mettreAJourSemaine &&
@@ -415,6 +512,25 @@ export function DisponibilitesProfesseursPage({ utilisateur, onLogout }) {
     [contexteDisponibilites, sessionActive, semaineCible]
   );
 
+  useEffect(() => {
+    if (!fenetreSemaineAffichee?.date_debut) {
+      return;
+    }
+
+    if (modeUtiliseSemaineReference(modeApplication)) {
+      setDateDebutApplication(fenetreSemaineAffichee.date_debut);
+      setDateFinApplication(fenetreSemaineAffichee.date_fin);
+      return;
+    }
+
+    setDateDebutApplication((valeurActuelle) =>
+      valeurActuelle || fenetreSemaineAffichee.date_debut
+    );
+    setDateFinApplication((valeurActuelle) =>
+      valeurActuelle || fenetreSemaineAffichee.date_fin
+    );
+  }, [fenetreSemaineAffichee, modeApplication]);
+
   const lundiPlanningActif = useMemo(
     () =>
       fenetreSemaineAffichee?.date_debut
@@ -491,7 +607,29 @@ export function DisponibilitesProfesseursPage({ utilisateur, onLogout }) {
   }
 
   async function persisterDisponibilites(prochainesDisponibilites) {
-    if (!idProfesseurActif || !sessionActive || !semaineCible) {
+    if (!idProfesseurActif || !sessionActive) {
+      return false;
+    }
+
+    if (modeUtiliseSemaineReference(modeApplication) && !semaineCible) {
+      setErreurDisponibilites(
+        "Une semaine de reference est obligatoire pour cette portee de modification."
+      );
+      return false;
+    }
+
+    if (modeUtiliseDateDebut(modeApplication) && !dateDebutApplication) {
+      setErreurDisponibilites("La date de debut d'application est obligatoire.");
+      return false;
+    }
+
+    if (
+      modeUtiliseDateFin(modeApplication) &&
+      (!dateFinApplication || dateFinApplication < dateDebutApplication)
+    ) {
+      setErreurDisponibilites(
+        "La date de fin doit etre posterieure ou egale a la date de debut."
+      );
       return false;
     }
 
@@ -503,6 +641,19 @@ export function DisponibilitesProfesseursPage({ utilisateur, onLogout }) {
     let resultat = null;
 
     try {
+      const optionsSauvegarde = {
+        semaine_cible: semaineCible,
+        mode_application: modeApplication,
+      };
+
+      if (modeUtiliseDateDebut(modeApplication)) {
+        optionsSauvegarde.date_debut_effet = dateDebutApplication;
+      }
+
+      if (modeUtiliseDateFin(modeApplication)) {
+        optionsSauvegarde.date_fin_effet = dateFinApplication;
+      }
+
       resultat = await mettreAJourDisponibilitesProfesseur(
         idProfesseurActif,
         prochainesDisponibilites.map((disponibilite) => ({
@@ -510,52 +661,12 @@ export function DisponibilitesProfesseursPage({ utilisateur, onLogout }) {
           heure_debut: normaliserHeure(disponibilite.heure_debut),
           heure_fin: normaliserHeure(disponibilite.heure_fin),
         })),
-        {
-          semaine_cible: semaineCible,
-          mode_application: modeApplication,
-        }
+        optionsSauvegarde
       );
     } catch (error) {
-      const resumeEchec =
-        error.replanification ||
-        (Array.isArray(error.details) && error.details.length > 0
-          ? {
-              statut: "echec",
-              message:
-                "Certains cours n'ont pas pu etre replanifies automatiquement. Une intervention manuelle est requise pour finaliser l'ajustement de l'horaire.",
-              seances_concernees: error.details.length,
-              seances_deplacees: [],
-              seances_non_replanifiees: error.details,
-              resume: {
-                seances_concernees: error.details.length,
-                seances_replanifiees: 0,
-                seances_replanifiees_meme_semaine: 0,
-                seances_reportees_semaines_suivantes: 0,
-                seances_non_replanifiees: error.details.length,
-              },
-            }
-          : null);
-
-      try {
-        await chargerEtatProfesseur(idProfesseurActif, {
-          effacerResumeReplanification: false,
-          semaine: semaineCible,
-        });
-      } catch (erreurRechargement) {
-        showError(
-          erreurRechargement.message ||
-            "Impossible de recharger l'etat enregistre du professeur."
-        );
-      }
-
-      const messageErreur =
-        error.status === 409
-          ? `${error.replanification?.message || error.message || "Impossible de replanifier automatiquement les seances touchees."} Aucune disponibilite n'a ete enregistree et l'horaire actuel du professeur ainsi que des groupes a ete conserve.`
-          : error.message || "Erreur lors de l'enregistrement.";
-
-      setErreurDisponibilites(messageErreur);
-      setResumeReplanification(resumeEchec);
-      showError(messageErreur);
+      setErreurDisponibilites(error.message || "Erreur lors de l'enregistrement.");
+      setResumeReplanification(error.replanification || null);
+      showError(error.message || "Erreur lors de l'enregistrement.");
       setChargementDisponibilites(false);
       return false;
     }
@@ -563,8 +674,11 @@ export function DisponibilitesProfesseursPage({ utilisateur, onLogout }) {
     const replanification = resultat?.replanification || null;
     const synchronisation = resultat?.synchronisation || {
       id_professeur: idProfesseurActif,
+      professeurs_impactes: [idProfesseurActif],
       groupes_impactes: replanification?.groupes_impactes || [],
       salles_impactees: replanification?.salles_impactees || [],
+      etudiants_impactes: replanification?.etudiants_impactes || [],
+      etudiants_reprises_impactes: replanification?.etudiants_reprises_impactes || [],
     };
 
     emettreSynchronisationPlanning(synchronisation);
@@ -576,12 +690,24 @@ export function DisponibilitesProfesseursPage({ utilisateur, onLogout }) {
       });
 
       setResumeReplanification(replanification);
-
-      const messageSucces =
+      const statutReplanification = String(replanification?.statut || "")
+        .trim()
+        .toLowerCase();
+      const messageReplanification =
         replanification?.message || "Disponibilites enregistrees avec succes.";
 
-      setMessageDisponibilites(messageSucces);
-      showSuccess(messageSucces);
+      if (
+        statutReplanification === "partiel" ||
+        statutReplanification === "echec"
+      ) {
+        const messageAlerte = `${messageReplanification} Les seances impossibles a replacer ont ete retirees des horaires valides et restent tracees dans le journal de replanification.`;
+        setErreurDisponibilites(messageAlerte);
+        showError(messageAlerte);
+      } else {
+        setMessageDisponibilites(messageReplanification);
+        showSuccess(messageReplanification);
+      }
+
       return true;
     } catch (error) {
       const messageErreur =
@@ -694,7 +820,7 @@ export function DisponibilitesProfesseursPage({ utilisateur, onLogout }) {
       utilisateur={utilisateur}
       onLogout={onLogout}
       title="Disponibilites professeurs"
-      subtitle="Appliquez des disponibilites a partir d'une semaine cible, sur une seule semaine ou jusqu'a la fin de la session."
+      subtitle="Appliquez une disponibilite standard ou temporaire, replanifiez localement les seances impactees et conservez un historique metier complet."
     >
       <div className="crud-page">
         <section className="professeurs-page__workspace professeurs-page__workspace--full">
@@ -704,7 +830,7 @@ export function DisponibilitesProfesseursPage({ utilisateur, onLogout }) {
                 <h2>Disponibilites du professeur</h2>
                 <p>
                   Chaque ajout, modification ou suppression est enregistre
-                  immediatement sur la semaine cible puis recharge depuis la base.
+                  immediatement avec sa portee temporelle puis recharge depuis la base.
                 </p>
               </div>
 
@@ -750,12 +876,13 @@ export function DisponibilitesProfesseursPage({ utilisateur, onLogout }) {
                         ? `${formaterDateCourte(creerDateLocale(fenetreSemaineAffichee.date_debut))} - ${formaterDateCourte(creerDateLocale(fenetreSemaineAffichee.date_fin))}`
                         : "Aucune semaine chargee"}
                     </span>
-                    <span>
-                      Portee de sauvegarde :{" "}
-                      {modeApplication === "semaine_unique"
-                        ? "semaine cible uniquement"
-                        : "semaine cible et toutes les suivantes"}
-                    </span>
+                    <span>Portee de sauvegarde : {decrirePorteeSauvegarde({
+                      modeApplication,
+                      dateDebutApplication,
+                      dateFinApplication,
+                      fenetreSemaineAffichee,
+                      sessionActive,
+                    })}</span>
                   </div>
                 ) : (
                   <div className="crud-page__alert crud-page__alert--error">
@@ -787,7 +914,7 @@ export function DisponibilitesProfesseursPage({ utilisateur, onLogout }) {
                   onSubmit={handleAjouterDisponibilite}
                 >
                   <label className="crud-page__field">
-                    <span>Semaine cible</span>
+                    <span>Semaine de reference</span>
                     <select
                       value={semaineCible || ""}
                       onChange={(event) =>
@@ -819,18 +946,53 @@ export function DisponibilitesProfesseursPage({ utilisateur, onLogout }) {
                   </label>
 
                   <label className="crud-page__field">
-                    <span>Application</span>
+                    <span>Type d'application</span>
                     <select
                       value={modeApplication}
                       onChange={(event) => setModeApplication(event.target.value)}
                       disabled={chargementDisponibilites || !sessionActive}
                     >
+                      <option value="permanente">
+                        Disponibilite standard permanente
+                      </option>
                       <option value="semaine_unique">Cette semaine uniquement</option>
                       <option value="semaine_et_suivantes">
                         Cette semaine et toutes les suivantes
                       </option>
+                      <option value="a_partir_date">
+                        A partir d'une date precise
+                      </option>
+                      <option value="plage_dates">Entre deux dates precises</option>
                     </select>
                   </label>
+
+                  {modeUtiliseDateDebut(modeApplication) ? (
+                    <label className="crud-page__field">
+                      <span>Date de debut</span>
+                      <input
+                        type="date"
+                        value={dateDebutApplication}
+                        min={sessionActive?.date_debut || undefined}
+                        max={sessionActive?.date_fin || undefined}
+                        onChange={(event) => setDateDebutApplication(event.target.value)}
+                        disabled={chargementDisponibilites || !sessionActive}
+                      />
+                    </label>
+                  ) : null}
+
+                  {modeUtiliseDateFin(modeApplication) ? (
+                    <label className="crud-page__field">
+                      <span>Date de fin</span>
+                      <input
+                        type="date"
+                        value={dateFinApplication}
+                        min={dateDebutApplication || sessionActive?.date_debut || undefined}
+                        max={sessionActive?.date_fin || undefined}
+                        onChange={(event) => setDateFinApplication(event.target.value)}
+                        disabled={chargementDisponibilites || !sessionActive}
+                      />
+                    </label>
+                  ) : null}
 
                   <label className="crud-page__field">
                     <span>Jour</span>
@@ -875,7 +1037,11 @@ export function DisponibilitesProfesseursPage({ utilisateur, onLogout }) {
                     <button
                       type="submit"
                       className="crud-page__primary-button"
-                      disabled={chargementDisponibilites || !sessionActive || !semaineCible}
+                      disabled={
+                        chargementDisponibilites ||
+                        !sessionActive ||
+                        (modeUtiliseSemaineReference(modeApplication) && !semaineCible)
+                      }
                     >
                       {indexEditionDisponibilite !== null ? "Mettre a jour" : "Ajouter"}
                     </button>
@@ -900,6 +1066,54 @@ export function DisponibilitesProfesseursPage({ utilisateur, onLogout }) {
 
                 <div className="professeurs-page__availability-layout">
                   <div className="professeurs-page__availability-sidebar">
+                    {journalReplanifications.length > 0 ? (
+                      <div className="professeurs-page__day-card">
+                        <div className="professeurs-page__day-title">
+                          Historique des recalculs
+                        </div>
+                        <ul className="professeurs-page__availability-list">
+                          {journalReplanifications.map((entree) => {
+                            const fenetreApplication =
+                              entree.resume?.fenetre_application || null;
+                            return (
+                              <li
+                                key={entree.id_journal_replanification}
+                                className="professeurs-page__availability-item"
+                              >
+                                <div>
+                                  <strong>
+                                    {formaterStatutJournal(entree.statut)} -{" "}
+                                    {formaterHorodatageJournal(entree.cree_le)}
+                                  </strong>
+                                  <div>
+                                    {getLibelleModeApplication(
+                                      fenetreApplication?.mode_application
+                                    )}
+                                  </div>
+                                  <small>
+                                    {fenetreApplication?.date_debut_effet &&
+                                    fenetreApplication?.date_fin_effet
+                                      ? `Portee: ${fenetreApplication.date_debut_effet} - ${fenetreApplication.date_fin_effet}`
+                                      : "Portee temporelle non detaillee"}
+                                  </small>
+                                </div>
+                                <div>
+                                  <strong>
+                                    {Number(entree.seances_concernees || 0)} seance(s)
+                                  </strong>
+                                  <div>
+                                    {Number(entree.seances_replanifiees || 0)} deplacee(s)
+                                  </div>
+                                  <small>
+                                    {Number(entree.seances_non_replanifiees || 0)} bloquee(s)
+                                  </small>
+                                </div>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    ) : null}
                     {variationsParPeriode.length > 0 ? (
                       <div className="professeurs-page__day-card">
                         <div className="professeurs-page__day-title">Variantes en session</div>
@@ -1157,6 +1371,15 @@ export function DisponibilitesProfesseursPage({ utilisateur, onLogout }) {
                             </div>
                           ) : null}
 
+                          {resumeReplanification.fenetre_impact?.date_debut &&
+                          resumeReplanification.fenetre_impact?.date_fin ? (
+                            <div className="crud-page__alert crud-page__alert--success">
+                              Fenetre d'impact analysee :{" "}
+                              {resumeReplanification.fenetre_impact.date_debut} -{" "}
+                              {resumeReplanification.fenetre_impact.date_fin}
+                            </div>
+                          ) : null}
+
                           {resumeReplanification.seances_deplacees?.length > 0 ? (
                             <>
                               <h3>Seances replanifiees</h3>
@@ -1204,6 +1427,11 @@ export function DisponibilitesProfesseursPage({ utilisateur, onLogout }) {
                                       {normaliserHeure(seance.ancien_creneau.heure_debut)} /{" "}
                                       {normaliserHeure(seance.ancien_creneau.heure_fin)}
                                     </span>
+                                    <span>
+                                      {seance.action_finale === "retiree_de_l_horaire"
+                                        ? "Retiree de l'horaire valide"
+                                        : "Toujours en attente de resolution"}
+                                    </span>
                                     <span>{seance.raison}</span>
                                   </li>
                                 ))}
@@ -1225,9 +1453,3 @@ export function DisponibilitesProfesseursPage({ utilisateur, onLogout }) {
     </AppShell>
   );
 }
-/**
- * PAGE - Disponibilites Professeurs
- *
- * Cette page gere les disponibilites
- * hebdomadaires des professeurs.
- */

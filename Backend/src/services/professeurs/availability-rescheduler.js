@@ -468,6 +468,20 @@ function calculerScorePlacementCandidat({
   return score;
 }
 
+function dedupeByNumericKey(items, key) {
+  const index = new Map();
+
+  for (const item of Array.isArray(items) ? items : []) {
+    const valeur = Number(item?.[key]);
+    if (!Number.isInteger(valeur) || valeur <= 0 || index.has(valeur)) {
+      continue;
+    }
+    index.set(valeur, item);
+  }
+
+  return [...index.values()];
+}
+
 function construireResumeSeance(affectation, prochainPlacement = null) {
   const groupesIds = Array.isArray(affectation.groupes_details)
     ? affectation.groupes_details
@@ -481,6 +495,21 @@ function construireResumeSeance(affectation, prochainPlacement = null) {
     nom_cours: affectation.nom_cours,
     groupes: affectation.groupes || "",
     groupes_ids: groupesIds,
+    groupes_details: Array.isArray(affectation.groupes_details)
+      ? affectation.groupes_details
+      : [],
+    etudiants_reguliers: Array.isArray(affectation.etudiants_reguliers)
+      ? affectation.etudiants_reguliers
+      : [],
+    etudiants_reprises: Array.isArray(affectation.etudiants_reprises)
+      ? affectation.etudiants_reprises
+      : [],
+    total_etudiants_reguliers: Array.isArray(affectation.etudiants_reguliers)
+      ? affectation.etudiants_reguliers.length
+      : 0,
+    total_etudiants_reprises: Array.isArray(affectation.etudiants_reprises)
+      ? affectation.etudiants_reprises.length
+      : 0,
     ancien_creneau: {
       date: affectation.date,
       heure_debut: normaliserHeure(affectation.heure_debut),
@@ -518,10 +547,15 @@ function construireResultatReplanification({
   seancesNonReplanifiees = [],
   statutForce = null,
   messageForce = null,
+  fenetreImpact = null,
 }) {
   const seancesDeplacees = deplacementsPlanifies.map((deplacement) =>
     construireResumeSeance(deplacement.affectation, deplacement.placement)
   );
+  const seancesBloquees = seancesNonReplanifiees.map((seance) => ({
+    ...seance,
+    action_finale: "retiree_de_l_horaire",
+  }));
   const replanifieesMemeSemaine = seancesDeplacees.filter(
     (seance) => seance.type_replanification === "meme_semaine"
   ).length;
@@ -550,6 +584,26 @@ function construireResultatReplanification({
       ]
     ),
   ].sort((idA, idB) => idA - idB);
+  const groupesImpactesDetails = dedupeByNumericKey(
+    seancesImpactees.flatMap((seance) => seance.groupes_details || []),
+    "id_groupes_etudiants"
+  );
+  const etudiantsReguliersImpactes = dedupeByNumericKey(
+    seancesImpactees.flatMap((seance) => seance.etudiants_reguliers || []),
+    "id_etudiant"
+  );
+  const etudiantsReprisesImpactes = dedupeByNumericKey(
+    seancesImpactees.flatMap((seance) => seance.etudiants_reprises || []),
+    "id_etudiant"
+  );
+  const coursImpactes = dedupeByNumericKey(
+    seancesImpactees.map((seance) => ({
+      id_cours: Number(seance.id_cours) || null,
+      code_cours: seance.code_cours || null,
+      nom_cours: seance.nom_cours || null,
+    })),
+    "id_cours"
+  );
 
   let statut = statutForce;
 
@@ -557,7 +611,7 @@ function construireResultatReplanification({
     if (seancesImpactees.length === 0) {
       statut = "aucun-impact";
     } else if (seancesNonReplanifiees.length > 0) {
-      statut = "echec";
+      statut = seancesDeplacees.length > 0 ? "partiel" : "echec";
     } else {
       statut = "succes";
     }
@@ -569,9 +623,12 @@ function construireResultatReplanification({
     if (statut === "aucun-impact") {
       message =
         "Les disponibilites du professeur ont ete mises a jour avec succes. Aucun cours planifie n'a ete impacte.";
+    } else if (statut === "partiel") {
+      message =
+        "Les disponibilites du professeur ont ete mises a jour. Certaines seances ont ete replanifiees, mais les seances restantes sans creneau compatible ont ete retirees des horaires valides et journalisees pour correction manuelle.";
     } else if (statut === "echec") {
       message =
-        "Certains cours n'ont pas pu etre replanifies automatiquement. Une intervention manuelle est requise pour finaliser l'ajustement de l'horaire.";
+        "Les disponibilites du professeur ont ete mises a jour, mais aucune solution automatique n'a ete trouvee pour toutes les seances impactees. Les seances bloquees ont ete retirees des horaires valides et doivent etre replanifiees manuellement.";
     } else if (reporteesSemainesSuivantes > 0) {
       message =
         "La modification des disponibilites a impacte certains cours planifies. Une replanification automatique ciblee a ete effectuee avec succes et certains cours ont ete reportes sur une semaine suivante.";
@@ -586,17 +643,29 @@ function construireResultatReplanification({
     message,
     seances_concernees: seancesImpactees.length,
     seances_deplacees: seancesDeplacees,
-    seances_non_replanifiees: seancesNonReplanifiees,
+    seances_non_replanifiees: seancesBloquees,
     resume: {
       seances_concernees: seancesImpactees.length,
       seances_replanifiees: seancesDeplacees.length,
       seances_replanifiees_meme_semaine: replanifieesMemeSemaine,
       seances_reportees_semaines_suivantes: reporteesSemainesSuivantes,
       seances_non_replanifiees: seancesNonReplanifiees.length,
+      seances_retirees_horaire: seancesNonReplanifiees.length,
+      etudiants_reguliers_impactes: etudiantsReguliersImpactes.length,
+      etudiants_reprises_impactes: etudiantsReprisesImpactes.length,
     },
+    fenetre_impact: fenetreImpact,
     professeurs_impactes: [Number(idProfesseur)],
     groupes_impactes: groupesImpactes,
+    groupes_impactes_details: groupesImpactesDetails,
     salles_impactees: sallesImpactees,
+    etudiants_reguliers_impactes: etudiantsReguliersImpactes,
+    etudiants_reprises_impactes: etudiantsReprisesImpactes,
+    etudiants_impactes: dedupeByNumericKey(
+      [...etudiantsReguliersImpactes, ...etudiantsReprisesImpactes],
+      "id_etudiant"
+    ),
+    cours_impactes: coursImpactes,
   };
 }
 
@@ -755,6 +824,145 @@ async function recupererGroupesAffectation(idAffectation, connection) {
     taille_max: Number(row.taille_max) || 0,
     effectif: Number(row.effectif) || 0,
   }));
+}
+
+async function recupererEtudiantsReguliersImpactes(
+  groupeIds,
+  connection
+) {
+  const idsValides = [...new Set(
+    (Array.isArray(groupeIds) ? groupeIds : [])
+      .map((idGroupe) => Number(idGroupe))
+      .filter((idGroupe) => Number.isInteger(idGroupe) && idGroupe > 0)
+  )];
+
+  if (idsValides.length === 0) {
+    return [];
+  }
+
+  const placeholders = idsValides.map(() => "?").join(", ");
+  const [rows] = await connection.query(
+    `SELECT e.id_etudiant,
+            e.matricule,
+            e.nom,
+            e.prenom,
+            ge.id_groupes_etudiants AS id_groupe_principal,
+            ge.nom_groupe AS groupe_principal
+     FROM etudiants e
+     LEFT JOIN groupes_etudiants ge
+       ON ge.id_groupes_etudiants = e.id_groupes_etudiants
+     WHERE e.id_groupes_etudiants IN (${placeholders})
+     ORDER BY e.matricule ASC, e.nom ASC, e.prenom ASC`,
+    idsValides
+  );
+
+  return rows.map((row) => ({
+    id_etudiant: Number(row.id_etudiant),
+    matricule: row.matricule || null,
+    nom: row.nom || null,
+    prenom: row.prenom || null,
+    id_groupe_principal: Number(row.id_groupe_principal) || null,
+    groupe_principal: row.groupe_principal || null,
+    type_impact: "regulier",
+  }));
+}
+
+async function recupererEtudiantsReprisesImpactes(
+  groupeIds,
+  idCours,
+  idSession,
+  connection
+) {
+  const idsValides = [...new Set(
+    (Array.isArray(groupeIds) ? groupeIds : [])
+      .map((idGroupe) => Number(idGroupe))
+      .filter((idGroupe) => Number.isInteger(idGroupe) && idGroupe > 0)
+  )];
+
+  if (idsValides.length === 0 || !Number.isInteger(Number(idCours)) || Number(idCours) <= 0) {
+    return [];
+  }
+
+  const placeholders = idsValides.map(() => "?").join(", ");
+  const [rows] = await connection.query(
+    `SELECT DISTINCT e.id_etudiant,
+            e.matricule,
+            e.nom,
+            e.prenom,
+            ge_principal.id_groupes_etudiants AS id_groupe_principal,
+            ge_principal.nom_groupe AS groupe_principal,
+            ae.id_cours_echoue
+     FROM affectation_etudiants ae
+     JOIN etudiants e
+       ON e.id_etudiant = ae.id_etudiant
+     LEFT JOIN groupes_etudiants ge_principal
+       ON ge_principal.id_groupes_etudiants = e.id_groupes_etudiants
+     WHERE ae.id_groupes_etudiants IN (${placeholders})
+       AND ae.id_cours = ?
+       AND ae.source_type = 'reprise'
+       AND (? IS NULL OR ae.id_session = ?)
+     ORDER BY e.matricule ASC, e.nom ASC, e.prenom ASC`,
+    [...idsValides, Number(idCours), Number(idSession) || null, Number(idSession) || null]
+  );
+
+  return rows.map((row) => ({
+    id_etudiant: Number(row.id_etudiant),
+    matricule: row.matricule || null,
+    nom: row.nom || null,
+    prenom: row.prenom || null,
+    id_groupe_principal: Number(row.id_groupe_principal) || null,
+    groupe_principal: row.groupe_principal || null,
+    id_cours_echoue: Number(row.id_cours_echoue) || null,
+    type_impact: "reprise",
+  }));
+}
+
+async function supprimerAffectationsInvalides(
+  seances,
+  connection
+) {
+  const idsAffectations = [...new Set(
+    (Array.isArray(seances) ? seances : [])
+      .map((seance) => Number(seance?.id_affectation_cours))
+      .filter((idAffectation) => Number.isInteger(idAffectation) && idAffectation > 0)
+  )];
+  const idsPlages = [...new Set(
+    (Array.isArray(seances) ? seances : [])
+      .map((seance) => Number(seance?.id_plage_horaires))
+      .filter((idPlage) => Number.isInteger(idPlage) && idPlage > 0)
+  )];
+
+  if (idsAffectations.length === 0) {
+    return;
+  }
+
+  const placeholdersAffectations = idsAffectations.map(() => "?").join(", ");
+  await connection.query(
+    `DELETE FROM affectation_groupes
+     WHERE id_affectation_cours IN (${placeholdersAffectations})`,
+    idsAffectations
+  );
+  await connection.query(
+    `DELETE FROM affectation_cours
+     WHERE id_affectation_cours IN (${placeholdersAffectations})`,
+    idsAffectations
+  );
+
+  if (idsPlages.length === 0) {
+    return;
+  }
+
+  const placeholdersPlages = idsPlages.map(() => "?").join(", ");
+  await connection.query(
+    `DELETE FROM plages_horaires
+     WHERE id_plage_horaires IN (${placeholdersPlages})
+       AND id_plage_horaires NOT IN (
+         SELECT DISTINCT ac.id_plage_horaires
+         FROM affectation_cours ac
+         WHERE ac.id_plage_horaires IS NOT NULL
+       )`,
+    idsPlages
+  );
 }
 
 async function verifierConflitProfesseurHorsSeancesImpactees(
@@ -1168,11 +1376,25 @@ export async function replanifierSeancesImpacteesParDisponibilites(
         seance.id_affectation_cours,
         connection
       );
+      const groupeIds = groupesDetails.map((groupe) =>
+        Number(groupe.id_groupes_etudiants)
+      );
+      const [etudiantsReguliers, etudiantsReprises] = await Promise.all([
+        recupererEtudiantsReguliersImpactes(groupeIds, connection),
+        recupererEtudiantsReprisesImpactes(
+          groupeIds,
+          Number(seance.id_cours),
+          Number(sessionActive.id_session),
+          connection
+        ),
+      ]);
 
       return {
         ...seance,
         id_professeur: Number(idProfesseur),
         groupes_details: groupesDetails,
+        etudiants_reguliers: etudiantsReguliers,
+        etudiants_reprises: etudiantsReprises,
       };
     })
   );
@@ -1262,23 +1484,6 @@ export async function replanifierSeancesImpacteesParDisponibilites(
     });
   }
 
-  if (seancesNonReplanifiees.length > 0) {
-    const replanification = construireResultatReplanification({
-      idProfesseur,
-      seancesImpactees,
-      deplacementsPlanifies,
-      seancesNonReplanifiees,
-      statutForce: "echec",
-    });
-    const erreur = new Error(
-      `Impossible de finaliser automatiquement la mise a jour des disponibilites: ${seancesNonReplanifiees.length} seance(s) reste(nt) sans creneau compatible dans la fenetre de rattrapage automatique.`
-    );
-    erreur.statusCode = 409;
-    erreur.details = replanification.seances_non_replanifiees;
-    erreur.replanification = replanification;
-    throw erreur;
-  }
-
   for (const deplacement of deplacementsPlanifies) {
     await connection.query(
       `UPDATE plages_horaires
@@ -1303,11 +1508,33 @@ export async function replanifierSeancesImpacteesParDisponibilites(
     );
   }
 
+  if (seancesNonReplanifiees.length > 0) {
+    await supprimerAffectationsInvalides(
+      seancesImpactees.filter((seance) =>
+        seancesNonReplanifiees.some(
+          (bloquee) =>
+            Number(bloquee.id_affectation_cours) ===
+            Number(seance.id_affectation_cours)
+        )
+      ),
+      connection
+    );
+  }
+
   return construireResultatReplanification({
     idProfesseur,
     seancesImpactees,
     deplacementsPlanifies,
-    seancesNonReplanifiees: [],
-    statutForce: "succes",
+    seancesNonReplanifiees,
+    statutForce:
+      seancesNonReplanifiees.length > 0
+        ? deplacementsPlanifies.length > 0
+          ? "partiel"
+          : "echec"
+        : "succes",
+    fenetreImpact: {
+      date_debut: dateDebutImpact || null,
+      date_fin: dateFinImpact || null,
+    },
   });
 }

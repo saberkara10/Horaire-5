@@ -4,6 +4,9 @@ export const DATE_FIN_DISPONIBILITE_DEFAUT = "2099-12-31";
 export const MODE_APPLICATION_DISPONIBILITES = Object.freeze({
   SEMAINE_UNIQUE: "semaine_unique",
   SEMAINE_ET_SUIVANTES: "semaine_et_suivantes",
+  A_PARTIR_DATE: "a_partir_date",
+  PLAGE_DATES: "plage_dates",
+  PERMANENTE: "permanente",
 });
 
 export function normaliserDateIso(date) {
@@ -186,26 +189,116 @@ export function calculerFenetreSemaineSession(session, semaineCible) {
 }
 
 export function normaliserModeApplicationDisponibilites(mode) {
-  return String(mode || "").trim() === MODE_APPLICATION_DISPONIBILITES.SEMAINE_UNIQUE
-    ? MODE_APPLICATION_DISPONIBILITES.SEMAINE_UNIQUE
-    : MODE_APPLICATION_DISPONIBILITES.SEMAINE_ET_SUIVANTES;
+  const valeur = String(mode || "").trim().toLowerCase();
+
+  switch (valeur) {
+    case MODE_APPLICATION_DISPONIBILITES.SEMAINE_UNIQUE:
+      return MODE_APPLICATION_DISPONIBILITES.SEMAINE_UNIQUE;
+    case MODE_APPLICATION_DISPONIBILITES.SEMAINE_ET_SUIVANTES:
+      return MODE_APPLICATION_DISPONIBILITES.SEMAINE_ET_SUIVANTES;
+    case MODE_APPLICATION_DISPONIBILITES.A_PARTIR_DATE:
+      return MODE_APPLICATION_DISPONIBILITES.A_PARTIR_DATE;
+    case MODE_APPLICATION_DISPONIBILITES.PLAGE_DATES:
+      return MODE_APPLICATION_DISPONIBILITES.PLAGE_DATES;
+    case MODE_APPLICATION_DISPONIBILITES.PERMANENTE:
+    case "standard":
+      return MODE_APPLICATION_DISPONIBILITES.PERMANENTE;
+    default:
+      return MODE_APPLICATION_DISPONIBILITES.SEMAINE_ET_SUIVANTES;
+  }
 }
 
 export function calculerFenetreApplicationDisponibilites(
   session,
-  semaineCible,
-  modeApplication
+  options = {},
+  legacyModeApplication
 ) {
-  const mode = normaliserModeApplicationDisponibilites(modeApplication);
-  const fenetreSemaine = calculerFenetreSemaineSession(session, semaineCible);
+  const optionsNormalisees =
+    options && typeof options === "object" && !Array.isArray(options)
+      ? options
+      : {
+          semaine_cible: options,
+          mode_application: legacyModeApplication,
+        };
+  const mode = normaliserModeApplicationDisponibilites(
+    optionsNormalisees.mode_application
+  );
+  const sessionDebut = normaliserDateIso(session?.date_debut);
+  const sessionFin = normaliserDateIso(session?.date_fin);
+  const fenetreSemaineParDefaut = calculerFenetreSemaineSession(
+    session,
+    optionsNormalisees.semaine_cible
+  );
+  const dateDebutDemandee = normaliserDateIso(
+    optionsNormalisees.date_debut_effet
+  );
+  const dateFinDemandee = normaliserDateIso(optionsNormalisees.date_fin_effet);
+
+  const construireFenetreSemaineReference = (dateReference) =>
+    calculerFenetreSemaineSession(
+      session,
+      optionsNormalisees.semaine_cible ??
+        calculerNumeroSemaineSession(
+          normaliserDateIso(dateReference) || sessionDebut,
+          session
+        )
+    );
+
+  if (mode === MODE_APPLICATION_DISPONIBILITES.PERMANENTE) {
+    return {
+      ...fenetreSemaineParDefaut,
+      mode_application: mode,
+      date_debut_effet: DATE_DEBUT_DISPONIBILITE_DEFAUT,
+      date_fin_effet: DATE_FIN_DISPONIBILITE_DEFAUT,
+      date_debut_impact: sessionDebut,
+      date_fin_impact: sessionFin,
+    };
+  }
+
+  if (mode === MODE_APPLICATION_DISPONIBILITES.PLAGE_DATES) {
+    const dateDebutEffet = dateDebutDemandee;
+    const dateFinEffet = dateFinDemandee || dateDebutDemandee;
+    const dateDebutImpact = maxDateIso(dateDebutEffet, sessionDebut);
+    const dateFinImpact = minDateIso(dateFinEffet, sessionFin);
+    const fenetreSemaine = construireFenetreSemaineReference(dateDebutImpact);
+
+    return {
+      ...fenetreSemaine,
+      mode_application: mode,
+      date_debut_effet: dateDebutEffet,
+      date_fin_effet: dateFinEffet,
+      date_debut_impact: dateDebutImpact,
+      date_fin_impact: dateFinImpact,
+    };
+  }
+
+  if (mode === MODE_APPLICATION_DISPONIBILITES.A_PARTIR_DATE) {
+    const dateDebutEffet = dateDebutDemandee || fenetreSemaineParDefaut.date_debut;
+    const dateDebutImpact = maxDateIso(dateDebutEffet, sessionDebut);
+    const fenetreSemaine = construireFenetreSemaineReference(dateDebutImpact);
+
+    return {
+      ...fenetreSemaine,
+      mode_application: mode,
+      date_debut_effet: dateDebutEffet,
+      date_fin_effet: sessionFin,
+      date_debut_impact: dateDebutImpact,
+      date_fin_impact: sessionFin,
+    };
+  }
 
   return {
-    ...fenetreSemaine,
+    ...fenetreSemaineParDefaut,
     mode_application: mode,
-    date_debut_effet: fenetreSemaine.date_debut,
+    date_debut_effet: fenetreSemaineParDefaut.date_debut,
     date_fin_effet:
       mode === MODE_APPLICATION_DISPONIBILITES.SEMAINE_UNIQUE
-        ? fenetreSemaine.date_fin
+        ? fenetreSemaineParDefaut.date_fin
+        : normaliserDateIso(session?.date_fin),
+    date_debut_impact: fenetreSemaineParDefaut.date_debut,
+    date_fin_impact:
+      mode === MODE_APPLICATION_DISPONIBILITES.SEMAINE_UNIQUE
+        ? fenetreSemaineParDefaut.date_fin
         : normaliserDateIso(session?.date_fin),
   };
 }

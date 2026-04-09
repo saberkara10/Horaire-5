@@ -23,6 +23,20 @@ export async function recupererDisponibilitesProfesseur(id, options = {}) {
   return apiRequest(`${BASE_URL}/${id}/disponibilites${suffixe}`);
 }
 
+export async function recupererJournalDisponibilitesProfesseur(
+  id,
+  options = {}
+) {
+  const params = new URLSearchParams();
+
+  if (options.limit) {
+    params.set("limit", String(options.limit));
+  }
+
+  const suffixe = params.toString() ? `?${params.toString()}` : "";
+  return apiRequest(`${BASE_URL}/${id}/disponibilites/journal${suffixe}`);
+}
+
 export async function recupererCoursProfesseur(id) {
   return apiRequest(`${BASE_URL}/${id}/cours`);
 }
@@ -47,6 +61,8 @@ export async function mettreAJourDisponibilitesProfesseur(
       disponibilites,
       semaine_cible: options.semaine_cible,
       mode_application: options.mode_application,
+      date_debut_effet: options.date_debut_effet,
+      date_fin_effet: options.date_fin_effet,
     }),
   });
 }

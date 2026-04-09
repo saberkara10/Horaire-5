@@ -7,6 +7,7 @@ import {
   modifierProfesseur,
   recupererCoursProfesseur,
   recupererDisponibilitesProfesseur,
+  recupererJournalDisponibilitesProfesseur,
   recupererHoraireProfesseur,
   recupererProfesseurParId,
   recupererTousLesProfesseurs,
@@ -98,9 +99,44 @@ function validerModeApplicationDisponibilites(mode) {
 
   if (
     mode !== "semaine_unique" &&
-    mode !== "semaine_et_suivantes"
+    mode !== "semaine_et_suivantes" &&
+    mode !== "a_partir_date" &&
+    mode !== "plage_dates" &&
+    mode !== "permanente"
   ) {
-    return "Le mode_application doit valoir semaine_unique ou semaine_et_suivantes.";
+    return "Le mode_application doit valoir semaine_unique, semaine_et_suivantes, a_partir_date, plage_dates ou permanente.";
+  }
+
+  return "";
+}
+
+function dateIsoValide(valeur) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(valeur || "").trim());
+}
+
+function validerPorteeTemporelleDisponibilites(body = {}) {
+  const mode = String(body?.mode_application || "").trim();
+
+  if (!mode || mode === "semaine_unique" || mode === "semaine_et_suivantes") {
+    return validerSemaineCible(body?.semaine_cible);
+  }
+
+  if (mode === "a_partir_date") {
+    if (!dateIsoValide(body?.date_debut_effet)) {
+      return "La date_debut_effet est obligatoire au format YYYY-MM-DD.";
+    }
+
+    return "";
+  }
+
+  if (mode === "plage_dates") {
+    if (!dateIsoValide(body?.date_debut_effet) || !dateIsoValide(body?.date_fin_effet)) {
+      return "Les dates_debut_effet et date_fin_effet sont obligatoires au format YYYY-MM-DD.";
+    }
+
+    if (String(body.date_debut_effet) > String(body.date_fin_effet)) {
+      return "La date_fin_effet doit etre posterieure ou egale a la date_debut_effet.";
+    }
   }
 
   return "";
@@ -228,6 +264,27 @@ export default function professeursRoutes(app) {
     }
   );
 
+  app.get(
+    "/api/professeurs/:id/disponibilites/journal",
+    ...accesLectureProfesseurs,
+    validerIdProfesseur,
+    verifierProfesseurExiste,
+    async (request, response) => {
+      try {
+        const journal = await recupererJournalDisponibilitesProfesseur(
+          Number(request.params.id),
+          {
+            limit: request.query?.limit,
+          }
+        );
+
+        return response.status(200).json(journal);
+      } catch (error) {
+        return response.status(500).json({ message: "Erreur serveur." });
+      }
+    }
+  );
+
   app.put(
     "/api/professeurs/:id/disponibilites",
     ...accesGestionProfesseurs,
@@ -238,23 +295,23 @@ export default function professeursRoutes(app) {
         const messageErreur = validerDisponibilitesPayload(
           request.body?.disponibilites
         );
-        const messageErreurSemaine = validerSemaineCible(
-          request.body?.semaine_cible
-        );
         const messageErreurMode = validerModeApplicationDisponibilites(
           request.body?.mode_application
+        );
+        const messageErreurPortee = validerPorteeTemporelleDisponibilites(
+          request.body
         );
 
         if (messageErreur) {
           return response.status(400).json({ message: messageErreur });
         }
 
-        if (messageErreurSemaine) {
-          return response.status(400).json({ message: messageErreurSemaine });
-        }
-
         if (messageErreurMode) {
           return response.status(400).json({ message: messageErreurMode });
+        }
+
+        if (messageErreurPortee) {
+          return response.status(400).json({ message: messageErreurPortee });
         }
 
         const disponibilites = await remplacerDisponibilitesProfesseur(
@@ -263,6 +320,8 @@ export default function professeursRoutes(app) {
           {
             semaine_cible: request.body?.semaine_cible,
             mode_application: request.body?.mode_application,
+            date_debut_effet: request.body?.date_debut_effet,
+            date_fin_effet: request.body?.date_fin_effet,
           }
         );
 

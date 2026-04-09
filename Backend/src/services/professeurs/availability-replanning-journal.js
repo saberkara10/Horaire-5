@@ -23,6 +23,22 @@ function serialiserValeur(valeur) {
   return JSON.stringify(valeur);
 }
 
+function parserValeurJson(valeur, fallback = null) {
+  if (valeur == null || valeur === "") {
+    return fallback;
+  }
+
+  if (typeof valeur === "object") {
+    return valeur;
+  }
+
+  try {
+    return JSON.parse(valeur);
+  } catch {
+    return fallback;
+  }
+}
+
 export async function assurerTableJournalReplanificationsDisponibilites(
   executor
 ) {
@@ -95,4 +111,43 @@ export async function enregistrerJournalReplanificationDisponibilites(
       serialiserValeur(details),
     ]
   );
+}
+
+export async function recupererJournalReplanificationDisponibilites(
+  executor,
+  idProfesseur,
+  { limit = 12 } = {}
+) {
+  await assurerTableJournalReplanificationsDisponibilites(executor);
+
+  const limite = Math.max(1, Math.min(50, Number(limit) || 12));
+  const [rows] = await executor.query(
+    `SELECT id_journal_replanification,
+            id_professeur,
+            source_operation,
+            statut,
+            seances_concernees,
+            seances_replanifiees,
+            seances_replanifiees_meme_semaine,
+            seances_reportees_semaines_suivantes,
+            seances_non_replanifiees,
+            disponibilites_avant_json,
+            disponibilites_apres_json,
+            resume_json,
+            details_json,
+            DATE_FORMAT(cree_le, '%Y-%m-%d %H:%i:%s') AS cree_le
+     FROM journal_replanifications_disponibilites
+     WHERE id_professeur = ?
+     ORDER BY id_journal_replanification DESC
+     LIMIT ?`,
+    [Number(idProfesseur), limite]
+  );
+
+  return rows.map((row) => ({
+    ...row,
+    disponibilites_avant: parserValeurJson(row.disponibilites_avant_json, []),
+    disponibilites_apres: parserValeurJson(row.disponibilites_apres_json, []),
+    resume: parserValeurJson(row.resume_json, null),
+    details: parserValeurJson(row.details_json, []),
+  }));
 }
