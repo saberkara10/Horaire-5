@@ -22,6 +22,7 @@ import {
   extraireSessionsEtudiants,
   filtrerEtudiants,
 } from "../utils/etudiants.utils.js";
+import { ecouterSynchronisationPlanning } from "../utils/planningSync.js";
 import "../styles/EtudiantsPage.css";
 import "../styles/PlanningEtudiantPage.css";
 
@@ -119,6 +120,30 @@ export function EtudiantsPage({ utilisateur, onLogout }) {
     }
 
     chargerConsultationSelectionnee(etudiantSelectionneId);
+  }, [chargerConsultationSelectionnee, etudiantSelectionneId]);
+
+  useEffect(() => {
+    return ecouterSynchronisationPlanning((payload) => {
+      if (!etudiantSelectionneId) {
+        return;
+      }
+
+      const etudiantsImpactes = [
+        ...(Array.isArray(payload?.etudiants_impactes)
+          ? payload.etudiants_impactes
+          : []),
+        ...(Array.isArray(payload?.etudiants_reprises_impactes)
+          ? payload.etudiants_reprises_impactes
+          : []),
+      ].map((idEtudiant) => Number(idEtudiant));
+      const idActif = Number(etudiantSelectionneId);
+
+      if (etudiantsImpactes.length > 0 && !etudiantsImpactes.includes(idActif)) {
+        return;
+      }
+
+      chargerConsultationSelectionnee(idActif, { forcer: true });
+    });
   }, [chargerConsultationSelectionnee, etudiantSelectionneId]);
 
   const consultationSelectionnee = etudiantSelectionneId

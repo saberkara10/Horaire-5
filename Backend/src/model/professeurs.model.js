@@ -12,7 +12,10 @@ import {
   MAX_PROGRAMS_PER_PROFESSOR,
 } from "../services/scheduler/AcademicCatalog.js";
 import { replanifierSeancesImpacteesParDisponibilites } from "../services/professeurs/availability-rescheduler.js";
-import { enregistrerJournalReplanificationDisponibilites } from "../services/professeurs/availability-replanning-journal.js";
+import {
+  enregistrerJournalReplanificationDisponibilites,
+  recupererJournalReplanificationDisponibilites,
+} from "../services/professeurs/availability-replanning-journal.js";
 import {
   ajouterJours,
   calculerFenetreApplicationDisponibilites,
@@ -22,6 +25,7 @@ import {
   datesSeChevauchent,
   determinerSemaineReferenceSession,
   enrichirDisponibilitePourSession,
+  MODE_APPLICATION_DISPONIBILITES,
   normaliserDateIso,
 } from "../services/professeurs/availability-temporal.js";
 
@@ -48,6 +52,28 @@ function normaliserTexteIdentite(valeur) {
   return String(valeur || "")
     .trim()
     .replace(/\s+/g, " ");
+}
+
+function normaliserStatutJournalReplanification(statut) {
+  const valeur = String(statut || "").trim().toLowerCase();
+
+  if (valeur === "aucun-impact") {
+    return "AUCUN_IMPACT";
+  }
+
+  if (valeur === "partiel") {
+    return "PARTIEL";
+  }
+
+  if (valeur === "echec") {
+    return "ECHEC";
+  }
+
+  if (valeur === "succes") {
+    return "SUCCES";
+  }
+
+  return "AUCUN_IMPACT";
 }
 
 function creerCleIdentiteProfesseur(professeur) {
@@ -770,6 +796,18 @@ export async function recupererDisponibilitesProfesseurs(executor = pool) {
   return disponibilitesParProfesseur;
 }
 
+export async function recupererJournalDisponibilitesProfesseur(
+  idProfesseur,
+  options = {},
+  executor = pool
+) {
+  return recupererJournalReplanificationDisponibilites(
+    executor,
+    idProfesseur,
+    options
+  );
+}
+
 async function insererDisponibilitesProfesseurDansFenetre(
   executor,
   idProfesseur,
@@ -844,15 +882,55 @@ export async function remplacerDisponibilitesProfesseur(
       throw erreur;
     }
 
-    const semaineReference = determinerSemaineReferenceSession(
-      sessionActive,
-      options.semaine_cible
-    );
     const fenetreApplication = calculerFenetreApplicationDisponibilites(
       sessionActive,
-      semaineReference,
-      options.mode_application
+      options
     );
+    const modeApplication = String(fenetreApplication.mode_application || "");
+
+    if (
+      !fenetreApplication.date_debut_effet ||
+      !fenetreApplication.date_fin_effet
+    ) {
+      const erreur = new Error(
+        "La portee temporelle de la disponibilite est incomplete."
+      );
+      erreur.statusCode = 400;
+      throw erreur;
+    }
+
+    if (
+      String(fenetreApplication.date_debut_effet).localeCompare(
+        String(fenetreApplication.date_fin_effet),
+        "fr"
+      ) > 0
+    ) {
+      const erreur = new Error(
+        "La date de fin doit etre posterieure ou egale a la date de debut."
+      );
+      erreur.statusCode = 400;
+      throw erreur;
+    }
+
+    if (
+      modeApplication !== MODE_APPLICATION_DISPONIBILITES.PERMANENTE &&
+      !datesSeChevauchent(
+        fenetreApplication.date_debut_effet,
+        fenetreApplication.date_fin_effet,
+        sessionActive.date_debut,
+        sessionActive.date_fin
+      )
+    ) {
+      const erreur = new Error(
+        "La portee choisie ne chevauche pas la session active. Aucune replanification academique ne pourrait etre appliquee."
+      );
+      erreur.statusCode = 400;
+      throw erreur;
+    }
+
+    const semaineReference =
+      Number(fenetreApplication.numero_semaine) ||
+      determinerSemaineReferenceSession(sessionActive, options.semaine_cible);
 
     disponibilitesAvant = await recupererDisponibilitesProfesseurAvecExecutor(
       connection,
@@ -941,19 +1019,15 @@ export async function remplacerDisponibilitesProfesseur(
         disponibilitesSession,
         connection,
         {
-          dateDebutImpact: fenetreApplication.date_debut_effet,
-          dateFinImpact: fenetreApplication.date_fin_effet,
+          dateDebutImpact: fenetreApplication.date_debut_impact,
+          dateFinImpact: fenetreApplication.date_fin_impact,
+          modeApplication: fenetreApplication.mode_application,
         }
       );
 
     await enregistrerJournalReplanificationDisponibilites(connection, {
       id_professeur: idProfesseur,
-      statut:
-        replanification?.statut === "succes"
-          ? "SUCCES"
-          : replanification?.statut === "echec"
-            ? "ECHEC"
-            : "AUCUN_IMPACT",
+      statut: normaliserStatutJournalReplanification(replanification?.statut),
       disponibilites_avant: disponibilitesAvant,
       disponibilites_apres: disponibilitesApres,
       replanification: {
@@ -976,8 +1050,17 @@ export async function remplacerDisponibilitesProfesseur(
       replanification,
       synchronisation: {
         id_professeur: Number(idProfesseur),
+        professeurs_impactes: replanification?.professeurs_impactes || [
+          Number(idProfesseur),
+        ],
         groupes_impactes: replanification?.groupes_impactes || [],
         salles_impactees: replanification?.salles_impactees || [],
+        etudiants_impactes: (replanification?.etudiants_impactes || []).map(
+          (etudiant) => Number(etudiant?.id_etudiant)
+        ),
+        etudiants_reprises_impactes: (
+          replanification?.etudiants_reprises_impactes || []
+        ).map((etudiant) => Number(etudiant?.id_etudiant)),
         horodatage: new Date().toISOString(),
       },
     };
@@ -1318,7 +1401,7 @@ export async function recupererHoraireProfesseur(idProfesseur) {
      FROM affectation_cours ac
      JOIN cours c
        ON c.id_cours = ac.id_cours
-     JOIN salles s
+     LEFT JOIN salles s
        ON s.id_salle = ac.id_salle
      JOIN plages_horaires ph
        ON ph.id_plage_horaires = ac.id_plage_horaires

@@ -7,6 +7,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { AppShell } from "../components/layout/AppShell.jsx";
+import { ExportButtons } from "../components/export/ExportButtons.jsx";
 import {
   recupererProfesseurs,
   recupererHoraireProfesseur,
@@ -18,6 +19,7 @@ import {
   getDebutSemaine,
   getIndexJourCalendrier,
 } from "../utils/calendar.js";
+import { ecouterSynchronisationPlanning } from "../utils/planningSync.js";
 import { usePopup } from "../components/feedback/PopupProvider.jsx";
 import "../styles/ProfesseursPage.css";
 import "../styles/HorairesProfesseursPage.css";
@@ -126,6 +128,34 @@ export function HorairesProfesseursPage({ utilisateur, onLogout }) {
     }
 
     chargerHoraire();
+  }, [idProfesseurActif]);
+
+  useEffect(() => {
+    return ecouterSynchronisationPlanning((payload) => {
+      if (!idProfesseurActif) {
+        return;
+      }
+
+      const professeursImpactes = Array.isArray(payload?.professeurs_impactes)
+        ? payload.professeurs_impactes.map((idProfesseur) => Number(idProfesseur))
+        : [];
+      const professeurPrincipal = Number(payload?.id_professeur);
+      const idActif = Number(idProfesseurActif);
+
+      if (
+        professeursImpactes.length > 0 &&
+        !professeursImpactes.includes(idActif) &&
+        professeurPrincipal !== idActif
+      ) {
+        return;
+      }
+
+      recupererHoraireProfesseur(idActif)
+        .then((data) => {
+          setHoraireProfesseur(Array.isArray(data) ? data : []);
+        })
+        .catch(() => {});
+    });
   }, [idProfesseurActif]);
 
   const professeursFiltres = useMemo(() => {
@@ -260,6 +290,19 @@ export function HorairesProfesseursPage({ utilisateur, onLogout }) {
                       : "Selectionnez un professeur pour afficher son horaire."}
                   </p>
                 </div>
+                {/* ── Boutons Export ── */}
+                {professeurActif && (
+                  <div style={{ marginLeft: "auto", flexShrink: 0 }}>
+                    <ExportButtons
+                      type="professeur"
+                      id={professeurActif.id_professeur}
+                      nom={`${professeurActif.prenom} ${professeurActif.nom}`}
+                      disabled={horaireProfesseur.length === 0}
+                      compact={false}
+                      onError={(msg) => showError(msg)}
+                    />
+                  </div>
+                )}
               </div>
 
               {professeurActif ? (
@@ -335,10 +378,7 @@ export function HorairesProfesseursPage({ utilisateur, onLogout }) {
                                   const seances = seancesMap[key] || [];
 
                                   return seances.map((seance) => {
-                                    const hauteur = getHauteurBloc(
-                                      seance.heure_debut,
-                                      seance.heure_fin
-                                    );
+                                    const hauteur = getHauteurBloc(seance.heure_debut, seance.heure_fin);
                                     const debut = heureEnMinutes(seance.heure_debut);
                                     const heureRef = heureEnMinutes(HEURES[0]);
                                     const top = ((debut - heureRef) / 60) * 60;

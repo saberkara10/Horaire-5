@@ -19,6 +19,8 @@ import {
 } from "../../services/export.api.js";
 import "../../styles/ExportButtons.css";
 
+// ─── Constantes ───────────────────────────────────────────────────────────────
+
 const HANDLERS = {
   groupe: { pdf: exporterGroupePDF, excel: exporterGroupeExcel },
   professeur: { pdf: exporterProfesseurPDF, excel: exporterProfesseurExcel },

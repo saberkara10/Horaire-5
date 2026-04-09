@@ -3,6 +3,9 @@ import {
   construireNomCompletEtudiant,
 } from "../../utils/etudiants.utils.js";
 import { EtudiantScheduleBoard } from "./EtudiantScheduleBoard.jsx";
+import { ExportButtons } from "../export/ExportButtons.jsx";
+import { usePopup } from "../feedback/PopupProvider.jsx";
+
 
 function formaterNomProfesseur(metaReprise) {
   const prenom = String(metaReprise?.prenom_professeur || "").trim();
@@ -112,6 +115,8 @@ export function EtudiantDetails({
   onRetourListe,
   affichagePleinEcran = false,
 }) {
+  const { showError } = usePopup();
+
   if (!consultation?.etudiant) {
     return (
       <section className="panel panel--stacked detail-panel">
@@ -133,17 +138,30 @@ export function EtudiantDetails({
     diagnosticReprises = [],
     resume = null,
   } = consultation;
+  const horaireEnChargement = consultation?.horaire === null;
+  const horaireListe = Array.isArray(horaire) ? horaire : [];
+  const horaireGroupeListe = Array.isArray(horaireGroupe) ? horaireGroupe : [];
+  const horaireReprisesListe = Array.isArray(horaireReprises) ? horaireReprises : [];
+  const reprisesListe = Array.isArray(reprises) ? reprises : [];
+  const diagnosticReprisesListe = Array.isArray(diagnosticReprises)
+    ? diagnosticReprises
+    : [];
   const consultationEnCours =
     chargementConsultation || actionEnCours === `consultation-${etudiant.id_etudiant}`;
   const groupeLibelle = etudiant.groupe || "Sans groupe";
   const nbReprises = Number(etudiant.nb_reprises || 0);
   const reprisePlanifiee = Number(resume?.nb_reprises_planifiees || 0);
   const repriseEnAttente = Number(resume?.nb_reprises_en_attente || 0);
-  const metaReprises = indexerMetaReprises(horaireReprises);
-  const diagnosticsIndex = indexerDiagnosticsReprises(diagnosticReprises);
-  const aDesReprisesEnAttente = reprises.some(
+  const metaReprises = indexerMetaReprises(horaireReprisesListe);
+  const diagnosticsIndex = indexerDiagnosticsReprises(diagnosticReprisesListe);
+  const aDesReprisesEnAttente = reprisesListe.some(
     (reprise) => reprise.statut !== "planifie" || !reprise.id_groupe_reprise
   );
+  const exportDesactive =
+    horaireEnChargement ||
+    (horaireListe.length === 0 &&
+      horaireReprisesListe.length === 0 &&
+      reprisesListe.length === 0);
 
   return (
     <section
@@ -153,7 +171,7 @@ export function EtudiantDetails({
     >
       <div className="detail-card">
         {onRetourListe ? (
-          <div className="detail-card__topbar">
+          <div className="detail-card__topbar" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem" }}>
             <button
               className="button button--secondary detail-card__back-button"
               type="button"
@@ -161,8 +179,17 @@ export function EtudiantDetails({
             >
               Retour a la liste
             </button>
+            <ExportButtons
+              type="etudiant"
+              id={etudiant.id_etudiant}
+              nom={`${etudiant.prenom || ""} ${etudiant.nom || ""}`.trim()}
+              disabled={exportDesactive}
+              compact
+              onError={showError}
+            />
           </div>
         ) : null}
+
 
         <div className="detail-card__header">
           <div className="teacher-avatar teacher-avatar--large" aria-hidden="true">
@@ -194,11 +221,11 @@ export function EtudiantDetails({
           </div>
           <div>
             <dt>Seances groupe</dt>
-            <dd>{horaireGroupe.length}</dd>
+            <dd>{horaireGroupeListe.length}</dd>
           </div>
           <div>
             <dt>Seances reprises</dt>
-            <dd>{horaireReprises.length}</dd>
+            <dd>{horaireReprisesListe.length}</dd>
           </div>
         </dl>
 
@@ -222,13 +249,13 @@ export function EtudiantDetails({
             </div>
           ) : null}
 
-          {reprises.length === 0 ? (
+          {reprisesListe.length === 0 ? (
             <p className="detail-card__subtitle">
               Cet etudiant suit uniquement le tronc commun de son groupe principal.
             </p>
           ) : (
             <ul className="schedule-preview schedule-preview--compact">
-              {reprises.map((reprise) => {
+              {reprisesListe.map((reprise) => {
                 const metaReprise =
                   metaReprises.get(`reprise-${reprise.id}`) ||
                   metaReprises.get(`cours-${reprise.id_cours}`) ||
@@ -278,11 +305,11 @@ export function EtudiantDetails({
         </div>
 
         <div className="detail-card__section">
-          {horaire === null ? (
+          {horaireEnChargement ? (
             <div className="schedule-preview schedule-preview--pending">
               <div className="loader" aria-hidden="true" />
             </div>
-          ) : horaire.length === 0 ? (
+          ) : horaireListe.length === 0 ? (
             <p className="detail-card__subtitle">
               {etudiant.groupe
                 ? "Aucune seance n'est encore planifiee pour cet etudiant."
@@ -290,7 +317,7 @@ export function EtudiantDetails({
             </p>
           ) : (
             <EtudiantScheduleBoard
-              seances={horaire}
+              seances={horaireListe}
               resume={resume}
               consultationEnCours={consultationEnCours}
               onRechargerHoraire={onRechargerHoraire}

@@ -7,6 +7,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { AppShell } from "../components/layout/AppShell.jsx";
+import { ExportButtons } from "../components/export/ExportButtons.jsx";
 import {
   recupererGroupes,
   recupererPlanningGroupe,
@@ -18,6 +19,7 @@ import {
   getDebutSemaine,
   getIndexJourCalendrier,
 } from "../utils/calendar.js";
+import { ecouterSynchronisationPlanning } from "../utils/planningSync.js";
 import { usePopup } from "../components/feedback/PopupProvider.jsx";
 import { formaterLibelleCohorte } from "../utils/sessions.js";
 import "../styles/PlanningEtudiantPage.css";
@@ -83,6 +85,7 @@ export function HorairesGroupesPage({ utilisateur, onLogout }) {
   const [horaire, setHoraire] = useState([]);
   const [loading, setLoading] = useState(true);
   const [chargementPlanning, setChargementPlanning] = useState(false);
+  const [exportError, setExportError] = useState("");
   const { showError } = usePopup();
   const [lundiCourant, setLundiCourant] = useState(() =>
     getDebutSemaine(new Date())
@@ -140,6 +143,30 @@ export function HorairesGroupesPage({ utilisateur, onLogout }) {
     chargerPlanning();
   }, [idGroupeActif]);
 
+  useEffect(() => {
+    return ecouterSynchronisationPlanning((payload) => {
+      if (!idGroupeActif) {
+        return;
+      }
+
+      const groupesImpactes = Array.isArray(payload?.groupes_impactes)
+        ? payload.groupes_impactes.map((idGroupe) => Number(idGroupe))
+        : [];
+      const idActif = Number(idGroupeActif);
+
+      if (groupesImpactes.length > 0 && !groupesImpactes.includes(idActif)) {
+        return;
+      }
+
+      recupererPlanningGroupe(idActif)
+        .then((resultat) => {
+          setGroupeActif(resultat.groupe || null);
+          setHoraire(Array.isArray(resultat.horaire) ? resultat.horaire : []);
+        })
+        .catch(() => {});
+    });
+  }, [idGroupeActif]);
+
   const finSemaine = useMemo(() => {
     const date = new Date(lundiCourant);
     date.setDate(date.getDate() + 6);
@@ -172,6 +199,7 @@ export function HorairesGroupesPage({ utilisateur, onLogout }) {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.35, ease: "easeOut" }}
       >
+        {/* ── Barre d'infos + Export ── */}
         <div className="planning-infos" style={{ marginBottom: "24px" }}>
           <div className="planning-info-item">
             <span className="planning-label">Groupe</span>
@@ -212,7 +240,21 @@ export function HorairesGroupesPage({ utilisateur, onLogout }) {
             <span className="planning-label">Effectif</span>
             <span className="planning-valeur">{groupeActif?.effectif || 0}</span>
           </div>
+          <div className="planning-info-item" style={{ marginLeft: "auto", paddingLeft: "1rem" }}>
+            <ExportButtons
+              type="groupe"
+              id={idGroupeActif ? Number(idGroupeActif) : null}
+              nom={groupeActif?.nom_groupe || ""}
+              disabled={!idGroupeActif || horaire.length === 0}
+              compact={false}
+              onError={(msg) => showError(msg)}
+            />
+          </div>
         </div>
+
+        {exportError && (
+          <p style={{ color: "#dc2626", fontSize: "0.85rem", marginBottom: "12px" }}>{exportError}</p>
+        )}
 
         {loading ? (
           <p className="planning-message">Chargement des groupes...</p>
@@ -330,13 +372,8 @@ export function HorairesGroupesPage({ utilisateur, onLogout }) {
                         const seances = seancesMap[cle] || [];
 
                         return seances.map((seance) => {
-                          const hauteur = getHauteur(
-                            seance.heure_debut,
-                            seance.heure_fin
-                          );
-                          const debut = heureEnMinutes(
-                            formaterHeure(seance.heure_debut)
-                          );
+                          const hauteur = getHauteur(seance.heure_debut, seance.heure_fin);
+                          const debut = heureEnMinutes(formaterHeure(seance.heure_debut));
                           const heureReference = heureEnMinutes(HEURES[0]);
                           const top = ((debut - heureReference) / 60) * 60;
 
@@ -351,9 +388,7 @@ export function HorairesGroupesPage({ utilisateur, onLogout }) {
                               <span className="cal-seance-code">{seance.code_cours}</span>
                               <span className="cal-seance-nom">{seance.nom_cours}</span>
                               <span className="cal-seance-salle">{seance.code_salle}</span>
-                              <span className="cal-seance-prof">
-                                {seance.nom_professeur}
-                              </span>
+                              <span className="cal-seance-prof">{seance.nom_professeur}</span>
                             </motion.div>
                           );
                         });

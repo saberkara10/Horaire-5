@@ -1,0 +1,133 @@
+/**
+ * ExportButtons.css — Styles premium des boutons d'export PDF / Excel
+ */
+
+/* ── Conteneur ────────────────────────────────────────────────────────────────── */
+.export-btns {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.export-btns__label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted, #64748b);
+  margin-right: 0.25rem;
+  white-space: nowrap;
+}
+
+/* ── Bouton de base ───────────────────────────────────────────────────────────── */
+.export-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.45rem 0.95rem;
+  border: none;
+  border-radius: 10px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
+  user-select: none;
+  position: relative;
+  overflow: hidden;
+  font-family: inherit;
+}
+
+.export-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.export-btn::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0);
+  transition: background 0.15s ease;
+}
+
+.export-btn:not(:disabled):hover::after {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.export-btn:not(:disabled):active {
+  transform: scale(0.97);
+}
+
+/* ── PDF ──────────────────────────────────────────────────────────────────────── */
+.export-btn--pdf {
+  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.28);
+}
+
+.export-btn--pdf:not(:disabled):hover {
+  box-shadow: 0 4px 14px rgba(220, 38, 38, 0.38);
+  transform: translateY(-1px);
+}
+
+/* ── Excel ────────────────────────────────────────────────────────────────────── */
+.export-btn--excel {
+  background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(22, 163, 74, 0.28);
+}
+
+.export-btn--excel:not(:disabled):hover {
+  box-shadow: 0 4px 14px rgba(22, 163, 74, 0.38);
+  transform: translateY(-1px);
+}
+
+/* ── État succès ──────────────────────────────────────────────────────────────── */
+.export-btn--ok {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%) !important;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.25) !important;
+}
+
+/* ── Icône et spinner ─────────────────────────────────────────────────────────── */
+.export-icon {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.export-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: export-spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes export-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Compact (sans libellé) ───────────────────────────────────────────────────── */
+.export-btns--compact .export-btn {
+  padding: 0.38rem 0.75rem;
+  font-size: 0.75rem;
+}
+
+/* ── Responsive ───────────────────────────────────────────────────────────────── */
+@media (max-width: 600px) {
+  .export-btns {
+    gap: 0.35rem;
+  }
+  .export-btn {
+    padding: 0.4rem 0.7rem;
+    font-size: 0.75rem;
+  }
+  .export-btns__label {
+    display: none;
+  }
+}

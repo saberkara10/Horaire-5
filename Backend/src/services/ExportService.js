@@ -1,539 +1,1496 @@
-/**
- * ExportService — Génération PDF et Excel d'horaires (niveau entreprise)
- *
- * Formats supportés : PDF (pdfkit), Excel (xlsx)
- * Types supportés   : groupe, professeur, étudiant
- */
-
 import PDFDocument from "pdfkit";
 import * as XLSX from "xlsx";
 
-// ─── Palette & constantes de mise en page ────────────────────────────────────
-const BRAND = {
-  primary:   [37,  99, 235],   // #2563EB  bleu HORAIRE 5
-  accent:    [99,  102, 241],  // #6366F1  indigo
-  dark:      [15,  23,  42],   // #0F172A  presque noir
-  muted:     [100, 116, 139],  // #64748B  gris bleu
-  light:     [248, 250, 252],  // #F8FAFC  fond clair
-  white:     [255, 255, 255],
-  reprise:   [234, 88,  12],   // #EA580C  orange reprise
-  surface:   [226, 232, 240],  // #E2E8D0  bordure douce
-  success:   [22,  163, 74],   // #16A34A  vert
+const PDF_PAGE = {
+  size: "A4",
+  layout: "landscape",
+  margins: { top: 30, bottom: 30, left: 30, right: 30 },
 };
 
-const PAGE_LANDSCAPE = { size: "A4", margins: { top: 48, bottom: 48, left: 40, right: 40 }, layout: "landscape" };
-const PAGE_PORTRAIT  = { size: "A4", margins: { top: 48, bottom: 48, left: 50, right: 50 } };
+const DAYS = [
+  { index: 0, label: "Lundi" },
+  { index: 1, label: "Mardi" },
+  { index: 2, label: "Mercredi" },
+  { index: 3, label: "Jeudi" },
+  { index: 4, label: "Vendredi" },
+  { index: 5, label: "Samedi" },
+  { index: 6, label: "Dimanche" },
+];
 
-// ─── Helpers horaire ─────────────────────────────────────────────────────────
-function h5(s) { return String(s || "").slice(0, 5); }
-function nomFichier(type, identifiant, session, ext) {
-  const slug = String(identifiant || "")
-    .toLowerCase()
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-  const sess = String(session || "")
-    .toLowerCase()
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-  return `horaire-${type}-${slug}${sess ? `-${sess}` : ""}.${ext}`;
+const GRID_START_MINUTES = 8 * 60;
+const GRID_END_MINUTES = 22 * 60;
+const MIN_GRID_DURATION = 8 * 60;
+const EXCEL_SLOT_MINUTES = 60;
+const TABLE_ROW_HEIGHT = 22;
+
+const COLORS = {
+  dark: "#0F172A",
+  text: "#0F172A",
+  muted: "#475569",
+  brand: "#1D4ED8",
+  brandSoft: "#DBEAFE",
+  panel: "#FFFFFF",
+  panelSoft: "#F8FAFC",
+  border: "#CBD5E1",
+  borderSoft: "#E2E8F0",
+  section: "#EFF6FF",
+  warning: "#EA580C",
+};
+
+const BLOCK_PALETTES = {
+  groupe: [
+    { fill: "#DBEAFE", stroke: "#2563EB", text: "#1E3A8A" },
+    { fill: "#E0E7FF", stroke: "#4338CA", text: "#312E81" },
+    { fill: "#EDE9FE", stroke: "#7C3AED", text: "#5B21B6" },
+  ],
+  professeur: [
+    { fill: "#CCFBF1", stroke: "#0F766E", text: "#134E4A" },
+    { fill: "#DCFCE7", stroke: "#16A34A", text: "#166534" },
+    { fill: "#E0F2FE", stroke: "#0284C7", text: "#0C4A6E" },
+  ],
+  etudiant: [
+    { fill: "#E0E7FF", stroke: "#4338CA", text: "#312E81" },
+    { fill: "#DBEAFE", stroke: "#2563EB", text: "#1E3A8A" },
+    { fill: "#F5F3FF", stroke: "#7C3AED", text: "#5B21B6" },
+  ],
+  reprise: { fill: "#FFEDD5", stroke: "#EA580C", text: "#9A3412" },
+};
+
+function safeArray(value) {
+  return Array.isArray(value) ? value : [];
 }
 
-function formatDateLong(dateStr) {
-  if (!dateStr) return "—";
-  try {
-    const d = new Date(dateStr + "T00:00:00");
-    return d.toLocaleDateString("fr-CA", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
-  } catch { return dateStr; }
+function cleanString(value) {
+  return String(value ?? "").trim();
 }
 
-function today() {
-  return new Date().toLocaleDateString("fr-CA", { year: "numeric", month: "2-digit", day: "2-digit" });
+function formatTime(value) {
+  return cleanString(value).slice(0, 5);
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-//  PDF — Utilitaires de dessin bas niveau
-// ═══════════════════════════════════════════════════════════════════════════════
-
-/** Dessine un en-tête premium « HORAIRE 5 » */
-function drawPDFHeader(doc, { type, identifiant, programme, etape, session, nomSupplementaire }) {
-  const w = doc.page.width;
-  const ml = doc.page.margins.left;
-  const mr = doc.page.margins.right;
-  const usableW = w - ml - mr;
-
-  // Bande de fond
-  doc.save();
-  doc.rect(0, 0, w, 90).fill(BRAND.dark.map ? `rgb(${BRAND.dark.join(",")})` : "#0F172A");
-
-  // Accentuation bleue à gauche
-  doc.rect(0, 0, 6, 90).fill(`rgb(${BRAND.primary.join(",")})`);
-  doc.restore();
-
-  // Logo texte HORAIRE 5
-  doc.font("Helvetica-Bold").fontSize(17).fillColor(`rgb(${BRAND.primary.join(",")})`)
-     .text("HORAIRE 5", ml, 18, { lineBreak: false });
-
-  // Séparateur vertical
-  doc.moveTo(ml + 105, 22).lineTo(ml + 105, 52)
-     .strokeColor(`rgb(${BRAND.muted.join(",")})`)
-     .lineWidth(1).stroke();
-
-  // Type + identifiant
-  const typeLabel = { groupe: "Horaire du groupe", professeur: "Horaire du professeur", etudiant: "Horaire de l'étudiant" }[type] || "Horaire";
-  doc.font("Helvetica").fontSize(9).fillColor(`rgb(${BRAND.muted.join(",")})`)
-     .text(typeLabel.toUpperCase(), ml + 115, 18, { lineBreak: false });
-  doc.font("Helvetica-Bold").fontSize(15).fillColor("#FFFFFF")
-     .text(identifiant, ml + 115, 30, { lineBreak: false });
-
-  // Métadonnées droite
-  const meta = [];
-  if (programme) meta.push(`Programme : ${programme}`);
-  if (etape != null) meta.push(`Étape : ${etape}`);
-  if (session) meta.push(`Session : ${session}`);
-  if (nomSupplementaire) meta.push(nomSupplementaire);
-  meta.push(`Exporté le : ${today()}`);
-
-  doc.font("Helvetica").fontSize(8).fillColor(`rgb(${BRAND.muted.join(",")})`)
-     .text(meta.join("   |   "), ml + 115, 58, { width: usableW - 120, lineBreak: false });
-
-  doc.y = 108;
+function timeToMinutes(value) {
+  const [hoursText = "0", minutesText = "0"] = formatTime(value).split(":");
+  const hours = Number(hoursText);
+  const minutes = Number(minutesText);
+  return (Number.isFinite(hours) ? hours : 0) * 60 + (Number.isFinite(minutes) ? minutes : 0);
 }
 
-/** Dessine un en-tête de section (titre de liste/tableau) */
-function drawSectionTitle(doc, text) {
-  const ml = doc.page.margins.left;
-  const usableW = doc.page.width - ml - doc.page.margins.right;
-  doc.moveDown(0.3);
-  doc.rect(ml, doc.y, usableW, 22).fill(`rgb(${BRAND.primary.join(",")})`);
-  doc.font("Helvetica-Bold").fontSize(9.5)
-     .fillColor("#FFFFFF")
-     .text(text.toUpperCase(), ml + 10, doc.y - 16, { lineBreak: false });
-  doc.moveDown(0.5);
+function minutesToLabel(minutes) {
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  return `${String(hours).padStart(2, "0")}:${String(remainder).padStart(2, "0")}`;
 }
 
-/** Dessine le tableau des séances (liste détaillée) */
-function drawHoraireTable(doc, seances, colonnes) {
-  const ml = doc.page.margins.left;
-  const mr = doc.page.margins.right;
-  const usableW = doc.page.width - ml - mr;
-
-  // Calculer largeurs relatives
-  const totalRatio = colonnes.reduce((s, c) => s + c.ratio, 0);
-  const widths = colonnes.map(c => Math.floor((c.ratio / totalRatio) * usableW));
-
-  const ROW_H = 18;
-  const FONT_SIZE = 8;
-
-  // En-tête tableau
-  let x = ml;
-  let y = doc.y;
-  colonnes.forEach((col, i) => {
-    doc.rect(x, y, widths[i], 22).fill(`rgb(${BRAND.dark.join(",")})`);
-    doc.font("Helvetica-Bold").fontSize(8).fillColor("#FFFFFF")
-       .text(col.label, x + 4, y + 7, { width: widths[i] - 8, lineBreak: false });
-    x += widths[i];
-  });
-  y += 22;
-
-  // Lignes
-  seances.forEach((seance, idx) => {
-    if (y + ROW_H > doc.page.height - doc.page.margins.bottom - 20) {
-      doc.addPage();
-      drawPDFHeader(doc, seance.__headerMeta__ || {});
-      y = doc.y;
-      // Ré-afficher en-tête tableau
-      x = ml;
-      colonnes.forEach((col, i) => {
-        doc.rect(x, y, widths[i], 22).fill(`rgb(${BRAND.dark.join(",")})`);
-        doc.font("Helvetica-Bold").fontSize(8).fillColor("#FFFFFF")
-           .text(col.label, x + 4, y + 7, { width: widths[i] - 8, lineBreak: false });
-        x += widths[i];
-      });
-      y += 22;
-    }
-
-    // Fond alterné
-    const bg = idx % 2 === 0 ? BRAND.white : BRAND.light;
-    x = ml;
-    colonnes.forEach((_, i) => {
-      doc.rect(x, y, widths[i], ROW_H).fill(`rgb(${bg.join(",")})`);
-      x += widths[i];
-    });
-
-    // Texte
-    x = ml;
-    const est_reprise = Boolean(seance.est_reprise);
-    colonnes.forEach((col, i) => {
-      const val = String(col.value(seance) || "—");
-      const color = est_reprise && col.key === "cours"
-        ? `rgb(${BRAND.reprise.join(",")})`
-        : `rgb(${BRAND.dark.join(",")})`;
-      doc.font(est_reprise && col.key === "cours" ? "Helvetica-Bold" : "Helvetica")
-         .fontSize(FONT_SIZE).fillColor(color)
-         .text(val, x + 4, y + 5, { width: widths[i] - 8, lineBreak: false, ellipsis: true });
-      if (est_reprise && col.key === "cours") {
-        // petit badge REPRISE
-        doc.fontSize(6).fillColor(`rgb(${BRAND.reprise.join(",")})`)
-           .text("REPRISE", x + 4, y + 12, { lineBreak: false });
-      }
-      x += widths[i];
-    });
-
-    // Bordure inférieure
-    doc.moveTo(ml, y + ROW_H).lineTo(ml + usableW, y + ROW_H)
-       .strokeColor(`rgb(${BRAND.surface.join(",")})`)
-       .lineWidth(0.5).stroke();
-
-    y += ROW_H;
-  });
-
-  doc.y = y + 8;
-}
-
-/** Pied de page numéroté */
-function addFooters(doc) {
-  const range = doc.bufferedPageRange();
-  for (let i = 0; i < range.count; i++) {
-    doc.switchToPage(range.start + i);
-    const pw = doc.page.width;
-    const ph = doc.page.height;
-    const mb = doc.page.margins.bottom;
-    doc.font("Helvetica").fontSize(7)
-       .fillColor(`rgb(${BRAND.muted.join(",")})`)
-       .text(`HORAIRE 5 — Document généré automatiquement le ${today()}`,
-         doc.page.margins.left, ph - mb + 8, { lineBreak: false })
-       .text(`Page ${i + 1} / ${range.count}`,
-         doc.page.margins.left, ph - mb + 8,
-         { width: pw - doc.page.margins.left - doc.page.margins.right, align: "right", lineBreak: false });
+function parseLocalDate(value) {
+  if (value instanceof Date) {
+    return new Date(value.getFullYear(), value.getMonth(), value.getDate());
   }
+
+  const text = cleanString(value);
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text.slice(0, 10));
+
+  if (match) {
+    const [, year, month, day] = match;
+    return new Date(Number(year), Number(month) - 1, Number(day));
+  }
+
+  const fallback = new Date(text);
+  if (Number.isNaN(fallback.getTime())) {
+    return new Date(1970, 0, 1);
+  }
+
+  return new Date(fallback.getFullYear(), fallback.getMonth(), fallback.getDate());
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-//  EXPORT GROUPE — PDF
-// ═══════════════════════════════════════════════════════════════════════════════
-export async function genererPDFGroupe({ groupe, horaire }) {
-  return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ ...PAGE_LANDSCAPE, bufferPages: true, info: { Title: `Horaire ${groupe.nom_groupe}`, Author: "HORAIRE 5" } });
-    const chunks = [];
-    doc.on("data", c => chunks.push(c));
-    doc.on("end", () => resolve(Buffer.concat(chunks)));
-    doc.on("error", reject);
+function getWeekStart(value) {
+  const date = parseLocalDate(value);
+  const copy = new Date(date);
+  const day = copy.getDay();
+  const offset = day === 0 ? -6 : 1 - day;
+  copy.setDate(copy.getDate() + offset);
+  copy.setHours(0, 0, 0, 0);
+  return copy;
+}
 
-    const meta = {
-      type: "groupe",
-      identifiant: groupe.nom_groupe,
-      programme: groupe.programme || null,
-      etape: groupe.etape || null,
-      session: groupe.session || null,
-    };
-    drawPDFHeader(doc, meta);
-    drawSectionTitle(doc, `Planning du groupe ${groupe.nom_groupe} — ${horaire.length} séance(s)`);
+function getDayIndex(value) {
+  return (parseLocalDate(value).getDay() + 6) % 7;
+}
 
-    if (horaire.length === 0) {
-      doc.font("Helvetica").fontSize(10).fillColor(`rgb(${BRAND.muted.join(",")})`)
-         .text("Aucune séance planifiée pour ce groupe.", { align: "center" });
-    } else {
-      const seancesAvecMeta = horaire.map(s => ({ ...s, __headerMeta__: meta }));
-      drawHoraireTable(doc, seancesAvecMeta, [
-        { key: "date",   label: "Date",          ratio: 3, value: s => formatDateLong(s.date) },
-        { key: "debut",  label: "Début",         ratio: 1, value: s => h5(s.heure_debut) },
-        { key: "fin",    label: "Fin",           ratio: 1, value: s => h5(s.heure_fin) },
-        { key: "cours",  label: "Cours",         ratio: 4, value: s => `${s.code_cours} — ${s.nom_cours}` },
-        { key: "prof",   label: "Professeur",    ratio: 2.5, value: s => `${s.prenom_professeur || ""} ${s.nom_professeur || ""}`.trim() },
-        { key: "salle",  label: "Salle",         ratio: 1.5, value: s => `${s.code_salle || "—"} (${s.type_salle || ""})` },
-      ]);
-    }
-
-    addFooters(doc);
-    doc.end();
+function formatDateShort(value) {
+  return parseLocalDate(value).toLocaleDateString("fr-CA", {
+    day: "numeric",
+    month: "short",
   });
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-//  EXPORT PROFESSEUR — PDF
-// ═══════════════════════════════════════════════════════════════════════════════
-export async function genererPDFProfesseur({ professeur, horaire }) {
-  return new Promise((resolve, reject) => {
-    const nomComplet = `${professeur.prenom || ""} ${professeur.nom || ""}`.trim();
-    const doc = new PDFDocument({ ...PAGE_LANDSCAPE, bufferPages: true, info: { Title: `Horaire ${nomComplet}`, Author: "HORAIRE 5" } });
-    const chunks = [];
-    doc.on("data", c => chunks.push(c));
-    doc.on("end", () => resolve(Buffer.concat(chunks)));
-    doc.on("error", reject);
-
-    const meta = {
-      type: "professeur",
-      identifiant: nomComplet,
-      programme: professeur.specialite || null,
-      session: professeur.session || null,
-      nomSupplementaire: professeur.matricule ? `Matricule : ${professeur.matricule}` : null,
-    };
-    drawPDFHeader(doc, meta);
-    drawSectionTitle(doc, `Planning de ${nomComplet} — ${horaire.length} séance(s)`);
-
-    if (horaire.length === 0) {
-      doc.font("Helvetica").fontSize(10).fillColor(`rgb(${BRAND.muted.join(",")})`)
-         .text("Aucune séance planifiée pour cet enseignant.", { align: "center" });
-    } else {
-      const seancesAvecMeta = horaire.map(s => ({ ...s, __headerMeta__: meta }));
-      drawHoraireTable(doc, seancesAvecMeta, [
-        { key: "date",    label: "Date",        ratio: 3,   value: s => formatDateLong(s.date) },
-        { key: "debut",   label: "Début",       ratio: 1,   value: s => h5(s.heure_debut) },
-        { key: "fin",     label: "Fin",         ratio: 1,   value: s => h5(s.heure_fin) },
-        { key: "cours",   label: "Cours",       ratio: 4,   value: s => `${s.code_cours} — ${s.nom_cours}` },
-        { key: "groupes", label: "Groupe(s)",   ratio: 2.5, value: s => s.groupes || s.nom_groupe || "—" },
-        { key: "salle",   label: "Salle",       ratio: 1.5, value: s => s.code_salle || "—" },
-      ]);
-    }
-
-    addFooters(doc);
-    doc.end();
+function formatDateLong(value) {
+  return parseLocalDate(value).toLocaleDateString("fr-CA", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
   });
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-//  EXPORT ÉTUDIANT — PDF
-// ═══════════════════════════════════════════════════════════════════════════════
-export async function genererPDFEtudiant({ etudiant, horaire, horaire_reprises, reprises }) {
-  return new Promise((resolve, reject) => {
-    const nomComplet = `${etudiant.prenom || ""} ${etudiant.nom || ""}`.trim();
-    const doc = new PDFDocument({ ...PAGE_LANDSCAPE, bufferPages: true, info: { Title: `Horaire ${nomComplet}`, Author: "HORAIRE 5" } });
-    const chunks = [];
-    doc.on("data", c => chunks.push(c));
-    doc.on("end", () => resolve(Buffer.concat(chunks)));
-    doc.on("error", reject);
+function formatToday() {
+  return new Date().toLocaleDateString("fr-CA", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+}
 
-    const horaireTotal = [...(horaire || []), ...(horaire_reprises || [])].sort((a, b) => {
-      const da = String(a.date || ""); const db = String(b.date || "");
-      if (da !== db) return da.localeCompare(db);
-      return String(a.heure_debut || "").localeCompare(String(b.heure_debut || ""));
+function composeSessionLabel(session, year) {
+  const sessionLabel = cleanString(session);
+  const yearLabel = cleanString(year);
+
+  if (!sessionLabel) {
+    return yearLabel;
+  }
+
+  if (!yearLabel || sessionLabel.includes(yearLabel)) {
+    return sessionLabel;
+  }
+
+  return `${sessionLabel} ${yearLabel}`;
+}
+
+function formatWeekRange(weekStart) {
+  const end = new Date(weekStart);
+  end.setDate(end.getDate() + 6);
+  return `${formatDateShort(weekStart)} au ${formatDateShort(end)}`;
+}
+
+function sortSessions(sessionA, sessionB) {
+  const dateCompare = cleanString(sessionA?.date).localeCompare(cleanString(sessionB?.date), "fr");
+  if (dateCompare !== 0) {
+    return dateCompare;
+  }
+
+  const startCompare = formatTime(sessionA?.heure_debut).localeCompare(
+    formatTime(sessionB?.heure_debut),
+    "fr"
+  );
+  if (startCompare !== 0) {
+    return startCompare;
+  }
+
+  const endCompare = formatTime(sessionA?.heure_fin).localeCompare(formatTime(sessionB?.heure_fin), "fr");
+  if (endCompare !== 0) {
+    return endCompare;
+  }
+
+  return Number(sessionA?.id_affectation_cours || 0) - Number(sessionB?.id_affectation_cours || 0);
+}
+
+function groupSessionsByWeek(sessions) {
+  const weeks = new Map();
+
+  safeArray(sessions)
+    .slice()
+    .sort(sortSessions)
+    .forEach((session) => {
+      const weekStart = getWeekStart(session.date);
+      const key = weekStart.toISOString().slice(0, 10);
+      const bucket = weeks.get(key) || { weekStart, sessions: [] };
+      bucket.sessions.push(session);
+      weeks.set(key, bucket);
     });
 
-    const meta = {
-      type: "etudiant",
-      identifiant: nomComplet,
-      programme: etudiant.programme || null,
-      etape: etudiant.etape || null,
-      session: etudiant.session ? `${etudiant.session} ${etudiant.annee || ""}`.trim() : null,
-      nomSupplementaire: etudiant.groupe ? `Groupe : ${etudiant.groupe}` : null,
+  return [...weeks.values()].sort((weekA, weekB) =>
+    weekA.weekStart.getTime() - weekB.weekStart.getTime()
+  );
+}
+
+function getGridBounds(sessions) {
+  const items = safeArray(sessions);
+  if (items.length === 0) {
+    return {
+      startMinutes: GRID_START_MINUTES,
+      endMinutes: Math.max(GRID_END_MINUTES, GRID_START_MINUTES + MIN_GRID_DURATION),
     };
-    drawPDFHeader(doc, meta);
-    drawSectionTitle(doc, `Horaire complet — ${horaireTotal.length} séance(s) dont ${(horaire_reprises || []).length} reprise(s)`);
+  }
 
-    if (horaireTotal.length === 0) {
-      doc.font("Helvetica").fontSize(10).fillColor(`rgb(${BRAND.muted.join(",")})`)
-         .text("Aucune séance planifiée pour cet étudiant.", { align: "center" });
-    } else {
-      const seancesAvecMeta = horaireTotal.map(s => ({ ...s, __headerMeta__: meta }));
-      drawHoraireTable(doc, seancesAvecMeta, [
-        { key: "date",    label: "Date",          ratio: 3,   value: s => formatDateLong(s.date) },
-        { key: "debut",   label: "Début",         ratio: 1,   value: s => h5(s.heure_debut) },
-        { key: "fin",     label: "Fin",           ratio: 1,   value: s => h5(s.heure_fin) },
-        { key: "cours",   label: "Cours",         ratio: 3.5, value: s => `${s.code_cours || ""} — ${s.nom_cours || ""}` },
-        { key: "type",    label: "Type",          ratio: 1.5, value: s => s.est_reprise ? "REPRISE" : "Régulier" },
-        { key: "groupe",  label: "Groupe suivi",  ratio: 2,   value: s => s.groupe_source || s.nom_groupe || "—" },
-        { key: "salle",   label: "Salle",         ratio: 1.5, value: s => s.code_salle || "—" },
-        { key: "prof",    label: "Professeur",    ratio: 2,   value: s => `${s.prenom_professeur || ""} ${s.nom_professeur || ""}`.trim() },
-      ]);
-    }
-
-    // Section reprises en attente
-    const reprisesEnAttente = (reprises || []).filter(r => r.statut === "a_reprendre");
-    if (reprisesEnAttente.length > 0) {
-      doc.moveDown(1);
-      drawSectionTitle(doc, `Cours échoués à reprendre — ${reprisesEnAttente.length} cours`);
-      drawHoraireTable(doc, reprisesEnAttente.map(r => ({
-        date: null, heure_debut: null, heure_fin: null,
-        code_cours: r.code_cours, nom_cours: r.nom_cours,
-        est_reprise: true,
-        note_echec: r.note_echec,
-        groupe_source: r.groupe_reprise || "Non assigné",
-        code_salle: null, nom_professeur: null,
-        __headerMeta__: meta,
-      })), [
-        { key: "cours",   label: "Cours",         ratio: 4, value: s => `${s.code_cours} — ${s.nom_cours}` },
-        { key: "etape",   label: "Étape",         ratio: 1, value: s => s.etape_etude || "—" },
-        { key: "note",    label: "Note échec",    ratio: 1.5, value: s => s.note_echec != null ? `${s.note_echec}/100` : "—" },
-        { key: "groupe",  label: "Groupe reprise",ratio: 3, value: s => s.groupe_source },
-        { key: "statut",  label: "Statut",        ratio: 2, value: () => "À reprendre" },
-      ]);
-    }
-
-    addFooters(doc);
-    doc.end();
-  });
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-//  EXPORT GROUPE — EXCEL
-// ═══════════════════════════════════════════════════════════════════════════════
-export function genererExcelGroupe({ groupe, horaire }) {
-  const wb = XLSX.utils.book_new();
-
-  // ── Feuille 1 : Données détaillées ──
-  const rows = horaire.map(s => ({
-    "Jour":            formatDateLong(s.date),
-    "Date":            s.date || "",
-    "Heure début":     h5(s.heure_debut),
-    "Heure fin":       h5(s.heure_fin),
-    "Code cours":      s.code_cours || "",
-    "Nom du cours":    s.nom_cours || "",
-    "Professeur":      `${s.prenom_professeur || ""} ${s.nom_professeur || ""}`.trim(),
-    "Salle":           s.code_salle || "",
-    "Type salle":      s.type_salle || "",
-    "Groupe":          groupe.nom_groupe,
-    "Programme":       groupe.programme || "",
-    "Étape":           groupe.etape || "",
-    "Remarque":        "",
-  }));
-
-  const ws = XLSX.utils.json_to_sheet([]);
-  // En-tête section info
-  XLSX.utils.sheet_add_aoa(ws, [
-    ["HORAIRE 5 — Horaire du groupe"],
-    [`Groupe : ${groupe.nom_groupe}   |   Programme : ${groupe.programme || "—"}   |   Étape : ${groupe.etape || "—"}   |   Exporté le : ${today()}`],
-    [],
-  ]);
-  XLSX.utils.sheet_add_json(ws, rows, { origin: "A4", skipHeader: false });
-  styleExcelSheet(ws, rows.length + 4);
-  XLSX.utils.book_append_sheet(wb, ws, "Horaire");
-
-  // ── Feuille 2 : Vue synthèse par semaine ──
-  const parSemaine = {};
-  horaire.forEach(s => {
-    const d = new Date(s.date + "T00:00:00");
-    const lundi = new Date(d);
-    lundi.setDate(d.getDate() - ((d.getDay() + 6) % 7)); // lundi
-    const cleSemaine = lundi.toISOString().slice(0, 10);
-    if (!parSemaine[cleSemaine]) parSemaine[cleSemaine] = [];
-    parSemaine[cleSemaine].push(s);
-  });
-  const semaines = Object.entries(parSemaine).sort(([a], [b]) => a.localeCompare(b));
-  const synthRows = semaines.map(([lundi, ses]) => ({
-    "Semaine (lundi)": lundi,
-    "Nb séances": ses.length,
-    "Cours": [...new Set(ses.map(s => s.code_cours))].join(", "),
-    "Salles": [...new Set(ses.map(s => s.code_salle).filter(Boolean))].join(", "),
-  }));
-  const ws2 = XLSX.utils.json_to_sheet(synthRows);
-  XLSX.utils.book_append_sheet(wb, ws2, "Synthèse semaines");
-
-  return XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-//  EXPORT PROFESSEUR — EXCEL
-// ═══════════════════════════════════════════════════════════════════════════════
-export function genererExcelProfesseur({ professeur, horaire }) {
-  const wb = XLSX.utils.book_new();
-  const nomComplet = `${professeur.prenom || ""} ${professeur.nom || ""}`.trim();
-
-  const rows = horaire.map(s => ({
-    "Jour":            formatDateLong(s.date),
-    "Date":            s.date || "",
-    "Heure début":     h5(s.heure_debut),
-    "Heure fin":       h5(s.heure_fin),
-    "Code cours":      s.code_cours || "",
-    "Nom du cours":    s.nom_cours || "",
-    "Groupe(s)":       s.groupes || s.nom_groupe || "",
-    "Salle":           s.code_salle || "",
-    "Type salle":      s.type_salle || "",
-    "Professeur":      nomComplet,
-    "Matricule":       professeur.matricule || "",
-    "Spécialité":      professeur.specialite || "",
-    "Remarque":        "",
-  }));
-
-  const ws = XLSX.utils.json_to_sheet([]);
-  XLSX.utils.sheet_add_aoa(ws, [
-    ["HORAIRE 5 — Horaire du professeur"],
-    [`Professeur : ${nomComplet}   |   Matricule : ${professeur.matricule || "—"}   |   Exporté le : ${today()}`],
-    [],
-  ]);
-  XLSX.utils.sheet_add_json(ws, rows, { origin: "A4" });
-  styleExcelSheet(ws, rows.length + 4);
-  XLSX.utils.book_append_sheet(wb, ws, "Horaire");
-
-  // Synthèse charge horaire
-  const parCours = {};
-  horaire.forEach(s => {
-    if (!parCours[s.code_cours]) parCours[s.code_cours] = { code: s.code_cours, nom: s.nom_cours, nb: 0 };
-    parCours[s.code_cours].nb++;
-  });
-  const chargeRows = Object.values(parCours).map(c => ({
-    "Code": c.code, "Cours": c.nom, "Nb séances": c.nb,
-  }));
-  const ws2 = XLSX.utils.json_to_sheet(chargeRows);
-  XLSX.utils.book_append_sheet(wb, ws2, "Charge horaire");
-
-  return XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-//  EXPORT ÉTUDIANT — EXCEL
-// ═══════════════════════════════════════════════════════════════════════════════
-export function genererExcelEtudiant({ etudiant, horaire, horaire_reprises, reprises }) {
-  const wb = XLSX.utils.book_new();
-  const nomComplet = `${etudiant.prenom || ""} ${etudiant.nom || ""}`.trim();
-
-  // Feuille 1 : Horaire complet fusionné
-  const horaireTotal = [...(horaire || []), ...(horaire_reprises || [])].sort((a, b) =>
-    String(a.date || "").localeCompare(String(b.date || "")) ||
-    String(a.heure_debut || "").localeCompare(String(b.heure_debut || ""))
+  const rawStart = items.reduce(
+    (minimum, session) => Math.min(minimum, timeToMinutes(session.heure_debut)),
+    GRID_END_MINUTES
+  );
+  const rawEnd = items.reduce(
+    (maximum, session) => Math.max(maximum, timeToMinutes(session.heure_fin)),
+    GRID_START_MINUTES
   );
 
-  const rows = horaireTotal.map(s => ({
-    "Jour":             formatDateLong(s.date),
-    "Date":             s.date || "",
-    "Heure début":      h5(s.heure_debut),
-    "Heure fin":        h5(s.heure_fin),
-    "Code cours":       s.code_cours || "",
-    "Nom du cours":     s.nom_cours || "",
-    "Type":             s.est_reprise ? "REPRISE" : "Régulier",
-    "Groupe suivi":     s.groupe_source || s.nom_groupe || "",
-    "Salle":            s.code_salle || "",
-    "Professeur":       `${s.prenom_professeur || ""} ${s.nom_professeur || ""}`.trim(),
-    "Statut reprise":   s.statut_reprise || "",
-    "Remarque":         "",
-  }));
+  const startMinutes = Math.max(GRID_START_MINUTES, Math.floor(rawStart / 60) * 60);
+  const roundedEnd = Math.ceil(rawEnd / 60) * 60;
+  const endMinutes = Math.max(
+    Math.min(Math.max(roundedEnd, GRID_START_MINUTES + 60), 23 * 60),
+    startMinutes + MIN_GRID_DURATION
+  );
 
-  const ws = XLSX.utils.json_to_sheet([]);
-  XLSX.utils.sheet_add_aoa(ws, [
-    ["HORAIRE 5 — Horaire de l'étudiant"],
-    [`Étudiant : ${nomComplet}   |   Matricule : ${etudiant.matricule || "—"}   |   Groupe : ${etudiant.groupe || "—"}   |   Étape : ${etudiant.etape || "—"}   |   Exporté le : ${today()}`],
-    [],
-  ]);
-  XLSX.utils.sheet_add_json(ws, rows, { origin: "A4" });
-  styleExcelSheet(ws, rows.length + 4);
-  XLSX.utils.book_append_sheet(wb, ws, "Horaire complet");
-
-  // Feuille 2 : Cours à reprendre
-  const reprisesRows = (reprises || []).map(r => ({
-    "Code cours":      r.code_cours || "",
-    "Nom du cours":    r.nom_cours || "",
-    "Étape":           r.etape_etude || "",
-    "Note d'échec":    r.note_echec != null ? r.note_echec : "",
-    "Statut":          r.statut || "a_reprendre",
-    "Groupe reprise":  r.groupe_reprise || "Non assigné",
-  }));
-  if (reprisesRows.length > 0) {
-    const wsR = XLSX.utils.json_to_sheet(reprisesRows);
-    XLSX.utils.book_append_sheet(wb, wsR, "Cours à reprendre");
-  }
-
-  return XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+  return { startMinutes, endMinutes };
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-//  Style basique feuille Excel (largeurs colonnes)
-// ═══════════════════════════════════════════════════════════════════════════════
-function styleExcelSheet(ws, totalRows) {
-  ws["!cols"] = [
-    { wch: 24 }, { wch: 12 }, { wch: 8  }, { wch: 8  }, { wch: 10 },
-    { wch: 32 }, { wch: 24 }, { wch: 14 }, { wch: 14 }, { wch: 20 },
-    { wch: 20 }, { wch: 10 }, { wch: 18 },
+function hashString(value) {
+  return [...cleanString(value)].reduce((hash, character) => {
+    const next = (hash * 31 + character.charCodeAt(0)) % 2147483647;
+    return next < 0 ? next + 2147483647 : next;
+  }, 7);
+}
+
+function getBlockTheme(entityType, session) {
+  if (entityType === "etudiant" && Boolean(session?.est_reprise)) {
+    return BLOCK_PALETTES.reprise;
+  }
+
+  const palette = BLOCK_PALETTES[entityType] || BLOCK_PALETTES.groupe;
+  return palette[hashString(session?.code_cours || session?.nom_cours || entityType) % palette.length];
+}
+
+function formatRoom(session) {
+  const type = cleanString(session?.type_salle).toLowerCase();
+
+  if (type.includes("ligne") || type.includes("virtuel") || type.includes("distance")) {
+    return "En ligne";
+  }
+
+  return cleanString(session?.code_salle) || "Salle a confirmer";
+}
+
+function formatProfessor(session) {
+  return `${cleanString(session?.prenom_professeur)} ${cleanString(session?.nom_professeur)}`
+    .trim() || "Prof a confirmer";
+}
+
+function formatStudentSource(session, defaultGroup = "") {
+  if (Boolean(session?.est_reprise)) {
+    return cleanString(session?.groupe_source) || "Groupe reprise a confirmer";
+  }
+
+  return (
+    cleanString(session?.groupe_source) ||
+    cleanString(session?.nom_groupe) ||
+    cleanString(defaultGroup) ||
+    "Groupe principal"
+  );
+}
+
+function normalizeDuration(startMinutes, endMinutes) {
+  if (endMinutes <= startMinutes) {
+    return startMinutes + 60;
+  }
+
+  return endMinutes;
+}
+
+function finalizeOverlapCluster(cluster, output) {
+  const laneCount = Math.max(
+    1,
+    cluster.reduce((maximum, item) => Math.max(maximum, Number(item.__lane || 0)), 0) + 1
+  );
+
+  cluster.forEach((item) => {
+    output.push({ ...item, __laneCount: laneCount });
+  });
+}
+
+function layoutSessionsForDay(sessions) {
+  const ordered = safeArray(sessions)
+    .map((session) => {
+      const startMinutes = timeToMinutes(session.heure_debut);
+      const endMinutes = normalizeDuration(startMinutes, timeToMinutes(session.heure_fin));
+      return {
+        ...session,
+        __startMinutes: startMinutes,
+        __endMinutes: endMinutes,
+      };
+    })
+    .sort((sessionA, sessionB) => {
+      if (sessionA.__startMinutes !== sessionB.__startMinutes) {
+        return sessionA.__startMinutes - sessionB.__startMinutes;
+      }
+
+      if (sessionA.__endMinutes !== sessionB.__endMinutes) {
+        return sessionB.__endMinutes - sessionA.__endMinutes;
+      }
+
+      return sortSessions(sessionA, sessionB);
+    });
+
+  const output = [];
+  let cluster = [];
+  let laneEnds = [];
+  let clusterEnd = -1;
+
+  ordered.forEach((session) => {
+    if (cluster.length > 0 && session.__startMinutes >= clusterEnd) {
+      finalizeOverlapCluster(cluster, output);
+      cluster = [];
+      laneEnds = [];
+      clusterEnd = -1;
+    }
+
+    let lane = laneEnds.findIndex((endMinutes) => endMinutes <= session.__startMinutes);
+    if (lane === -1) {
+      lane = laneEnds.length;
+      laneEnds.push(session.__endMinutes);
+    } else {
+      laneEnds[lane] = session.__endMinutes;
+    }
+
+    cluster.push({ ...session, __lane: lane });
+    clusterEnd = Math.max(clusterEnd, session.__endMinutes);
+  });
+
+  if (cluster.length > 0) {
+    finalizeOverlapCluster(cluster, output);
+  }
+
+  return output;
+}
+
+function drawPill(doc, x, y, label, fillColor, borderColor, textColor) {
+  const text = cleanString(label);
+  const width = doc.widthOfString(text, { font: "Helvetica-Bold", size: 7 }) + 18;
+
+  doc.save();
+  doc.roundedRect(x, y, width, 18, 9).fillAndStroke(fillColor, borderColor);
+  doc.restore();
+
+  doc
+    .font("Helvetica-Bold")
+    .fontSize(7)
+    .fillColor(textColor)
+    .text(text, x + 9, y + 5, { lineBreak: false });
+
+  return width;
+}
+
+function drawHeader(doc, meta, badgeLabel) {
+  const left = doc.page.margins.left;
+  const right = doc.page.width - doc.page.margins.right;
+  const usableWidth = right - left;
+
+  doc.save();
+  doc.roundedRect(left, 16, usableWidth, 86, 18).fill(COLORS.dark);
+  doc.rect(left, 16, 8, 86).fill(COLORS.brand);
+  doc.restore();
+
+  doc
+    .font("Helvetica-Bold")
+    .fontSize(17)
+    .fillColor("#FFFFFF")
+    .text("HORAIRE 5", left + 18, 30, { lineBreak: false });
+
+  doc
+    .font("Helvetica")
+    .fontSize(8.5)
+    .fillColor("#CBD5E1")
+    .text(meta.kindLabel.toUpperCase(), left + 18, 54, { lineBreak: false });
+
+  doc
+    .font("Helvetica-Bold")
+    .fontSize(16)
+    .fillColor("#FFFFFF")
+    .text(meta.subjectLabel, left + 18, 66, {
+      width: usableWidth - 210,
+      lineBreak: false,
+      ellipsis: true,
+    });
+
+  if (badgeLabel) {
+    const badgeWidth = Math.min(
+      184,
+      doc.widthOfString(badgeLabel, { font: "Helvetica-Bold", size: 8 }) + 26
+    );
+    const badgeX = right - badgeWidth - 16;
+
+    doc.save();
+    doc.roundedRect(badgeX, 28, badgeWidth, 24, 12).fill(COLORS.brandSoft);
+    doc.restore();
+
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(8)
+      .fillColor(COLORS.brand)
+      .text(badgeLabel, badgeX + 13, 36, {
+        width: badgeWidth - 26,
+        align: "center",
+        lineBreak: false,
+        ellipsis: true,
+      });
+  }
+
+  doc.save();
+  doc.roundedRect(left, 112, usableWidth, 42, 14).fillAndStroke(COLORS.panel, COLORS.borderSoft);
+  doc.restore();
+
+  doc
+    .font("Helvetica-Bold")
+    .fontSize(12)
+    .fillColor(COLORS.text)
+    .text(meta.mainTitle, left + 16, 124, {
+      width: usableWidth - 32,
+      lineBreak: false,
+      ellipsis: true,
+    });
+
+  doc
+    .font("Helvetica")
+    .fontSize(8)
+    .fillColor(COLORS.muted)
+    .text(meta.infoParts.join(" | "), left + 16, 140, {
+      width: usableWidth - 32,
+      lineBreak: false,
+      ellipsis: true,
+    });
+
+  return 166;
+}
+
+function drawLegend(doc, meta, startY) {
+  let cursorX = doc.page.margins.left;
+  const cursorY = startY;
+
+  cursorX += drawPill(
+    doc,
+    cursorX,
+    cursorY,
+    "Vue hebdomadaire",
+    COLORS.panelSoft,
+    COLORS.border,
+    COLORS.text
+  );
+  cursorX += 8;
+
+  if (meta.entityType === "etudiant") {
+    const normalTheme = BLOCK_PALETTES.etudiant[0];
+    cursorX += drawPill(
+      doc,
+      cursorX,
+      cursorY,
+      "Groupe principal",
+      normalTheme.fill,
+      normalTheme.stroke,
+      normalTheme.text
+    );
+    cursorX += 8;
+    drawPill(
+      doc,
+      cursorX,
+      cursorY,
+      "Reprise",
+      BLOCK_PALETTES.reprise.fill,
+      BLOCK_PALETTES.reprise.stroke,
+      BLOCK_PALETTES.reprise.text
+    );
+  }
+
+  return cursorY + 28;
+}
+
+function drawGridPanel(doc, x, y, width, height) {
+  doc.save();
+  doc.roundedRect(x, y, width, height, 18).fillAndStroke(COLORS.panel, COLORS.border);
+  doc.restore();
+}
+
+function drawSessionBlock(doc, meta, session, x, y, width, height) {
+  const theme = getBlockTheme(meta.entityType, session);
+  const contentWidth = Math.max(width - 12, 30);
+  const availableLineCount = Math.max(1, Math.floor((height - 10) / 10));
+  const firstLine = [cleanString(session.code_cours), cleanString(session.nom_cours)]
+    .filter(Boolean)
+    .join(" - ");
+  const detailLines = [];
+
+  detailLines.push(`${formatTime(session.heure_debut)} - ${formatTime(session.heure_fin)}`);
+  detailLines.push(formatRoom(session));
+
+  if (meta.entityType === "groupe") {
+    detailLines.push(formatProfessor(session));
+  } else if (meta.entityType === "professeur") {
+    detailLines.push(cleanString(session.groupes) || "Groupe a confirmer");
+  } else {
+    if (Boolean(session.est_reprise)) {
+      detailLines.push(`Groupe suivi : ${formatStudentSource(session, meta.defaultGroup)}`);
+    } else if (meta.defaultGroup) {
+      detailLines.push(`Groupe principal : ${meta.defaultGroup}`);
+    }
+    detailLines.push(formatProfessor(session));
+  }
+
+  doc.save();
+  doc.roundedRect(x, y, width, height, 10).fillAndStroke(theme.fill, theme.stroke);
+  doc.restore();
+
+  if (meta.entityType === "etudiant" && Boolean(session.est_reprise) && height >= 30) {
+    const badgeWidth = Math.min(
+      width - 10,
+      doc.widthOfString("REPRISE", { font: "Helvetica-Bold", size: 6.5 }) + 14
+    );
+
+    doc.save();
+    doc.roundedRect(x + width - badgeWidth - 5, y + 5, badgeWidth, 14, 7).fillAndStroke("#FFFFFF", theme.stroke);
+    doc.restore();
+
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(6.5)
+      .fillColor(theme.stroke)
+      .text("REPRISE", x + width - badgeWidth - 5, y + 9, {
+        width: badgeWidth,
+        align: "center",
+        lineBreak: false,
+      });
+  }
+
+  doc.save();
+  doc.rect(x + 1, y + 1, width - 2, height - 2).clip();
+
+  let cursorY = y + 6;
+
+  doc
+    .font("Helvetica-Bold")
+    .fontSize(height >= 30 ? 8.5 : 7.5)
+    .fillColor(theme.text)
+    .text(firstLine || "Cours", x + 6, cursorY, {
+      width: contentWidth,
+      lineBreak: false,
+      ellipsis: true,
+    });
+
+  cursorY += height >= 30 ? 12 : 10;
+
+  detailLines.slice(0, availableLineCount - 1).forEach((line) => {
+    doc
+      .font("Helvetica")
+      .fontSize(6.8)
+      .fillColor(theme.text)
+      .text(line, x + 6, cursorY, {
+        width: contentWidth,
+        lineBreak: false,
+        ellipsis: true,
+      });
+    cursorY += 9;
+  });
+
+  doc.restore();
+}
+
+function drawWeekGrid(doc, meta, weekStart, sessions) {
+  const headerBottom = drawHeader(doc, meta, `Semaine du ${formatWeekRange(weekStart)}`);
+  const legendBottom = drawLegend(doc, meta, headerBottom);
+
+  const left = doc.page.margins.left;
+  const right = doc.page.width - doc.page.margins.right;
+  const top = legendBottom + 8;
+  const bottom = doc.page.height - doc.page.margins.bottom - 20;
+  const width = right - left;
+  const height = bottom - top;
+  const timeColumnWidth = 66;
+  const dayHeaderHeight = 38;
+  const gridBodyTop = top + dayHeaderHeight;
+  const gridBodyHeight = height - dayHeaderHeight;
+  const dayWidth = (width - timeColumnWidth) / DAYS.length;
+  const bounds = getGridBounds(sessions);
+  const totalMinutes = bounds.endMinutes - bounds.startMinutes;
+  const totalHours = Math.round(totalMinutes / 60);
+
+  drawGridPanel(doc, left, top, width, height);
+
+  doc.save();
+  doc.rect(left, top, timeColumnWidth, height).fill(COLORS.panelSoft);
+  doc.restore();
+
+  for (let index = 0; index <= DAYS.length; index += 1) {
+    const x = left + timeColumnWidth + dayWidth * index;
+    doc
+      .moveTo(x, top)
+      .lineTo(x, top + height)
+      .strokeColor(COLORS.borderSoft)
+      .lineWidth(0.8)
+      .stroke();
+  }
+
+  doc
+    .moveTo(left, gridBodyTop)
+    .lineTo(right, gridBodyTop)
+    .strokeColor(COLORS.border)
+    .lineWidth(0.8)
+    .stroke();
+
+  for (let hourIndex = 0; hourIndex <= totalHours; hourIndex += 1) {
+    const minutesOffset = hourIndex * 60;
+    const y = gridBodyTop + (minutesOffset / totalMinutes) * gridBodyHeight;
+    const labelMinutes = bounds.startMinutes + minutesOffset;
+
+    doc
+      .moveTo(left, y)
+      .lineTo(right, y)
+      .strokeColor(COLORS.borderSoft)
+      .lineWidth(hourIndex === totalHours ? 0.8 : 0.5)
+      .stroke();
+
+    if (hourIndex < totalHours) {
+      const halfHourY = gridBodyTop + ((minutesOffset + 30) / totalMinutes) * gridBodyHeight;
+      doc
+        .moveTo(left + timeColumnWidth, halfHourY)
+        .lineTo(right, halfHourY)
+        .dash(1, { space: 2 })
+        .strokeColor("#E2E8F0")
+        .lineWidth(0.4)
+        .stroke()
+        .undash();
+    }
+
+    if (hourIndex < totalHours) {
+      doc
+        .font("Helvetica")
+        .fontSize(7)
+        .fillColor(COLORS.muted)
+        .text(minutesToLabel(labelMinutes), left + 10, y + 4, {
+          width: timeColumnWidth - 16,
+          align: "left",
+          lineBreak: false,
+        });
+    }
+  }
+
+  DAYS.forEach((day) => {
+    const date = new Date(weekStart);
+    date.setDate(date.getDate() + day.index);
+    const dayLeft = left + timeColumnWidth + dayWidth * day.index;
+
+    doc.save();
+    doc.rect(dayLeft, top, dayWidth, dayHeaderHeight).fill(day.index >= 5 ? "#F8FAFC" : COLORS.section);
+    doc.restore();
+
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(8.5)
+      .fillColor(COLORS.text)
+      .text(day.label, dayLeft + 8, top + 10, {
+        width: dayWidth - 16,
+        lineBreak: false,
+        ellipsis: true,
+      });
+
+    doc
+      .font("Helvetica")
+      .fontSize(7.5)
+      .fillColor(COLORS.muted)
+      .text(formatDateShort(date), dayLeft + 8, top + 22, {
+        width: dayWidth - 16,
+        lineBreak: false,
+      });
+  });
+
+  DAYS.forEach((day) => {
+    const daySessions = layoutSessionsForDay(
+      safeArray(sessions).filter((session) => getDayIndex(session.date) === day.index)
+    );
+
+    daySessions.forEach((session) => {
+      const slotLeft = left + timeColumnWidth + dayWidth * day.index + 4;
+      const slotWidth = dayWidth - 8;
+      const laneGap = 4;
+      const laneCount = Math.max(1, Number(session.__laneCount || 1));
+      const laneWidth = (slotWidth - laneGap * (laneCount - 1)) / laneCount;
+      const blockLeft = slotLeft + Number(session.__lane || 0) * (laneWidth + laneGap);
+      const blockTop =
+        gridBodyTop +
+        ((session.__startMinutes - bounds.startMinutes) / totalMinutes) * gridBodyHeight +
+        2;
+      const blockHeight = Math.max(
+        ((session.__endMinutes - session.__startMinutes) / totalMinutes) * gridBodyHeight - 4,
+        18
+      );
+
+      drawSessionBlock(doc, meta, session, blockLeft, blockTop, laneWidth, blockHeight);
+    });
+  });
+}
+
+function drawSectionBanner(doc, title, subtitle, topY) {
+  const left = doc.page.margins.left;
+  const right = doc.page.width - doc.page.margins.right;
+  const width = right - left;
+
+  doc.save();
+  doc.roundedRect(left, topY, width, 28, 12).fillAndStroke(COLORS.panelSoft, COLORS.borderSoft);
+  doc.restore();
+
+  doc
+    .font("Helvetica-Bold")
+    .fontSize(10)
+    .fillColor(COLORS.text)
+    .text(title, left + 12, topY + 9, { lineBreak: false });
+
+  if (subtitle) {
+    doc
+      .font("Helvetica")
+      .fontSize(8)
+      .fillColor(COLORS.muted)
+      .text(subtitle, left + 170, topY + 10, {
+        width: width - 182,
+        align: "right",
+        lineBreak: false,
+        ellipsis: true,
+      });
+  }
+
+  return topY + 40;
+}
+
+function drawTableHeader(doc, x, y, width, columns) {
+  const totalRatio = columns.reduce((sum, column) => sum + column.ratio, 0);
+  let currentX = x;
+
+  return columns.map((column) => {
+    const columnWidth = (width * column.ratio) / totalRatio;
+
+    doc.save();
+    doc.rect(currentX, y, columnWidth, TABLE_ROW_HEIGHT).fill(COLORS.dark);
+    doc.restore();
+
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(7.5)
+      .fillColor("#FFFFFF")
+      .text(column.label, currentX + 6, y + 7, {
+        width: columnWidth - 12,
+        lineBreak: false,
+        ellipsis: true,
+      });
+
+    const result = { ...column, width: columnWidth };
+    currentX += columnWidth;
+    return result;
+  });
+}
+
+function drawTableRows(doc, x, y, bottomLimit, rows, columns) {
+  let cursorY = y;
+  let index = 0;
+  const totalWidth = columns.reduce((sum, column) => sum + column.width, 0);
+
+  while (index < rows.length) {
+    if (cursorY + TABLE_ROW_HEIGHT > bottomLimit) {
+      break;
+    }
+
+    const row = rows[index];
+    const background = index % 2 === 0 ? "#FFFFFF" : "#F8FAFC";
+    let currentX = x;
+
+    columns.forEach((column) => {
+      doc.save();
+      doc.rect(currentX, cursorY, column.width, TABLE_ROW_HEIGHT).fill(background);
+      doc.restore();
+
+      const value = cleanString(column.value(row)) || "-";
+      doc
+        .font(column.emphasis?.(row) ? "Helvetica-Bold" : "Helvetica")
+        .fontSize(7.2)
+        .fillColor(column.color?.(row) || COLORS.text)
+        .text(value, currentX + 6, cursorY + 7, {
+          width: column.width - 12,
+          lineBreak: false,
+          ellipsis: true,
+        });
+
+      currentX += column.width;
+    });
+
+    doc
+      .moveTo(x, cursorY + TABLE_ROW_HEIGHT)
+      .lineTo(x + totalWidth, cursorY + TABLE_ROW_HEIGHT)
+      .strokeColor(COLORS.borderSoft)
+      .lineWidth(0.5)
+      .stroke();
+
+    cursorY += TABLE_ROW_HEIGHT;
+    index += 1;
+  }
+
+  return { nextIndex: index, nextY: cursorY };
+}
+
+function drawTablePages(doc, meta, title, rows, columns, emptyMessage) {
+  const normalizedRows = safeArray(rows);
+  let currentIndex = 0;
+
+  if (normalizedRows.length === 0) {
+    doc.addPage(PDF_PAGE);
+    const headerBottom = drawHeader(doc, meta, title);
+    const sectionBottom = drawSectionBanner(doc, title, null, headerBottom);
+    doc
+      .font("Helvetica")
+      .fontSize(10)
+      .fillColor(COLORS.muted)
+      .text(emptyMessage, doc.page.margins.left, sectionBottom + 10, {
+        width: doc.page.width - doc.page.margins.left - doc.page.margins.right,
+        align: "center",
+      });
+    return;
+  }
+
+  while (currentIndex < normalizedRows.length) {
+    doc.addPage(PDF_PAGE);
+    const headerBottom = drawHeader(doc, meta, title);
+    const sectionBottom = drawSectionBanner(
+      doc,
+      title,
+      `${normalizedRows.length} ligne(s)`,
+      headerBottom
+    );
+    const left = doc.page.margins.left;
+    const width = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+    const bottomLimit = doc.page.height - doc.page.margins.bottom - 18;
+    const tableColumns = drawTableHeader(doc, left, sectionBottom, width, columns);
+    const result = drawTableRows(
+      doc,
+      left,
+      sectionBottom + TABLE_ROW_HEIGHT,
+      bottomLimit,
+      normalizedRows.slice(currentIndex),
+      tableColumns
+    );
+
+    currentIndex += result.nextIndex;
+  }
+}
+
+function buildWorkbookSheet(title, subtitle, columns, rows) {
+  const headerRow = columns.map((column) => column.label);
+  const bodyRows = safeArray(rows).map((row) => columns.map((column) => column.value(row)));
+  const sheetRows = [[title], [subtitle], [], headerRow, ...bodyRows];
+  const sheet = XLSX.utils.aoa_to_sheet(sheetRows);
+  const lastColumnIndex = Math.max(columns.length - 1, 0);
+
+  sheet["!merges"] = [
+    { s: { r: 0, c: 0 }, e: { r: 0, c: lastColumnIndex } },
+    { s: { r: 1, c: 0 }, e: { r: 1, c: lastColumnIndex } },
   ];
-  ws["!freeze"] = { xSplit: 0, ySplit: 4 }; // figer les 3 lignes d'en-tête
+  sheet["!cols"] = columns.map((column) => ({ wch: column.width }));
+  sheet["!freeze"] = { xSplit: 0, ySplit: 4 };
+
+  if (columns.length > 0) {
+    sheet["!autofilter"] = {
+      ref: `A4:${XLSX.utils.encode_col(lastColumnIndex)}${Math.max(sheetRows.length, 4)}`,
+    };
+  }
+
+  return sheet;
+}
+
+function buildWeeklyCellText(entityType, session, defaultGroup) {
+  const lines = [];
+
+  lines.push(
+    `${cleanString(session.code_cours) || "Cours"} (${formatTime(session.heure_debut)}-${formatTime(session.heure_fin)})`
+  );
+
+  if (cleanString(session.nom_cours)) {
+    lines.push(cleanString(session.nom_cours));
+  }
+
+  if (entityType === "groupe") {
+    lines.push(formatProfessor(session));
+  } else if (entityType === "professeur") {
+    lines.push(cleanString(session.groupes) || "Groupe a confirmer");
+  } else {
+    if (Boolean(session.est_reprise)) {
+      lines.push("REPRISE");
+      lines.push(`Groupe suivi: ${formatStudentSource(session, defaultGroup)}`);
+    } else if (defaultGroup) {
+      lines.push(`Groupe principal: ${defaultGroup}`);
+    }
+    lines.push(formatProfessor(session));
+  }
+
+  lines.push(formatRoom(session));
+  return lines.join("\n");
+}
+
+function buildWeeklySheet(meta, sessions) {
+  const rows = [[meta.mainTitle], [meta.infoParts.join(" | ")], []];
+  const merges = [
+    { s: { r: 0, c: 0 }, e: { r: 0, c: 7 } },
+    { s: { r: 1, c: 0 }, e: { r: 1, c: 7 } },
+  ];
+  const rowHeights = [{ hpt: 24 }, { hpt: 18 }, { hpt: 8 }];
+  const weeks = groupSessionsByWeek(sessions);
+
+  if (weeks.length === 0) {
+    rows.push(["Aucune seance planifiee pour cet export."]);
+    merges.push({ s: { r: 3, c: 0 }, e: { r: 3, c: 7 } });
+    rowHeights.push({ hpt: 24 });
+  } else {
+    weeks.forEach((week) => {
+      const titleRowIndex = rows.length;
+      rows.push([`Semaine du ${formatWeekRange(week.weekStart)}`]);
+      merges.push({ s: { r: titleRowIndex, c: 0 }, e: { r: titleRowIndex, c: 7 } });
+      rowHeights.push({ hpt: 20 });
+
+      rows.push([
+        "Heure",
+        ...DAYS.map(
+          (day) =>
+            `${day.label}\n${formatDateShort(
+              new Date(
+                week.weekStart.getFullYear(),
+                week.weekStart.getMonth(),
+                week.weekStart.getDate() + day.index
+              )
+            )}`
+        ),
+      ]);
+      rowHeights.push({ hpt: 30 });
+
+      const bounds = getGridBounds(week.sessions);
+      for (
+        let startMinutes = bounds.startMinutes;
+        startMinutes < bounds.endMinutes;
+        startMinutes += EXCEL_SLOT_MINUTES
+      ) {
+        const endMinutes = Math.min(startMinutes + EXCEL_SLOT_MINUTES, bounds.endMinutes);
+        const row = [`${minutesToLabel(startMinutes)}-${minutesToLabel(endMinutes)}`];
+
+        DAYS.forEach((day) => {
+          const overlapping = week.sessions
+            .filter((session) => getDayIndex(session.date) === day.index)
+            .filter((session) => {
+              const sessionStart = timeToMinutes(session.heure_debut);
+              const sessionEnd = normalizeDuration(sessionStart, timeToMinutes(session.heure_fin));
+              return sessionStart < endMinutes && sessionEnd > startMinutes;
+            })
+            .sort(sortSessions);
+
+          row.push(
+            overlapping
+              .map((session) => buildWeeklyCellText(meta.entityType, session, meta.defaultGroup))
+              .join("\n\n")
+          );
+        });
+
+        rows.push(row);
+        rowHeights.push({ hpt: 44 });
+      }
+
+      rows.push([]);
+      rowHeights.push({ hpt: 8 });
+    });
+  }
+
+  const sheet = XLSX.utils.aoa_to_sheet(rows);
+  sheet["!merges"] = merges;
+  sheet["!cols"] = [
+    { wch: 13 },
+    { wch: 24 },
+    { wch: 24 },
+    { wch: 24 },
+    { wch: 24 },
+    { wch: 24 },
+    { wch: 24 },
+    { wch: 24 },
+  ];
+  sheet["!rows"] = rowHeights;
+  return sheet;
+}
+
+function buildGroupMeta(groupe) {
+  const sessionLabel = composeSessionLabel(groupe?.session, groupe?.annee);
+  return {
+    entityType: "groupe",
+    kindLabel: "Horaire du groupe",
+    subjectLabel: cleanString(groupe?.nom_groupe) || "Groupe",
+    mainTitle: `Horaire du groupe ${cleanString(groupe?.nom_groupe) || "Sans nom"}`,
+    infoParts: [
+      sessionLabel ? `Session ${sessionLabel}` : "Session active",
+      cleanString(groupe?.programme) ? `Programme ${groupe.programme}` : null,
+      groupe?.etape !== null && groupe?.etape !== undefined ? `Etape ${groupe.etape}` : null,
+      groupe?.effectif !== null && groupe?.effectif !== undefined ? `Effectif ${groupe.effectif}` : null,
+      `Exporte le ${formatToday()}`,
+    ].filter(Boolean),
+    defaultGroup: cleanString(groupe?.nom_groupe),
+  };
+}
+
+function buildProfesseurMeta(professeur) {
+  const fullName = `${cleanString(professeur?.prenom)} ${cleanString(professeur?.nom)}`.trim();
+  const sessionLabel = composeSessionLabel(professeur?.session, professeur?.annee);
+  return {
+    entityType: "professeur",
+    kindLabel: "Horaire du professeur",
+    subjectLabel: fullName || "Professeur",
+    mainTitle: `Horaire du professeur ${fullName || "sans nom"}`,
+    infoParts: [
+      sessionLabel ? `Session ${sessionLabel}` : "Session active",
+      cleanString(professeur?.matricule) ? `Matricule ${professeur.matricule}` : null,
+      cleanString(professeur?.programmes_assignes || professeur?.specialite)
+        ? `Programme ${professeur.programmes_assignes || professeur.specialite}`
+        : null,
+      `Exporte le ${formatToday()}`,
+    ].filter(Boolean),
+  };
+}
+
+function buildEtudiantMeta(etudiant, resume = null) {
+  const fullName = `${cleanString(etudiant?.prenom)} ${cleanString(etudiant?.nom)}`.trim();
+  const sessionLabel = composeSessionLabel(etudiant?.session, etudiant?.annee);
+  return {
+    entityType: "etudiant",
+    kindLabel: "Horaire de l'etudiant",
+    subjectLabel: fullName || "Etudiant",
+    mainTitle: `Horaire de l'etudiant ${fullName || "sans nom"}`,
+    infoParts: [
+      sessionLabel ? `Session ${sessionLabel}` : "Session active",
+      cleanString(etudiant?.matricule) ? `Matricule ${etudiant.matricule}` : null,
+      cleanString(etudiant?.programme) ? `Programme ${etudiant.programme}` : null,
+      etudiant?.etape !== null && etudiant?.etape !== undefined ? `Etape ${etudiant.etape}` : null,
+      cleanString(etudiant?.groupe) ? `Groupe principal ${etudiant.groupe}` : null,
+      resume?.charge_cible !== null && resume?.charge_cible !== undefined
+        ? `Charge cible ${resume.charge_cible}`
+        : null,
+      `Exporte le ${formatToday()}`,
+    ].filter(Boolean),
+    defaultGroup: cleanString(etudiant?.groupe),
+  };
+}
+
+function buildGroupDetailedRows(groupe, sessions) {
+  return safeArray(sessions)
+    .slice()
+    .sort(sortSessions)
+    .map((session) => ({
+      date: formatDateLong(session.date),
+      day: formatDateShort(session.date),
+      start: formatTime(session.heure_debut),
+      end: formatTime(session.heure_fin),
+      code: cleanString(session.code_cours),
+      title: cleanString(session.nom_cours),
+      room: formatRoom(session),
+      roomType: cleanString(session.type_salle) || "-",
+      professor: formatProfessor(session),
+      group: cleanString(groupe?.nom_groupe),
+      program: cleanString(groupe?.programme),
+      step: groupe?.etape ?? "-",
+    }));
+}
+
+function buildProfesseurDetailedRows(professeur, sessions) {
+  const fullName = `${cleanString(professeur?.prenom)} ${cleanString(professeur?.nom)}`.trim();
+
+  return safeArray(sessions)
+    .slice()
+    .sort(sortSessions)
+    .map((session) => ({
+      date: formatDateLong(session.date),
+      day: formatDateShort(session.date),
+      start: formatTime(session.heure_debut),
+      end: formatTime(session.heure_fin),
+      code: cleanString(session.code_cours),
+      title: cleanString(session.nom_cours),
+      groups: cleanString(session.groupes) || "-",
+      room: formatRoom(session),
+      roomType: cleanString(session.type_salle) || "-",
+      professor: fullName || "Professeur",
+      matricule: cleanString(professeur?.matricule) || "-",
+      program: cleanString(professeur?.programmes_assignes || professeur?.specialite) || "-",
+      step: cleanString(session.etape_etude) || "-",
+    }));
+}
+
+function buildEtudiantDetailedRows(etudiant, sessions) {
+  return safeArray(sessions)
+    .slice()
+    .sort(sortSessions)
+    .map((session) => ({
+      date: formatDateLong(session.date),
+      day: formatDateShort(session.date),
+      start: formatTime(session.heure_debut),
+      end: formatTime(session.heure_fin),
+      code: cleanString(session.code_cours),
+      title: cleanString(session.nom_cours),
+      type: Boolean(session.est_reprise) ? "Reprise" : "Groupe principal",
+      reprise: Boolean(session.est_reprise) ? "Oui" : "Non",
+      room: formatRoom(session),
+      professor: formatProfessor(session),
+      mainGroup: cleanString(etudiant?.groupe) || "-",
+      trackedGroup: formatStudentSource(session, etudiant?.groupe),
+      status: cleanString(session.statut_reprise) || "-",
+      source: cleanString(session.source_horaire) || "-",
+      note: session.note_echec === null || session.note_echec === undefined ? "-" : String(session.note_echec),
+    }));
+}
+
+function buildRepriseRows(reprises) {
+  return safeArray(reprises).map((reprise) => ({
+    code: cleanString(reprise.code_cours),
+    title: cleanString(reprise.nom_cours),
+    step: cleanString(reprise.etape_etude) || "-",
+    status: cleanString(reprise.statut) || "-",
+    note: reprise.note_echec === null || reprise.note_echec === undefined ? "-" : String(reprise.note_echec),
+    trackedGroup: cleanString(reprise.groupe_reprise) || "Non assigne",
+  }));
+}
+
+function mergeStudentSessions(horaire, horaireReprises) {
+  const merged = [...safeArray(horaire), ...safeArray(horaireReprises)];
+  const seen = new Set();
+
+  return merged
+    .filter((session) => {
+      const key = [
+        cleanString(session?.source_horaire),
+        Number(session?.id_affectation_cours || 0),
+        Number(session?.id_plage_horaires || 0),
+        cleanString(session?.date),
+        formatTime(session?.heure_debut),
+        formatTime(session?.heure_fin),
+        cleanString(session?.code_cours),
+        Boolean(session?.est_reprise) ? "1" : "0",
+      ].join("|");
+
+      if (seen.has(key)) {
+        return false;
+      }
+
+      seen.add(key);
+      return true;
+    })
+    .sort(sortSessions);
+}
+
+function finalizePdf(doc) {
+  const range = doc.bufferedPageRange();
+
+  for (let offset = 0; offset < range.count; offset += 1) {
+    doc.switchToPage(range.start + offset);
+    const footerY = doc.page.height - doc.page.margins.bottom + 6;
+    doc
+      .font("Helvetica")
+      .fontSize(7)
+      .fillColor(COLORS.muted)
+      .text(`HORAIRE 5 | Exporte le ${formatToday()}`, doc.page.margins.left, footerY, {
+        lineBreak: false,
+      })
+      .text(`Page ${offset + 1} / ${range.count}`, doc.page.margins.left, footerY, {
+        width: doc.page.width - doc.page.margins.left - doc.page.margins.right,
+        align: "right",
+        lineBreak: false,
+      });
+  }
+}
+
+function appendWeeklyPages(doc, meta, sessions) {
+  const weeks = groupSessionsByWeek(sessions);
+
+  if (weeks.length === 0) {
+    doc.addPage(PDF_PAGE);
+    const headerBottom = drawHeader(doc, meta, "Vue hebdomadaire");
+    const sectionBottom = drawSectionBanner(doc, "Vue hebdomadaire", null, headerBottom);
+    doc
+      .font("Helvetica")
+      .fontSize(10)
+      .fillColor(COLORS.muted)
+      .text("Aucune seance planifiee pour cet export.", doc.page.margins.left, sectionBottom + 12, {
+        width: doc.page.width - doc.page.margins.left - doc.page.margins.right,
+        align: "center",
+      });
+    return;
+  }
+
+  weeks.forEach((week) => {
+    doc.addPage(PDF_PAGE);
+    drawWeekGrid(doc, meta, week.weekStart, week.sessions);
+  });
+}
+
+function createPdf(meta) {
+  const doc = new PDFDocument({
+    ...PDF_PAGE,
+    autoFirstPage: false,
+    bufferPages: true,
+    compress: false,
+    info: {
+      Title: meta.mainTitle,
+      Author: "HORAIRE 5",
+      Subject: meta.kindLabel,
+    },
+  });
+  const chunks = [];
+  const bufferPromise = new Promise((resolve, reject) => {
+    doc.on("data", (chunk) => chunks.push(chunk));
+    doc.on("end", () => resolve(Buffer.concat(chunks)));
+    doc.on("error", reject);
+  });
+
+  return { doc, bufferPromise };
+}
+
+function buildGroupPdfColumns() {
+  return [
+    { label: "Date", ratio: 2.8, value: (row) => row.date },
+    { label: "Debut", ratio: 1, value: (row) => row.start },
+    { label: "Fin", ratio: 1, value: (row) => row.end },
+    { label: "Code", ratio: 1.2, value: (row) => row.code },
+    { label: "Cours", ratio: 3.6, value: (row) => row.title },
+    { label: "Professeur", ratio: 2.4, value: (row) => row.professor },
+    { label: "Salle", ratio: 1.6, value: (row) => row.room },
+  ];
+}
+
+function buildProfesseurPdfColumns() {
+  return [
+    { label: "Date", ratio: 2.8, value: (row) => row.date },
+    { label: "Debut", ratio: 1, value: (row) => row.start },
+    { label: "Fin", ratio: 1, value: (row) => row.end },
+    { label: "Code", ratio: 1.1, value: (row) => row.code },
+    { label: "Cours", ratio: 3.2, value: (row) => row.title },
+    { label: "Groupes", ratio: 2.4, value: (row) => row.groups },
+    { label: "Salle", ratio: 1.5, value: (row) => row.room },
+  ];
+}
+
+function buildEtudiantPdfColumns() {
+  return [
+    { label: "Date", ratio: 2.8, value: (row) => row.date },
+    { label: "Debut", ratio: 1, value: (row) => row.start },
+    { label: "Fin", ratio: 1, value: (row) => row.end },
+    { label: "Code", ratio: 1.1, value: (row) => row.code },
+    {
+      label: "Cours",
+      ratio: 3.1,
+      value: (row) => row.title,
+      emphasis: (row) => row.reprise === "Oui",
+      color: (row) => (row.reprise === "Oui" ? COLORS.warning : COLORS.text),
+    },
+    { label: "Type", ratio: 1.6, value: (row) => row.type },
+    { label: "Groupe", ratio: 2.1, value: (row) => row.trackedGroup },
+    { label: "Salle", ratio: 1.5, value: (row) => row.room },
+    { label: "Professeur", ratio: 2.3, value: (row) => row.professor },
+  ];
+}
+
+function buildReprisePdfColumns() {
+  return [
+    { label: "Code", ratio: 1.2, value: (row) => row.code },
+    { label: "Cours", ratio: 3.6, value: (row) => row.title },
+    { label: "Etape", ratio: 1.2, value: (row) => row.step },
+    { label: "Statut", ratio: 1.8, value: (row) => row.status },
+    { label: "Note echec", ratio: 1.3, value: (row) => row.note },
+    { label: "Groupe reprise", ratio: 2.9, value: (row) => row.trackedGroup },
+  ];
+}
+
+export async function genererPDFGroupe({ groupe, horaire }) {
+  const meta = buildGroupMeta(groupe);
+  const { doc, bufferPromise } = createPdf(meta);
+
+  appendWeeklyPages(doc, meta, horaire);
+  drawTablePages(
+    doc,
+    meta,
+    "Seances detaillees",
+    buildGroupDetailedRows(groupe, horaire),
+    buildGroupPdfColumns(),
+    "Aucune seance detaillee a afficher."
+  );
+
+  finalizePdf(doc);
+  doc.end();
+  return bufferPromise;
+}
+
+export async function genererPDFProfesseur({ professeur, horaire }) {
+  const meta = buildProfesseurMeta(professeur);
+  const { doc, bufferPromise } = createPdf(meta);
+
+  appendWeeklyPages(doc, meta, horaire);
+  drawTablePages(
+    doc,
+    meta,
+    "Seances detaillees",
+    buildProfesseurDetailedRows(professeur, horaire),
+    buildProfesseurPdfColumns(),
+    "Aucune seance detaillee a afficher."
+  );
+
+  finalizePdf(doc);
+  doc.end();
+  return bufferPromise;
+}
+
+export async function genererPDFEtudiant({
+  etudiant,
+  horaire,
+  horaire_reprises,
+  reprises,
+  resume,
+}) {
+  const mergedSchedule = mergeStudentSessions(horaire, horaire_reprises);
+  const detailedRows = buildEtudiantDetailedRows(etudiant, mergedSchedule);
+  const repriseRows = buildRepriseRows(reprises).filter(
+    (row) => row.status.toLowerCase() !== "planifie" || row.trackedGroup === "Non assigne"
+  );
+  const meta = buildEtudiantMeta(etudiant, resume);
+  const { doc, bufferPromise } = createPdf(meta);
+
+  appendWeeklyPages(doc, meta, mergedSchedule);
+  drawTablePages(
+    doc,
+    meta,
+    "Seances detaillees",
+    detailedRows,
+    buildEtudiantPdfColumns(),
+    "Aucune seance detaillee a afficher."
+  );
+
+  if (repriseRows.length > 0) {
+    drawTablePages(
+      doc,
+      meta,
+      "Reprises a suivre",
+      repriseRows,
+      buildReprisePdfColumns(),
+      "Aucune reprise a afficher."
+    );
+  }
+
+  finalizePdf(doc);
+  doc.end();
+  return bufferPromise;
+}
+
+export function genererExcelGroupe({ groupe, horaire }) {
+  const workbook = XLSX.utils.book_new();
+  const meta = buildGroupMeta(groupe);
+  const detailedRows = buildGroupDetailedRows(groupe, horaire);
+
+  XLSX.utils.book_append_sheet(workbook, buildWeeklySheet(meta, horaire), "Vue hebdo");
+  XLSX.utils.book_append_sheet(
+    workbook,
+    buildWorkbookSheet(
+      meta.mainTitle,
+      meta.infoParts.join(" | "),
+      [
+        { label: "Date", width: 26, value: (row) => row.date },
+        { label: "Jour", width: 12, value: (row) => row.day },
+        { label: "Heure debut", width: 11, value: (row) => row.start },
+        { label: "Heure fin", width: 11, value: (row) => row.end },
+        { label: "Code cours", width: 14, value: (row) => row.code },
+        { label: "Nom cours", width: 34, value: (row) => row.title },
+        { label: "Salle", width: 16, value: (row) => row.room },
+        { label: "Type salle", width: 16, value: (row) => row.roomType },
+        { label: "Professeur", width: 26, value: (row) => row.professor },
+        { label: "Groupe", width: 18, value: (row) => row.group },
+        { label: "Programme", width: 18, value: (row) => row.program },
+        { label: "Etape", width: 10, value: (row) => row.step },
+      ],
+      detailedRows
+    ),
+    "Seances detaillees"
+  );
+
+  return XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+}
+
+export function genererExcelProfesseur({ professeur, horaire }) {
+  const workbook = XLSX.utils.book_new();
+  const meta = buildProfesseurMeta(professeur);
+  const detailedRows = buildProfesseurDetailedRows(professeur, horaire);
+
+  XLSX.utils.book_append_sheet(workbook, buildWeeklySheet(meta, horaire), "Vue hebdo");
+  XLSX.utils.book_append_sheet(
+    workbook,
+    buildWorkbookSheet(
+      meta.mainTitle,
+      meta.infoParts.join(" | "),
+      [
+        { label: "Date", width: 26, value: (row) => row.date },
+        { label: "Jour", width: 12, value: (row) => row.day },
+        { label: "Heure debut", width: 11, value: (row) => row.start },
+        { label: "Heure fin", width: 11, value: (row) => row.end },
+        { label: "Code cours", width: 14, value: (row) => row.code },
+        { label: "Nom cours", width: 34, value: (row) => row.title },
+        { label: "Groupes", width: 24, value: (row) => row.groups },
+        { label: "Salle", width: 16, value: (row) => row.room },
+        { label: "Type salle", width: 16, value: (row) => row.roomType },
+        { label: "Professeur", width: 26, value: (row) => row.professor },
+        { label: "Matricule", width: 16, value: (row) => row.matricule },
+        { label: "Programme", width: 24, value: (row) => row.program },
+        { label: "Etape", width: 10, value: (row) => row.step },
+      ],
+      detailedRows
+    ),
+    "Seances detaillees"
+  );
+
+  return XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+}
+
+export function genererExcelEtudiant({
+  etudiant,
+  horaire,
+  horaire_reprises,
+  reprises,
+  resume,
+}) {
+  const workbook = XLSX.utils.book_new();
+  const mergedSchedule = mergeStudentSessions(horaire, horaire_reprises);
+  const meta = buildEtudiantMeta(etudiant, resume);
+  const detailedRows = buildEtudiantDetailedRows(etudiant, mergedSchedule);
+  const repriseRows = buildRepriseRows(reprises);
+
+  XLSX.utils.book_append_sheet(workbook, buildWeeklySheet(meta, mergedSchedule), "Vue hebdo");
+  XLSX.utils.book_append_sheet(
+    workbook,
+    buildWorkbookSheet(
+      meta.mainTitle,
+      meta.infoParts.join(" | "),
+      [
+        { label: "Date", width: 26, value: (row) => row.date },
+        { label: "Jour", width: 12, value: (row) => row.day },
+        { label: "Heure debut", width: 11, value: (row) => row.start },
+        { label: "Heure fin", width: 11, value: (row) => row.end },
+        { label: "Code cours", width: 14, value: (row) => row.code },
+        { label: "Nom cours", width: 34, value: (row) => row.title },
+        { label: "Type", width: 18, value: (row) => row.type },
+        { label: "Reprise", width: 11, value: (row) => row.reprise },
+        { label: "Salle", width: 16, value: (row) => row.room },
+        { label: "Professeur", width: 26, value: (row) => row.professor },
+        { label: "Groupe principal", width: 20, value: (row) => row.mainGroup },
+        { label: "Groupe suivi", width: 22, value: (row) => row.trackedGroup },
+        { label: "Statut reprise", width: 18, value: (row) => row.status },
+        { label: "Source", width: 14, value: (row) => row.source },
+        { label: "Note echec", width: 12, value: (row) => row.note },
+      ],
+      detailedRows
+    ),
+    "Seances detaillees"
+  );
+
+  if (repriseRows.length > 0) {
+    XLSX.utils.book_append_sheet(
+      workbook,
+      buildWorkbookSheet(
+        `${meta.mainTitle} - Reprises`,
+        meta.infoParts.join(" | "),
+        [
+          { label: "Code cours", width: 14, value: (row) => row.code },
+          { label: "Nom cours", width: 34, value: (row) => row.title },
+          { label: "Etape", width: 12, value: (row) => row.step },
+          { label: "Statut", width: 16, value: (row) => row.status },
+          { label: "Note echec", width: 12, value: (row) => row.note },
+          { label: "Groupe reprise", width: 22, value: (row) => row.trackedGroup },
+        ],
+        repriseRows
+      ),
+      "Reprises"
+    );
+  }
+
+  return XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
 }
