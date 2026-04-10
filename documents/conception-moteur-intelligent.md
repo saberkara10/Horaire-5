@@ -1,254 +1,496 @@
-# Conception du moteur intelligent de planification
+# Conception bout en bout du moteur intelligent de planification
 
-## 1. Objectif
+## 1. Objectif du scheduler
 
-Le moteur intelligent de planification est le coeur decisionnel du projet.
+Le moteur intelligent de planification est le sous-systeme qui produit,
+reconstruit et explique l'horaire academique d'une session.
 
-Il a pour role de :
+Il ne se limite pas a creer des affectations :
 
-- charger le contexte academique de la session cible ;
-- former ou reajuster les groupes reels ;
-- reserver un motif hebdomadaire stable pour chaque cours ;
-- traiter les reprises issues des cours echoues ;
-- evaluer la qualite de la solution ;
-- persister les affectations et les rapports d'execution.
+- il assure le schema minimal requis au runtime ;
+- il peut completer un jeu de donnees academique operationnel ;
+- il charge le contexte pedagogique et logistique de la session ;
+- il forme des groupes reels par `programme + etape` ;
+- il genere une semaine type stable repliquee sur toute la session ;
+- il rattache les cours echoues a des groupes reels deja planifies ;
+- il calcule un score qualite et persiste un rapport metier exploitable ;
+- il alimente les flux annexes de regeneration ciblee et de replanification locale.
 
-Le module de reference est compose principalement de :
+Le present document est aligne avec :
 
 - `Backend/routes/scheduler.routes.js`
+- `Backend/routes/groupes.routes.js`
+- `Backend/routes/professeurs.routes.js`
 - `Backend/src/services/scheduler/SchedulerEngine.js`
+- `Backend/src/services/scheduler/SchedulerDataBootstrap.js`
 - `Backend/src/services/scheduler/ContextLoader.js`
 - `Backend/src/services/scheduler/GroupFormer.js`
 - `Backend/src/services/scheduler/ConstraintMatrix.js`
+- `Backend/src/services/scheduler/AvailabilityChecker.js`
 - `Backend/src/services/scheduler/FailedCourseEngine.js`
 - `Backend/src/services/scheduler/SchedulerReportService.js`
+- `Backend/src/services/academic-scheduler-schema.js`
+- `Backend/src/services/professeurs/availability-rescheduler.js`
+- `Frontend/src/pages/SchedulerPage.jsx`
+- `Frontend/src/pages/DisponibilitesProfesseursPage.jsx`
 
-## 2. Positionnement dans l'architecture
+## 2. Perimetre fonctionnel
 
-Le moteur intelligent n'est pas un simple CRUD d'affectations.
+Le scheduler couvre les flux suivants :
 
-Il orchestre plusieurs sous-systemes :
+- bootstrap academique et operationnel ;
+- gestion des sessions cibles ;
+- generation complete d'une session via `/api/scheduler` ;
+- diffusion de l'avancement via SSE ;
+- consultation d'historique et lecture de rapports enrichis ;
+- gestion des reprises via `cours_echoues` ;
+- gestion des absences professeurs et des indisponibilites salles ;
+- gestion des prerequis de cours ;
+- generation ciblee par groupe via `/api/groupes` ;
+- replanification locale quand les disponibilites d'un professeur changent.
 
-- le bootstrap academique ;
-- la lecture des donnees metier de la session ;
-- la modelisation des contraintes en memoire ;
-- la generation recurrente des seances ;
-- l'affectation des reprises et les diagnostics ;
-- la persistance transactionnelle ;
-- l'historisation des rapports.
+Le scheduler doit etre distingue de la planification standard exposee sous
+`/api/horaires` :
 
-```mermaid
-flowchart LR
-    A[API Scheduler] --> B[Schema + Bootstrap]
-    B --> C[ContextLoader]
-    C --> D[GroupFormer]
-    D --> E[ConstraintMatrix]
-    E --> F[Generation hebdomadaire]
-    F --> G[Passes de recuperation]
-    G --> H[FailedCourseEngine]
-    H --> I[Evaluation qualite]
-    I --> J[Persistance + rapports]
-```
+- le module standard est un CRUD transactionnel centre sur l'affectation ;
+- le scheduler est un orchestrateur multi-etapes centre sur la session ;
+- le scheduler reconstruit un motif recurrent et produit des diagnostics ;
+- le scheduler manipule explicitement les reprises, les rapports et les
+  ajustements locaux.
 
-## 3. Entrees metier
+## 3. Acteurs et cas d'usage
 
-Le moteur travaille sur une session academique active ou explicite.
+![Diagramme de cas d'usage du scheduler](diagrammes/scheduler-use-case.svg)
 
-Les entrees principales sont :
+Lecture du diagramme :
 
-- `sessions`
-- `cours`
-- `professeurs`
-- `professeur_cours`
-- `disponibilites_professeurs`
-- `absences_professeurs`
-- `salles`
-- `salles_indisponibles`
-- `etudiants`
-- `groupes_etudiants`
-- `cours_echoues`
-- `prerequis_cours`
-- `affectations` deja existantes de la session
+- `Admin` pilote la session, le bootstrap, la generation complete et les
+  objets de contrainte ;
+- `Responsable` consulte les rapports, lance des generations ciblees et
+  exploite les diagnostics ;
+- la mise a jour des disponibilites professeurs prolonge le scheduler par
+  une replanification locale au lieu de casser silencieusement l'horaire ;
+- le rapport de generation est un livrable fonctionnel, pas un simple log.
 
-Les parametres d'execution sont :
+## 4. Positionnement dans l'architecture
 
-- `id_session`
-- `id_utilisateur`
-- `inclure_weekend` ; le code force actuellement le mode sans weekend
-- `sa_params`
-- `onProgress` pour le flux SSE
+### 4.1 Vue composants
 
-## 4. Pipeline reel du moteur
+![Diagramme de composants du scheduler](diagrammes/scheduler-components.svg)
 
-### 4.1 Preparation du schema
+La decomposition reelle du projet suit cinq couches :
 
-Avant toute generation, le module appelle `assurerSchemaSchedulerAcademique`.
+- presentation : `SchedulerPage` et `DisponibilitesProfesseursPage` ;
+- exposition API : `scheduler.routes.js`, `groupes.routes.js`,
+  `professeurs.routes.js` ;
+- orchestration : `SchedulerEngine` et `SchedulerDataBootstrap` ;
+- domaine : `ContextLoader`, `GroupFormer`, `ConstraintMatrix`,
+  `AvailabilityChecker`, `FailedCourseEngine` ;
+- persistence et lecture metier : MySQL, `SchedulerReportService`,
+  `availability-rescheduler` et le journal de replanification.
 
-Cette couche garantit la presence ou l'evolution de structures indispensables :
+### 4.2 Vue deploiement logique
 
-- `affectation_etudiants`
-- clefs et index sur `groupes_etudiants`
-- colonnes et contraintes de `cours_echoues`
+![Diagramme de deploiement logique du scheduler](diagrammes/scheduler-deployment.svg)
 
-### 4.2 Bootstrap operationnel
+La solution repose sur un deploiement web classique mais avec deux canaux :
 
-Le moteur appelle ensuite `SchedulerDataBootstrap.ensureOperationalDataset`.
+- REST pour les operations de gestion ;
+- SSE pour suivre les phases de generation longue depuis le navigateur.
 
-Cette etape cree ou complete au besoin :
+Le moteur intelligent est donc embarque dans le meme backend Express que le
+reste de l'application, sans worker externe ni ordonnanceur dedie dans l'etat
+actuel du depot.
 
-- sessions ;
-- catalogue de cours academiques ;
-- professeurs et associations cours-professeurs ;
+## 5. Pipeline de generation complete
+
+### 5.1 Vue activite
+
+![Diagramme d'activite du scheduler](diagrammes/scheduler-activity.svg)
+
+### 5.2 Vue sequence
+
+![Diagramme de sequence de generation du scheduler](diagrammes/scheduler-sequence.svg)
+
+### 5.3 Etapes reelles
+
+#### Etape 0 - Preparation technique
+
+Avant toute generation, `SchedulerEngine.generer` execute :
+
+- `assurerSchemaSchedulerAcademique()` ;
+- `SchedulerDataBootstrap.ensureOperationalDataset()`.
+
+La premiere operation garantit la presence des evolutions techniques
+indispensables :
+
+- table `affectation_etudiants` ;
+- index `uniq_groupes_session_nom` sur `groupes_etudiants` ;
+- colonne `id_groupe_reprise` et contrainte associee sur `cours_echoues`.
+
+La seconde operation assure un dataset academique minimal :
+
+- session active si aucune session n'existe ;
+- programmes de reference ;
 - salles ;
-- disponibilites standards.
+- cours du catalogue academique ;
+- professeurs et associations `professeur_cours` ;
+- disponibilites professeurs ;
+- groupes sources et etudiants de bootstrap.
 
-### 4.3 Chargement du contexte
+Le bootstrap est appele de facon non bloquante avant la generation complete :
+une erreur de bootstrap est journalisee mais ne bloque pas necessairement le
+moteur si le jeu de donnees est deja exploitable.
 
-`ContextLoader.charger` lit tout le contexte de la session cible.
+#### Etape 1 - Chargement du contexte
 
-La sortie contient :
+`ContextLoader.charger()` construit le contexte de travail de la session :
 
-- la session ;
-- la saison normalisee ;
-- les cours actifs ;
-- les professeurs et leurs cours autorises ;
-- les salles ;
-- les etudiants filtres sur la session ;
-- les groupes de la session ;
-- les disponibilites, absences et indisponibilites ;
-- les affectations existantes ;
-- les cours echoues indexees par etudiant ;
-- les prerequis.
-
-### 4.4 Formation des groupes
-
-`GroupFormer.formerGroupes` reconstruit les groupes reels par segment
-`programme + etape`.
-
-La logique reserve aussi une charge projetee pour les reprises a absorber,
-afin que les groupes reels restent capacitaires apres rattachement des cours echoues.
-
-### 4.5 Matrice de contraintes
-
-`ConstraintMatrix` construit des index de reservation en memoire.
-
-Les ressources verifiees sont :
-
+- session cible ou session active ;
+- saison normalisee ;
+- cours non archives ;
+- professeurs et leurs `cours_ids` ;
 - salles ;
-- professeurs ;
-- groupes ;
-- etudiants ;
+- etudiants filtres sur la session ;
+- groupes de la session ;
+- disponibilites et absences professeurs ;
+- indisponibilites de salles ;
+- affectations existantes de la session ;
+- cours echoues planifiables ;
+- prerequis.
+
+La session est obligatoire. Sans session, le moteur doit s'arreter proprement.
+
+#### Etape 2 - Formation des groupes reels
+
+`GroupFormer.formerGroupes()` segmente les etudiants par
+`programme + etape` puis calcule :
+
+- un nombre de groupes suffisant pour l'effectif regulier ;
+- une reserve de capacite pour les reprises a absorber ;
+- un `effectif_projete_max` par groupe ;
+- une `charge_estimee_par_cours` quand un cours attire des reprises.
+
+Le moteur ne planifie donc pas seulement des cohortes actuelles ; il planifie
+des groupes projetes qui doivent rester viables apres rattachement des reprises.
+
+#### Etape 3 - Construction de la matrice de contraintes
+
+`ConstraintMatrix` centralise les conflits en memoire pour eviter des lectures
+SQL repetitives pendant la generation.
+
+Les verifications portent sur :
+
+- occupation des salles ;
+- occupation des professeurs ;
+- occupation des groupes ;
+- occupation des etudiants ;
 - charge hebdomadaire des groupes ;
 - charge hebdomadaire des professeurs ;
 - nombre de cours distincts par professeur ;
-- nombre de groupes suivis par professeur.
+- nombre de groupes distincts par professeur.
 
-### 4.6 Generation hebdomadaire recurrente
+Cette matrice est enrichie au fur et a mesure des placements retenus.
 
-Le moteur ne choisit pas une date isolee pour chaque seance.
+#### Etape 4 - Generation de la semaine type stable
 
-Il construit d'abord une serie hebdomadaire stable :
+Le moteur ne raisonne pas seance par seance isolee.
 
-- choix d'un jour de semaine ;
-- choix d'un creneau horaire ;
-- choix d'un professeur ;
-- choix d'une salle ;
-- replication de cette combinaison sur toutes les semaines de la session.
+Il cherche une serie recurrente composee de :
 
-Cette strategie garantit un horaire lisible et stable.
+- un jour de semaine ;
+- un creneau ;
+- un professeur ;
+- une salle ou un mode en ligne ;
+- une repetition sur toutes les semaines admissibles de la session.
 
-### 4.7 Passes de recuperation
+La recherche principale applique une logique de couverture :
 
-Apres la passe principale, le moteur execute deux corrections :
+- seuil de couverture principale a `60%` des dates d'un meme jour ;
+- filtrage date par date au lieu de rejeter toute la serie au premier echec ;
+- bonus de score quand le placement colle a une preference historique ;
+- priorite aux groupes et professeurs les moins charges ;
+- respect du plafond quotidien et hebdomadaire.
 
-- `Phase 4B` : recherche assouplie pour les cours encore non planifies ;
-- `Phase 4C` : passe de garantie pour rapprocher chaque groupe du volume cible de `7` cours hebdomadaires.
+Ce mecanisme est la cle de la stabilite du scheduler : le systeme prefere un
+motif stable incomplet mais robuste a un ensemble de placements fragiles.
 
-### 4.8 Traitement des cours echoues
+#### Etape 4B - Passe assouplie
 
-`FailedCourseEngine.rattacherCoursEchoues` tente de rattacher chaque etudiant
+Si la recherche principale echoue, le moteur lance
+`_trouverSerieAssouplie()` avec une cascade de secours :
+
+- presentiel complet si une salle reste disponible ;
+- hybride si certaines dates doivent basculer en ligne ;
+- entierement en ligne si `ENABLE_ONLINE_COURSES` est active.
+
+La couverture minimale descend a `40%`.
+
+Le mode en ligne est donc un mecanisme d'assouplissement controle, pas la
+strategie nominale.
+
+#### Etape 4C - Garantie metier de 7 cours
+
+Apres les deux passes precedentes, `_passeDeGarantieGroupes()` identifie les
+groupes qui n'atteignent pas la cible hebdomadaire.
+
+La cible structurelle est :
+
+- `REQUIRED_WEEKLY_SESSIONS_PER_GROUP = 7`.
+
+Le moteur tente alors d'ajouter des cours manquants via la passe assouplie.
+Si cela reste impossible, il genere un diagnostic prefixe par `GARANTIE_...`.
+
+#### Etape 5 - Traitement des cours echoues
+
+`FailedCourseEngine.rattacherCoursEchoues()` ne cree pas de groupes speciaux
+dans le flux principal courant. Il tente plutot de rattacher chaque etudiant
 en reprise a une section reelle deja planifiee.
 
-Le moteur :
+Les controles portent sur :
 
-- indexe les sections reelles par cours ;
-- verifie la capacite restante ;
-- verifie l'absence de conflit avec l'horaire principal de l'etudiant ;
-- reserve les placements individuels dans la matrice ;
-- produit des conflits riches si aucun rattachement n'est possible.
+- existence de sections reelles pour le cours ;
+- capacite operationnelle restante ;
+- absence de conflit avec l'horaire principal ;
+- prise en charge ou non des sections en ligne.
 
-### 4.9 Evaluation de la qualite
+Les reprises retenues sont reservees dans la matrice et persistees ensuite dans
+`affectation_etudiants`.
 
-Le module `SimulatedAnnealing` existe dans le depot, mais `SchedulerEngine`
-neutralise actuellement son utilisation pour proteger la stabilite du motif hebdomadaire.
+#### Etape 6 - Evaluation qualite
 
-L'evaluation finale repose donc sur :
+`SimulatedAnnealing` existe dans le depot, mais le flux principal du moteur ne
+l'utilise pas pour modifier la solution finale.
 
-- le nombre de cours non planifies ;
-- le nombre de resolutions manuelles ;
-- le respect de la charge hebdomadaire ;
-- la repartition des jours ;
-- le taux de stabilite par rapport aux affectations de reference.
+Le score qualite calcule par `_calculerScoreQualite()` penalise notamment :
 
-### 4.10 Persistance transactionnelle
+- les cours non planifies ;
+- les resolutions manuelles ;
+- les seances hors semaine de travail ;
+- les groupes hors plage de jours actifs ;
+- les surcharges quotidiennes ;
+- les groupes sous la cible hebdomadaire ;
+- la perte de stabilite par rapport a l'historique disponible.
 
-La generation se fait dans une transaction SQL.
+#### Etape 7 - Persistance transactionnelle
 
-Les ecritures principales sont :
+La generation complete fonctionne dans une transaction SQL unique.
 
-- nettoyage de l'horaire de la session cible ;
-- persistence des groupes ;
-- mise a jour des etudiants vers leurs groupes ;
+Elle execute notamment :
+
+- suppression de l'horaire courant de la session cible ;
+- persistence ou mise a jour des groupes ;
+- mise a jour de l'appartenance des etudiants ;
 - insertion des `plages_horaires` ;
 - insertion des `affectation_cours` ;
 - insertion des `affectation_groupes` ;
-- persistence des rattachements individuels pour les reprises ;
-- ecriture de `rapports_generation`.
+- insertion des `affectation_etudiants` pour les reprises ;
+- mise a jour du statut des `cours_echoues` ;
+- insertion d'une entree dans `rapports_generation`.
 
-## 5. Sorties du moteur
+Si une etape echoue, le moteur annule la transaction complete.
 
-La sortie metier contient notamment :
+## 6. Flux annexes relies au scheduler
 
-- `score_qualite`
-- `score_initial`
-- `nb_cours_planifies`
-- `nb_cours_non_planifies`
-- `nb_cours_echoues_traites`
-- `nb_cours_en_ligne_generes`
-- `nb_resolutions_manuelles`
-- `affectations`
-- `non_planifies`
-- `resolutions_manuelles`
-- `groupes_crees`
-- `details.qualite`
-- `details.reprises`
+### 6.1 Generation ciblee par groupe
 
-## 6. Contraintes metier structurantes
+`SchedulerEngine.genererGroupe()` est expose indirectement par :
 
-- une session cible doit exister ;
-- les etudiants sont filtres par session academique ;
-- les conflits temporels sont interdits pour salle, professeur, groupe et etudiant ;
-- un professeur ne peut depasser ses plafonds de charge ;
-- un groupe doit tendre vers 7 cours hebdomadaires ;
-- le weekend n'est pas utilise par le moteur actuel ;
-- les cours en ligne ne sont autorises que si `ENABLE_ONLINE_COURSES` est active ;
-- les reprises privilegient des groupes reels deja planifies plutot que des groupes speciaux.
+- `POST /api/groupes/generer-cible`
+- `POST /api/groupes/:id/generer-horaire`
 
-## 7. Points de vigilance
+Cette generation :
 
-- Le moteur modifie les groupes et les horaires de la session cible.
-- Le module de recuit simule est present mais volontairement desactive dans le flux final.
-- La qualite de sortie depend fortement de la qualite des associations `professeur_cours`, des disponibilites et du catalogue de salles.
-- Les rapports servent a expliquer les echecs, pas seulement a compter les succes.
+- ne supprime que les affectations du groupe cible ;
+- recharge les contraintes globales des autres groupes pour eviter les conflits ;
+- integre les reprises deja rattachees a ce groupe ;
+- ne reconstitue pas de preference de stabilite historique ;
+- ne persiste pas d'entree dans `rapports_generation` dans l'etat actuel.
 
-## 8. Conclusion
+Il s'agit donc d'un flux d'ajustement local, pas d'un recalcul institutionnel.
 
-Le moteur intelligent du projet est un orchestrateur transactionnel multi-etapes.
+### 6.2 Replanification locale apres changement de disponibilites
 
-Sa valeur vient de la combinaison suivante :
+![Diagramme de sequence de replanification locale](diagrammes/scheduler-replanification-sequence.svg)
 
-- segmentation academique rigoureuse ;
-- gestion explicite des contraintes ;
-- traitement des reprises ;
-- diagnostics persistants ;
-- stabilite d'un motif recurrent sur toute la session.
+Quand les disponibilites d'un professeur sont modifiees, le module
+`professeurs.model.js` appelle
+`replanifierSeancesImpacteesParDisponibilites()`.
+
+Le service :
+
+- identifie les seances futures qui ne sont plus couvertes ;
+- cherche un nouveau creneau compatible avec les groupes, la salle et la
+  disponibilite du professeur ;
+- privilegie la meme semaine puis les semaines suivantes ;
+- met a jour les seances replacables ;
+- retire de l'horaire valide les seances impossibles a replacer ;
+- journalise l'operation dans `journal_replanifications_disponibilites`.
+
+Ce flux est volontairement local : il tente de minimiser l'impact sans relancer
+la generation complete de session.
+
+## 7. Composants coeur du moteur
+
+![Diagramme de classes du scheduler](diagrammes/scheduler-class.svg)
+
+### `SchedulerEngine`
+
+Role :
+
+- orchestrer la generation complete et ciblee ;
+- diffuser la progression ;
+- evaluer la qualite ;
+- persister les affectations et les rapports.
+
+### `SchedulerDataBootstrap`
+
+Role :
+
+- assurer qu'une session, un catalogue, des salles, des professeurs et des
+  disponibilites minimales existent ;
+- maintenir un dataset de reference coherent avec le catalogue academique.
+
+### `ContextLoader`
+
+Role :
+
+- fournir un contexte de session complet et normalise ;
+- filtrer les etudiants par saison/session ;
+- preparer les index de disponibilites, absences, indisponibilites et reprises.
+
+### `GroupFormer`
+
+Role :
+
+- former les groupes reels de travail ;
+- projeter la charge de reprises dans les capacites cibles.
+
+### `ConstraintMatrix`
+
+Role :
+
+- reserver et liberer les ressources en memoire ;
+- verifier les conflits temporels et les plafonds.
+
+### `AvailabilityChecker`
+
+Role :
+
+- centraliser la compatibilite professeur/cours et salle/cours ;
+- verifier disponibilites, absences et indisponibilites.
+
+### `FailedCourseEngine`
+
+Role :
+
+- rattacher les cours echoues a des groupes reels ;
+- produire des raisons de conflit explicites quand le rattachement echoue.
+
+### `SchedulerReportService`
+
+Role :
+
+- lire l'historique ;
+- enrichir les rapports avec contexte metier, ressources compatibles et actions
+  manuelles suggerees.
+
+## 8. Modele de donnees
+
+![Diagramme entite-relation du scheduler](diagrammes/scheduler-er.svg)
+
+Le modele de donnees du scheduler s'articule autour de quatre blocs.
+
+### 8.1 Pilotage et contraintes
+
+- `sessions`
+- `prerequis_cours`
+- `disponibilites_professeurs`
+- `absences_professeurs`
+- `salles_indisponibles`
+
+### 8.2 Ressources academiques
+
+- `cours`
+- `professeurs`
+- `professeur_cours`
+- `salles`
+- `groupes_etudiants`
+- `etudiants`
+
+### 8.3 Execution de planning
+
+- `plages_horaires`
+- `affectation_cours`
+- `affectation_groupes`
+- `affectation_etudiants`
+
+### 8.4 Diagnostic et historisation
+
+- `cours_echoues`
+- `rapports_generation`
+- `journal_replanifications_disponibilites`
+
+Deux particularites sont structurantes :
+
+- le nom de groupe est rendu unique par session et non plus globalement ;
+- `rapports_generation.details` et le journal de replanification stockent des
+  structures JSON riches pour l'analyse metier.
+
+## 9. Regles metier structurantes
+
+- une generation complete doit toujours etre attachee a une session active ou
+  explicite ;
+- le moteur force actuellement `weekendAutorise = false`, meme si le payload
+  expose `inclure_weekend` ;
+- la semaine type vise `7` cours et `3 a 4` jours actifs par groupe ;
+- un groupe ne doit pas depasser `3` seances par jour ;
+- un professeur ne doit pas depasser `4` seances par jour ;
+- les plafonds hebdomadaires et de portefeuille professeur combinent des
+  constantes du catalogue et des variables d'environnement ;
+- `professeur_cours` est la source de verite pour la compatibilite
+  professeur/cours ; a defaut, la specialite texte sert de fallback ;
+- les cours en ligne sont desactives par defaut ;
+- les reprises privilegient les groupes reels existants plutot que des groupes
+  dedies ;
+- le rapport final doit expliquer les echecs et proposer une action manuelle
+  plausible.
+
+## 10. Invariants architecturaux
+
+- la generation complete est transactionnelle ;
+- la generation ciblee doit rester localisee a un groupe ;
+- une seance invalide ne doit pas rester dans l'horaire valide apres une
+  replanification en echec ;
+- les diagnostics metier doivent etre persistables et relisibles apres coup ;
+- la stabilite hebdomadaire prime sur une optimisation locale aggressive.
+
+## 11. Points de vigilance
+
+- `sa_params` est recu par l'API mais le recuit simule est neutralise dans le
+  flux final ;
+- la qualite depend fortement des associations `professeur_cours`, des salles
+  et des disponibilites ;
+- le bootstrap peut modifier ou archiver des donnees de reference pour rendre
+  l'environnement coherent ;
+- `assurerSchemaSchedulerAcademique()` est desactive en environnement de test,
+  ce qui est utile pour l'isolation mais masque la migration runtime ;
+- la generation ciblee n'inscrit pas de rapport dans `rapports_generation` ;
+- la replanification locale peut retirer des seances de l'horaire si aucune
+  solution compatible n'existe.
+
+## 12. Conclusion
+
+Le scheduler du projet est un moteur academique transactionnel construit autour
+de la stabilite d'une semaine type, de la gestion explicite des contraintes et
+de la production de diagnostics metier persistants.
+
+Sa valeur architecturale ne vient pas d'un algorithme unique, mais de
+l'orchestration coherente entre :
+
+- schema runtime ;
+- bootstrap academique ;
+- segmentation en groupes reels ;
+- reservation de ressources ;
+- gestion des reprises ;
+- lecture de rapports et replanification locale.
