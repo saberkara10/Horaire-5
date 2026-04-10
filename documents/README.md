@@ -7,6 +7,7 @@ Ce dossier regroupe les documents utiles du projet **Gestion des horaires**.
 - [Guide collaborateur - Git prive et codebase](guide-collaborateur-git-code.md)
 - [Guide d'installation](guide-d'installation.md)
 - [Guide des tests](guide-tests.md)
+- [Audit de couverture documentaire](audit-conception-documentation.md)
 
 ## Conception
 
@@ -18,6 +19,13 @@ Ce dossier regroupe les documents utiles du projet **Gestion des horaires**.
 - [Conception - Horaire etudiant](conception-horaires-etudiants.md)
 - [Conception - Planification](conception-planification.md)
 - [Conception - Base de donnees](conception-base-de-donnees.md)
+- [Conception - Import etudiants](conception-import-etudiants.md)
+- [Conception - Etudiants](conception-etudiants.md)
+- [Conception - Groupes](conception-groupes.md)
+- [Conception - Dashboard](conception-dashboard.md)
+- [Conception - Admins](conception-admins.md)
+- [Conception - Export](conception-export.md)
+- [Conception - Moteur intelligent](conception-moteur-intelligent.md)
 
 ## Documentation technique
 
@@ -28,14 +36,21 @@ Ce dossier regroupe les documents utiles du projet **Gestion des horaires**.
 - [Documentation - Salles](documentation-salles.md)
 - [Documentation - Importation des etudiants](documentation-import-etudiants.md)
 - [Documentation - Horaire etudiant](documentation-horaires-etudiants.md)
+- [Documentation - Planification standard](documentation-planification.md)
+- [Documentation - Gestion des etudiants](documentation-gestion-etudiants.md)
+- [Documentation - Groupes](documentation-groupes.md)
+- [Documentation - Dashboard](documentation-dashboard.md)
+- [Documentation - Admins](documentation-admins.md)
+- [Documentation - Export](documentation-export.md)
+- [Documentation - Moteur intelligent](documentation-moteur-intelligent.md)
 - [Gestion des roles](roles.md)
 
 ## Annexes
 
 - [Cahier des charges](Cahier_de_charge_G5_VF.md)
-- [Initialisation du projet - Sprint 1](Initialisation%20du%20projet_Sprint1.md)
+- [Initialisation du projet - Sprint 1](Initialisation du projet_Sprint1.md)
 - [Tests serveur - Sprint 1](Sprint1_Tester_le_serveur.md)
-- [Schema BD historique](schemaBD.png)
+- [Schema BD historique](diagrammes/database-relations.svg)
 
 ## Diagrammes
 

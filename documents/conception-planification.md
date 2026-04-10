@@ -1,62 +1,118 @@
-# Conception de la planification des horaires
+# Conception de la planification standard
 
 ## 1. Objectif
 
-La planification relie les principales ressources du projet :
+La planification standard couvre le module `/api/horaires`.
+
+Elle permet :
+
+- de lire les affectations existantes ;
+- de creer, modifier et supprimer une affectation ;
+- de lancer une generation automatique simple sur une fenetre courte.
+
+Le document de reference est aligne sur :
+
+- `Backend/routes/horaire.routes.js`
+- `Backend/src/model/horaire.js`
+
+## 2. Positionnement dans le systeme
+
+Ce module ne doit pas etre confondu avec le moteur intelligent expose sous `/api/scheduler`.
+
+La planification standard est une couche plus directe :
+
+- basee sur des validations synchrones ;
+- orientee CRUD ;
+- utile pour corriger, tester ou produire un premier horaire rapidement.
+
+Le moteur intelligent, lui, gere une orchestration academique plus large.
+
+## 3. Ressources manipulees
+
+Une affectation standard relie :
 
 - un cours ;
 - un professeur ;
 - une salle ;
-- une plage horaire ;
-- un ou plusieurs groupes d'etudiants.
+- un groupe ;
+- une plage horaire.
 
-Ce document formalise la structure cible de cette fonctionnalite a partir du schema SQL du projet.
+Les tables principales sont :
 
-## Statut actuel dans le projet
+- `cours`
+- `professeurs`
+- `salles`
+- `groupes_etudiants`
+- `plages_horaires`
+- `affectation_cours`
+- `affectation_groupes`
 
-La structure SQL de planification est bien presente dans `Backend/Database/GDH5.sql`, mais les routes backend actives du projet ne branchent pas encore ce module dans l'application principale. Les schemas ci-dessous decrivent donc la conception cible alignee avec :
+## 4. Composants techniques
 
-- le cahier des charges ;
-- le schema relationnel deja cree ;
-- l'orientation fonctionnelle du projet.
+Le module est concentre dans `Backend/src/model/horaire.js`.
 
----
+Les responsabilites principales y sont regroupees :
 
-## 2. Diagramme UML de classes de la planification
+- verifications de compatibilite professeur/cours ;
+- verifications de compatibilite salle/cours ;
+- verification des conflits ;
+- creation et mise a jour transactionnelle ;
+- generation automatique simple.
 
-![Diagramme UML de classes de la planification](diagrammes/planification-class.svg)
+## 5. Logique de validation
 
-### Lecture du schema
+Avant toute ecriture, le module verifie :
 
-- `AffectationCours` est l'entite centrale de la planification ;
-- elle depend de `Cours`, `Professeur`, `Salle` et `PlageHoraire` ;
-- `AffectationGroupes` relie ensuite l'affectation aux groupes d'etudiants.
+- la presence des identifiants metier ;
+- l'existence des ressources ;
+- la disponibilite du professeur ;
+- l'absence de conflit de groupe ;
+- l'absence de conflit de salle ;
+- l'absence de conflit de professeur ;
+- la validite de la date et de la plage horaire.
 
----
+La conception impose donc que l'affectation soit validee avant persistence,
+et non corrigee apres coup.
 
-## 3. Diagramme UML de sequence de creation d'une affectation
+## 6. Generation automatique simple
 
-![Diagramme UML de sequence de creation d une affectation](diagrammes/planification-sequence.svg)
+La fonction `genererHoraireAutomatiquement` fonctionne sur un principe plus direct
+que le scheduler avance.
 
-### Lecture du schema
+Elle :
 
-- le responsable selectionne les ressources necessaires ;
-- le backend controle l'existence des donnees ;
-- les conflits potentiels sont verifies ;
-- la plage horaire, l'affectation et les associations de groupes sont ensuite enregistrees.
+- cible un `programme`, une `etape` et une `session` ;
+- calcule ou cree les groupes compatibles de la cohorte ;
+- parcourt une fenetre courte de `10` jours ;
+- teste des creneaux de depart predefinis ;
+- choisit professeurs et salles compatibles ;
+- persiste les affectations creees.
 
----
+Cette generation reste utile pour :
 
-## 4. Regles metier attendues
+- des jeux de test ;
+- des corrections rapides ;
+- des environnements ou le moteur intelligent n'est pas encore requis.
 
-- une affectation doit referencer des ressources existantes ;
-- une salle ne doit pas etre reservee a deux cours au meme moment ;
-- un professeur ne doit pas etre affecte a deux cours simultanes ;
-- un groupe ne doit pas suivre deux cours sur le meme creneau ;
-- l'horaire d'un etudiant decoule du groupe auquel il appartient.
+## 7. Regles metier structurantes
 
----
+- une affectation ne peut pas superposer un groupe deja reserve ;
+- un professeur ne peut pas etre double-booke ;
+- une salle ne peut pas etre double-bookee ;
+- les salles doivent etre compatibles avec le type de cours et la capacite cible ;
+- les professeurs doivent etre compatibles avec le cours et sous le plafond de charge hebdomadaire.
 
-## 5. Conclusion
+## 8. Relation avec les autres modules
 
-La planification est le point de convergence du systeme. Les deux diagrammes integres donnent une vue claire de sa structure et de son deroulement metier.
+- `groupes` fournit la cible pedagogique ;
+- `professeurs` fournit la disponibilite et la compatibilite ;
+- `salles` fournit les ressources physiques ;
+- `etudiants` consomme indirectement les horaires de groupe ;
+- `scheduler` constitue la version avancee et plus complete de la planification.
+
+## 9. Conclusion
+
+La planification standard est la couche de reservation et de correction rapide des horaires.
+
+Elle reste volontairement plus simple que le moteur intelligent, mais elle conserve
+les controles de coherence indispensables a l'integrite des affectations.
