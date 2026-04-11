@@ -1,0 +1,39 @@
+flowchart LR
+    admin[Admin]
+    responsable[Responsable]
+
+    uc_bootstrap((Preparer le jeu de donnees))
+    uc_sessions((Creer ou activer une session))
+    uc_generate((Lancer une generation complete))
+    uc_reports((Consulter les rapports et diagnostics))
+    uc_failures((Gerer les cours echoues))
+    uc_absences((Declarer des absences professeurs))
+    uc_rooms((Declarer des indisponibilites salles))
+    uc_prereq((Gerer les prerequis))
+    uc_target((Regenerer un groupe cible))
+    uc_availability((Mettre a jour les disponibilites professeurs))
+    uc_replan((Replanifier localement les seances impactees))
+    uc_groups((Former des groupes reels))
+    uc_weekly((Construire la semaine type stable))
+    uc_retake_attach((Rattacher les reprises a des groupes reels))
+    uc_persist((Persister l'horaire et le rapport))
+
+    admin --> uc_bootstrap
+    admin --> uc_sessions
+    admin --> uc_generate
+    admin --> uc_reports
+    admin --> uc_failures
+    admin --> uc_absences
+    admin --> uc_rooms
+    admin --> uc_prereq
+    admin --> uc_availability
+
+    responsable --> uc_reports
+    responsable --> uc_target
+    responsable --> uc_availability
+
+    uc_generate -. inclut .-> uc_groups
+    uc_generate -. inclut .-> uc_weekly
+    uc_generate -. inclut .-> uc_retake_attach
+    uc_generate -. inclut .-> uc_persist
+    uc_availability -. declenche .-> uc_replan

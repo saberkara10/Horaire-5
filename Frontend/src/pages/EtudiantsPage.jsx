@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 import { AppShell } from "../components/layout/AppShell.jsx";
+import { CourseExchangePanel } from "../components/etudiants/CourseExchangePanel.jsx";
 import { EtudiantDetails } from "../components/etudiants/EtudiantDetails.jsx";
 import { EtudiantsFilters } from "../components/etudiants/EtudiantsFilters.jsx";
 import { EtudiantsHero } from "../components/etudiants/EtudiantsHero.jsx";
@@ -45,6 +46,7 @@ export function EtudiantsPage({ utilisateur, onLogout }) {
     recharger,
     consulter,
     importer,
+    invaliderConsultations,
   } = useEtudiants();
 
   const [recherche, setRecherche] = useState("");
@@ -124,10 +126,6 @@ export function EtudiantsPage({ utilisateur, onLogout }) {
 
   useEffect(() => {
     return ecouterSynchronisationPlanning((payload) => {
-      if (!etudiantSelectionneId) {
-        return;
-      }
-
       const etudiantsImpactes = [
         ...(Array.isArray(payload?.etudiants_impactes)
           ? payload.etudiants_impactes
@@ -136,6 +134,13 @@ export function EtudiantsPage({ utilisateur, onLogout }) {
           ? payload.etudiants_reprises_impactes
           : []),
       ].map((idEtudiant) => Number(idEtudiant));
+
+      invaliderConsultations(etudiantsImpactes);
+
+      if (!etudiantSelectionneId) {
+        return;
+      }
+
       const idActif = Number(etudiantSelectionneId);
 
       if (etudiantsImpactes.length > 0 && !etudiantsImpactes.includes(idActif)) {
@@ -144,7 +149,7 @@ export function EtudiantsPage({ utilisateur, onLogout }) {
 
       chargerConsultationSelectionnee(idActif, { forcer: true });
     });
-  }, [chargerConsultationSelectionnee, etudiantSelectionneId]);
+  }, [chargerConsultationSelectionnee, etudiantSelectionneId, invaliderConsultations]);
 
   const consultationSelectionnee = etudiantSelectionneId
     ? consultationsParId[etudiantSelectionneId] || {
@@ -226,7 +231,7 @@ export function EtudiantsPage({ utilisateur, onLogout }) {
   const afficherVueDetail = vueActive === "detail" && Boolean(etudiantSelectionneId);
 
   return (
-    <AppShell utilisateur={utilisateur} onLogout={onLogout} title="Horaires etudiants" subtitle="Consultez le tronc commun des groupes et les reprises individuelles dans un horaire fusionne.">
+    <AppShell utilisateur={utilisateur} onLogout={onLogout} title="Horaires etudiants" subtitle="Consultez le groupe principal, les reprises et les exceptions individuelles de suivi dans un horaire fusionne.">
       <div className="page-layout">
         <input
           ref={inputImportRef}
@@ -270,6 +275,11 @@ export function EtudiantsPage({ utilisateur, onLogout }) {
           totalGlobal={etudiants.length}
           onRecharger={recharger}
           surChargement={etatChargement === "loading"}
+        />
+
+        <CourseExchangePanel
+          etudiants={etudiants}
+          etudiantSelectionneId={etudiantSelectionneId}
         />
 
         <div className={`content-grid ${afficherVueDetail ? "content-grid--detail" : ""}`}>

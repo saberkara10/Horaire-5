@@ -12,8 +12,12 @@ process.env.SESSION_SECRET = "test-secret";
 const horaireModelMock = {
   getAllAffectations: jest.fn(),
   getAffectationById: jest.fn(),
-  creerAffectationValidee: jest.fn(),
-  updateAffectationValidee: jest.fn(),
+  planifierAffectationManuelle: jest.fn(),
+  replanifierAffectationManuelle: jest.fn(),
+  recupererEtudiantsPourPlanificationReprise: jest.fn(),
+  recupererCoursEchouesEtudiantPlanifiables: jest.fn(),
+  recupererGroupesCompatiblesPourCoursEchoueEtudiant: jest.fn(),
+  planifierRepriseEtudiant: jest.fn(),
   genererHoraireAutomatiquement: jest.fn(),
   deleteAffectation: jest.fn(),
   deleteAllAffectations: jest.fn(),
@@ -94,6 +98,47 @@ describe("Tests routes Horaires", () => {
     });
   });
 
+  test("GET /api/horaires/reprises/etudiants retourne la liste enrichie pour la reprise manuelle", async () => {
+    horaireModelMock.recupererEtudiantsPourPlanificationReprise.mockResolvedValue([
+      {
+        id_etudiant: 25,
+        matricule: "2024001",
+        nom: "Kara",
+        prenom: "Saber",
+        groupe: "GPI-E4-2",
+        reprise_manuelle: {
+          statut: "a_traiter",
+          a_traiter: true,
+          nb_total: 2,
+          nb_planifies: 0,
+          nb_non_planifies: 2,
+        },
+      },
+    ]);
+
+    const response = await request(app).get("/api/horaires/reprises/etudiants");
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toHaveLength(1);
+    expect(
+      horaireModelMock.recupererEtudiantsPourPlanificationReprise
+    ).toHaveBeenCalledWith();
+  });
+
+  test("GET /api/horaires/reprises/etudiants retourne le status metier en cas d'erreur", async () => {
+    horaireModelMock.recupererEtudiantsPourPlanificationReprise.mockRejectedValue({
+      statusCode: 409,
+      message: "Aucune session active n'est disponible.",
+    });
+
+    const response = await request(app).get("/api/horaires/reprises/etudiants");
+
+    expect(response.statusCode).toBe(409);
+    expect(response.body).toEqual({
+      message: "Aucune session active n'est disponible.",
+    });
+  });
+
   test("GET /api/horaires retourne 500 si lecture impossible", async () => {
     horaireModelMock.getAllAffectations.mockRejectedValue(new Error("db"));
 
@@ -148,7 +193,7 @@ describe("Tests routes Horaires", () => {
   });
 
   test("POST /api/horaires retourne 201 quand le creneau est valide", async () => {
-    horaireModelMock.creerAffectationValidee.mockResolvedValue({
+    horaireModelMock.planifierAffectationManuelle.mockResolvedValue({
       id_affectation_cours: 7,
       id_plage_horaires: 3,
     });
@@ -166,7 +211,7 @@ describe("Tests routes Horaires", () => {
       });
 
     expect(response.statusCode).toBe(201);
-    expect(horaireModelMock.creerAffectationValidee).toHaveBeenCalledWith({
+    expect(horaireModelMock.planifierAffectationManuelle).toHaveBeenCalledWith({
       idCours: 1,
       idProfesseur: 2,
       idSalle: 3,
@@ -174,11 +219,53 @@ describe("Tests routes Horaires", () => {
       date: "2026-03-23",
       heureDebut: "08:00",
       heureFin: "10:00",
+      portee: {
+        mode: "single",
+        date_debut: null,
+        date_fin: null,
+      },
+    });
+  });
+
+  test("POST /api/horaires transmet la portee personnalisee au service", async () => {
+    horaireModelMock.planifierAffectationManuelle.mockResolvedValue({
+      message: "2 occurrence(s) planifiee(s).",
+    });
+
+    const response = await request(app)
+      .post("/api/horaires")
+      .send({
+        id_cours: 1,
+        id_professeur: 2,
+        id_salle: 3,
+        id_groupes_etudiants: 4,
+        date: "2026-03-23",
+        heure_debut: "08:00",
+        heure_fin: "10:00",
+        portee_mode: "custom_range",
+        date_debut_portee: "2026-03-23",
+        date_fin_portee: "2026-04-20",
+      });
+
+    expect(response.statusCode).toBe(201);
+    expect(horaireModelMock.planifierAffectationManuelle).toHaveBeenCalledWith({
+      idCours: 1,
+      idProfesseur: 2,
+      idSalle: 3,
+      idGroupeEtudiants: 4,
+      date: "2026-03-23",
+      heureDebut: "08:00",
+      heureFin: "10:00",
+      portee: {
+        mode: "custom_range",
+        date_debut: "2026-03-23",
+        date_fin: "2026-04-20",
+      },
     });
   });
 
   test("POST /api/horaires retourne le statusCode du modele en cas d'erreur metier", async () => {
-    horaireModelMock.creerAffectationValidee.mockRejectedValue({
+    horaireModelMock.planifierAffectationManuelle.mockRejectedValue({
       statusCode: 409,
       message: "Conflit detecte.",
     });
@@ -200,7 +287,7 @@ describe("Tests routes Horaires", () => {
   });
 
   test("POST /api/horaires retourne 409 si le groupe a deja un cours sur ce creneau", async () => {
-    horaireModelMock.creerAffectationValidee.mockRejectedValue({
+    horaireModelMock.planifierAffectationManuelle.mockRejectedValue({
       statusCode: 409,
       message: "Groupe deja occupe sur ce creneau.",
     });
@@ -240,7 +327,7 @@ describe("Tests routes Horaires", () => {
   });
 
   test("PUT /api/horaires/:id retourne 200 si mise a jour valide", async () => {
-    horaireModelMock.updateAffectationValidee.mockResolvedValue({
+    horaireModelMock.replanifierAffectationManuelle.mockResolvedValue({
       id_affectation_cours: 4,
       id_salle: 8,
     });
@@ -256,7 +343,7 @@ describe("Tests routes Horaires", () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(horaireModelMock.updateAffectationValidee).toHaveBeenCalledWith(4, {
+    expect(horaireModelMock.replanifierAffectationManuelle).toHaveBeenCalledWith(4, {
       idCours: 1,
       idProfesseur: 2,
       idSalle: 8,
@@ -264,11 +351,16 @@ describe("Tests routes Horaires", () => {
       date: "2026-03-24",
       heureDebut: "09:00",
       heureFin: "11:00",
+      portee: {
+        mode: "single",
+        date_debut: null,
+        date_fin: null,
+      },
     });
   });
 
   test("PUT /api/horaires/:id retourne le statusCode du modele si erreur metier", async () => {
-    horaireModelMock.updateAffectationValidee.mockRejectedValue({
+    horaireModelMock.replanifierAffectationManuelle.mockRejectedValue({
       statusCode: 404,
       message: "Affectation introuvable.",
     });
@@ -285,6 +377,57 @@ describe("Tests routes Horaires", () => {
 
     expect(response.statusCode).toBe(404);
     expect(response.body).toEqual({ message: "Affectation introuvable." });
+  });
+
+  test("GET /api/horaires/etudiants/:id/cours-echoues retourne les reprises planifiables", async () => {
+    horaireModelMock.recupererCoursEchouesEtudiantPlanifiables.mockResolvedValue([
+      { id: 10, code_cours: "INF201" },
+    ]);
+
+    const response = await request(app).get("/api/horaires/etudiants/25/cours-echoues");
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toEqual([{ id: 10, code_cours: "INF201" }]);
+    expect(
+      horaireModelMock.recupererCoursEchouesEtudiantPlanifiables
+    ).toHaveBeenCalledWith(25);
+  });
+
+  test("GET /api/horaires/etudiants/:id/cours-echoues/:idCoursEchoue/groupes-compatibles retourne les groupes filtres", async () => {
+    horaireModelMock.recupererGroupesCompatiblesPourCoursEchoueEtudiant.mockResolvedValue([
+      { id_groupes_etudiants: 4, nom_groupe: "INF-A1" },
+    ]);
+
+    const response = await request(app).get(
+      "/api/horaires/etudiants/25/cours-echoues/10/groupes-compatibles"
+    );
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toEqual([{ id_groupes_etudiants: 4, nom_groupe: "INF-A1" }]);
+    expect(
+      horaireModelMock.recupererGroupesCompatiblesPourCoursEchoueEtudiant
+    ).toHaveBeenCalledWith(25, 10);
+  });
+
+  test("POST /api/horaires/reprises rattache l'etudiant a un groupe d'accueil", async () => {
+    horaireModelMock.planifierRepriseEtudiant.mockResolvedValue({
+      message: "Cours echoue planifie pour l'etudiant.",
+    });
+
+    const response = await request(app)
+      .post("/api/horaires/reprises")
+      .send({
+        id_etudiant: 25,
+        id_cours_echoue: 10,
+        id_groupes_etudiants: 4,
+      });
+
+    expect(response.statusCode).toBe(201);
+    expect(horaireModelMock.planifierRepriseEtudiant).toHaveBeenCalledWith({
+      idEtudiant: 25,
+      idCoursEchoue: 10,
+      idGroupeEtudiants: 4,
+    });
   });
 
   test("POST /api/horaires/generer retourne 201 avec un resume de generation", async () => {

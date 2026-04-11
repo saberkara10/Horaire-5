@@ -1757,7 +1757,8 @@ export class SchedulerEngine {
     try {
       await connection.query(
         `DELETE FROM affectation_etudiants
-         WHERE id_session = ?`,
+         WHERE id_session = ?
+           AND source_type = 'reprise'`,
         [idSession]
       );
 

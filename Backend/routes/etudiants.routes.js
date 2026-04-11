@@ -10,6 +10,11 @@ import {
   recupererHoraireCompletEtudiant,
   supprimerTousLesEtudiants,
 } from "../src/model/etudiants.model.js";
+import {
+  executerEchangeCoursEtudiants,
+  listerCoursCommunsEchangeables,
+  previsualiserEchangeCoursEtudiants,
+} from "../src/services/etudiants/student-course-exchange.service.js";
 
 export default function etudiantsRoutes(app) {
   app.get("/api/etudiants", async (request, response) => {
@@ -21,6 +26,59 @@ export default function etudiantsRoutes(app) {
     } catch (error) {
       response.status(500).json({
         message: "Erreur lors de la recuperation des etudiants.",
+      });
+    }
+  });
+
+  app.get("/api/etudiants/echange-cours/options", async (request, response) => {
+    try {
+      const resultat = await listerCoursCommunsEchangeables(
+        Number(request.query.etudiant_a),
+        Number(request.query.etudiant_b)
+      );
+
+      return response.status(200).json(resultat);
+    } catch (error) {
+      return response.status(error.statusCode || 500).json({
+        message: error.message || "Erreur lors du chargement des cours communs.",
+        ...(error.code ? { code: error.code } : {}),
+        ...(error.details?.length ? { details: error.details } : {}),
+      });
+    }
+  });
+
+  app.get("/api/etudiants/echange-cours/preview", async (request, response) => {
+    try {
+      const resultat = await previsualiserEchangeCoursEtudiants({
+        idEtudiantA: Number(request.query.etudiant_a),
+        idEtudiantB: Number(request.query.etudiant_b),
+        idCours: Number(request.query.id_cours),
+      });
+
+      return response.status(200).json(resultat);
+    } catch (error) {
+      return response.status(error.statusCode || 500).json({
+        message: error.message || "Erreur lors de la previsualisation de l'echange.",
+        ...(error.code ? { code: error.code } : {}),
+        ...(error.details?.length ? { details: error.details } : {}),
+      });
+    }
+  });
+
+  app.post("/api/etudiants/echange-cours", async (request, response) => {
+    try {
+      const resultat = await executerEchangeCoursEtudiants({
+        idEtudiantA: Number(request.body?.id_etudiant_a),
+        idEtudiantB: Number(request.body?.id_etudiant_b),
+        idCours: Number(request.body?.id_cours),
+      });
+
+      return response.status(200).json(resultat);
+    } catch (error) {
+      return response.status(error.statusCode || 500).json({
+        message: error.message || "Erreur lors de l'echange cible du cours.",
+        ...(error.code ? { code: error.code } : {}),
+        ...(error.details?.length ? { details: error.details } : {}),
       });
     }
   });

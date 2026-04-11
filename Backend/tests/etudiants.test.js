@@ -13,6 +13,9 @@ const recupererEtudiantParId = jest.fn();
 const recupererHoraireCompletEtudiant = jest.fn();
 const supprimerTousLesEtudiants = jest.fn();
 const importerEtudiantsDepuisFichier = jest.fn();
+const listerCoursCommunsEchangeables = jest.fn();
+const previsualiserEchangeCoursEtudiants = jest.fn();
+const executerEchangeCoursEtudiants = jest.fn();
 
 class ImportEtudiantsErrorMock extends Error {
   constructor(message, { status = 400, erreurs = [] } = {}) {
@@ -32,6 +35,12 @@ jest.unstable_mockModule("../src/model/etudiants.model.js", () => ({
 jest.unstable_mockModule("../src/services/import-etudiants.service.js", () => ({
   importerEtudiantsDepuisFichier,
   ImportEtudiantsError: ImportEtudiantsErrorMock,
+}));
+
+jest.unstable_mockModule("../src/services/etudiants/student-course-exchange.service.js", () => ({
+  listerCoursCommunsEchangeables,
+  previsualiserEchangeCoursEtudiants,
+  executerEchangeCoursEtudiants,
 }));
 
 const { default: etudiantsRoutes } = await import("../routes/etudiants.routes.js");
@@ -130,6 +139,65 @@ describe("routes etudiants", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.body.horaire).toHaveLength(1);
+  });
+
+  it("GET /api/etudiants/echange-cours/options retourne 200", async () => {
+    listerCoursCommunsEchangeables.mockResolvedValue({
+      cours_communs: [{ id_cours: 4, code_cours: "POO" }],
+    });
+    const app = createApp();
+
+    const response = await request(app).get(
+      "/api/etudiants/echange-cours/options?etudiant_a=1&etudiant_b=2"
+    );
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body.cours_communs).toHaveLength(1);
+    expect(listerCoursCommunsEchangeables).toHaveBeenCalledWith(1, 2);
+  });
+
+  it("GET /api/etudiants/echange-cours/preview retourne 200", async () => {
+    previsualiserEchangeCoursEtudiants.mockResolvedValue({
+      echange_possible: true,
+      cours: { id_cours: 4, code_cours: "POO" },
+    });
+    const app = createApp();
+
+    const response = await request(app).get(
+      "/api/etudiants/echange-cours/preview?etudiant_a=1&etudiant_b=2&id_cours=4"
+    );
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body.echange_possible).toBe(true);
+    expect(previsualiserEchangeCoursEtudiants).toHaveBeenCalledWith({
+      idEtudiantA: 1,
+      idEtudiantB: 2,
+      idCours: 4,
+    });
+  });
+
+  it("POST /api/etudiants/echange-cours retourne 200", async () => {
+    executerEchangeCoursEtudiants.mockResolvedValue({
+      message: "Echange de cours effectue avec succes.",
+      etudiants_impactes: [1, 2],
+    });
+    const app = createApp();
+
+    const response = await request(app)
+      .post("/api/etudiants/echange-cours")
+      .send({
+        id_etudiant_a: 1,
+        id_etudiant_b: 2,
+        id_cours: 4,
+      });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body.etudiants_impactes).toEqual([1, 2]);
+    expect(executerEchangeCoursEtudiants).toHaveBeenCalledWith({
+      idEtudiantA: 1,
+      idEtudiantB: 2,
+      idCours: 4,
+    });
   });
 
   it("POST /api/etudiants/import retourne 400 sans fichier", async () => {

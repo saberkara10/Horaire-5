@@ -22,12 +22,6 @@ function valeurCapaciteValide(capacite) {
 }
 
 export function recupererSallesCompatiblesPourCours(cours, salles = []) {
-  const idSalleReference = Number(cours?.id_salle_reference);
-
-  if (Number.isInteger(idSalleReference) && idSalleReference > 0) {
-    return salles.filter((salle) => Number(salle?.id_salle) === idSalleReference);
-  }
-
   const typeSalleCours = normaliserTexte(cours?.type_salle);
 
   if (!typeSalleCours) {

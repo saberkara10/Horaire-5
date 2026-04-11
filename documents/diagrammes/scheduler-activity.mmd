@@ -1,0 +1,22 @@
+flowchart TD
+    start([Demande de generation complete])
+    schema[Assurer le schema scheduler]
+    bootstrap[Assurer le dataset operationnel]
+    load[Charger le contexte de session]
+    check{Contexte exploitable ?}
+    groups[Former les groupes reels]
+    persist_groups[Persister groupes et rattachements etudiants]
+    matrix[Construire la matrice de contraintes]
+    cleanup[Nettoyer l'horaire de la session cible]
+    main[Phase 4 : trouver une serie hebdomadaire stable<br/>couverture principale a 60%]
+    fallback[Phase 4B : recherche assouplie<br/>presentiel puis hybride puis en ligne]
+    guarantee[Phase 4C : garantir 7 cours par groupe]
+    retakes[Phase 5 : rattacher les cours echoues]
+    quality[Phase 6 : calculer score et diagnostics]
+    persist[Phase 7 : inserer horaires, reprises et rapport]
+    commit([Commit transactionnel])
+    rollback[[Rollback et erreur metier]]
+
+    start --> schema --> bootstrap --> load --> check
+    check -- non --> rollback
+    check -- oui --> groups --> persist_groups --> matrix --> cleanup --> main --> fallback --> guarantee --> retakes --> quality --> persist --> commit

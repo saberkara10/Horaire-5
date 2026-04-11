@@ -44,6 +44,39 @@ export async function creerAffectation(affectation) {
   });
 }
 
+export async function recupererCoursEchouesEtudiant(idEtudiant) {
+  return apiRequest(`${API_URL}/etudiants/${idEtudiant}/cours-echoues`, {
+    credentials: "include",
+  });
+}
+
+export async function recupererEtudiantsPlanificationReprise() {
+  return apiRequest(`${API_URL}/reprises/etudiants`, {
+    credentials: "include",
+  });
+}
+
+export async function recupererGroupesCompatiblesReprise(
+  idEtudiant,
+  idCoursEchoue
+) {
+  return apiRequest(
+    `${API_URL}/etudiants/${idEtudiant}/cours-echoues/${idCoursEchoue}/groupes-compatibles`,
+    {
+      credentials: "include",
+    }
+  );
+}
+
+export async function planifierRepriseEtudiant(payload) {
+  return apiRequest(`${API_URL}/reprises`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    credentials: "include",
+  });
+}
+
 export async function genererHoraire(parametres = {}) {
   return apiRequest(`${API_URL}/generer`, {
     method: "POST",
@@ -75,9 +108,3 @@ export async function resetHoraires(options = {}) {
     credentials: "include",
   });
 }
-/**
- * SERVICE - Horaire API
- *
- * Ce service centralise les appels HTTP
- * lies aux horaires et affectations.
- */

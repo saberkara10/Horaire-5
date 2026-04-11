@@ -54,6 +54,7 @@ const BLOCK_PALETTES = {
     { fill: "#F5F3FF", stroke: "#7C3AED", text: "#5B21B6" },
   ],
   reprise: { fill: "#FFEDD5", stroke: "#EA580C", text: "#9A3412" },
+  individuelle: { fill: "#CCFBF1", stroke: "#0F766E", text: "#134E4A" },
 };
 
 function safeArray(value) {
@@ -242,6 +243,10 @@ function getBlockTheme(entityType, session) {
     return BLOCK_PALETTES.reprise;
   }
 
+  if (entityType === "etudiant" && cleanString(session?.source_horaire) === "individuelle") {
+    return BLOCK_PALETTES.individuelle;
+  }
+
   const palette = BLOCK_PALETTES[entityType] || BLOCK_PALETTES.groupe;
   return palette[hashString(session?.code_cours || session?.nom_cours || entityType) % palette.length];
 }
@@ -266,12 +271,32 @@ function formatStudentSource(session, defaultGroup = "") {
     return cleanString(session?.groupe_source) || "Groupe reprise a confirmer";
   }
 
+  if (cleanString(session?.source_horaire) === "individuelle") {
+    return cleanString(session?.groupe_source) || "Groupe d'accueil a confirmer";
+  }
+
   return (
     cleanString(session?.groupe_source) ||
     cleanString(session?.nom_groupe) ||
     cleanString(defaultGroup) ||
     "Groupe principal"
   );
+}
+
+function isStudentIndividualException(session) {
+  return cleanString(session?.source_horaire) === "individuelle";
+}
+
+function getStudentSessionTypeLabel(session) {
+  if (Boolean(session?.est_reprise)) {
+    return "Reprise";
+  }
+
+  if (isStudentIndividualException(session)) {
+    return "Exception individuelle";
+  }
+
+  return "Groupe principal";
 }
 
 function normalizeDuration(startMinutes, endMinutes) {
@@ -483,6 +508,16 @@ function drawLegend(doc, meta, startY) {
       BLOCK_PALETTES.reprise.stroke,
       BLOCK_PALETTES.reprise.text
     );
+    cursorX += 8;
+    drawPill(
+      doc,
+      cursorX,
+      cursorY,
+      "Exception individuelle",
+      BLOCK_PALETTES.individuelle.fill,
+      BLOCK_PALETTES.individuelle.stroke,
+      BLOCK_PALETTES.individuelle.text
+    );
   }
 
   return cursorY + 28;
@@ -513,6 +548,8 @@ function drawSessionBlock(doc, meta, session, x, y, width, height) {
   } else {
     if (Boolean(session.est_reprise)) {
       detailLines.push(`Groupe suivi : ${formatStudentSource(session, meta.defaultGroup)}`);
+    } else if (isStudentIndividualException(session)) {
+      detailLines.push(`Groupe d'accueil : ${formatStudentSource(session, meta.defaultGroup)}`);
     } else if (meta.defaultGroup) {
       detailLines.push(`Groupe principal : ${meta.defaultGroup}`);
     }
@@ -523,10 +560,15 @@ function drawSessionBlock(doc, meta, session, x, y, width, height) {
   doc.roundedRect(x, y, width, height, 10).fillAndStroke(theme.fill, theme.stroke);
   doc.restore();
 
-  if (meta.entityType === "etudiant" && Boolean(session.est_reprise) && height >= 30) {
+  if (
+    meta.entityType === "etudiant" &&
+    (Boolean(session.est_reprise) || isStudentIndividualException(session)) &&
+    height >= 30
+  ) {
+    const badgeLabel = Boolean(session.est_reprise) ? "REPRISE" : "EXCEPTION";
     const badgeWidth = Math.min(
       width - 10,
-      doc.widthOfString("REPRISE", { font: "Helvetica-Bold", size: 6.5 }) + 14
+      doc.widthOfString(badgeLabel, { font: "Helvetica-Bold", size: 6.5 }) + 14
     );
 
     doc.save();
@@ -537,7 +579,7 @@ function drawSessionBlock(doc, meta, session, x, y, width, height) {
       .font("Helvetica-Bold")
       .fontSize(6.5)
       .fillColor(theme.stroke)
-      .text("REPRISE", x + width - badgeWidth - 5, y + 9, {
+      .text(badgeLabel, x + width - badgeWidth - 5, y + 9, {
         width: badgeWidth,
         align: "center",
         lineBreak: false,
@@ -1113,7 +1155,7 @@ function buildEtudiantDetailedRows(etudiant, sessions) {
       end: formatTime(session.heure_fin),
       code: cleanString(session.code_cours),
       title: cleanString(session.nom_cours),
-      type: Boolean(session.est_reprise) ? "Reprise" : "Groupe principal",
+      type: getStudentSessionTypeLabel(session),
       reprise: Boolean(session.est_reprise) ? "Oui" : "Non",
       room: formatRoom(session),
       professor: formatProfessor(session),

@@ -13,7 +13,7 @@ export function EtudiantsHero({ statistiques, onImporter, importEnCours, surChar
         <p className="hero-panel__text">
           Importez un fichier Excel fourni par l'administration, consultez la liste
           des etudiants et retrouvez rapidement leur horaire personnel fusionne :
-          tronc commun du groupe principal plus reprises individuelles.
+          tronc commun du groupe principal, reprises et exceptions individuelles.
         </p>
       </div>
 

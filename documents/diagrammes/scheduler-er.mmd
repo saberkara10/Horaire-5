@@ -1,0 +1,192 @@
+erDiagram
+    UTILISATEURS {
+        int id_utilisateur PK
+        string nom
+        string prenom
+        string email
+        string role
+    }
+
+    SESSIONS {
+        int id_session PK
+        string nom
+        date date_debut
+        date date_fin
+        boolean active
+    }
+
+    COURS {
+        int id_cours PK
+        string code
+        string nom
+        string programme
+        string etape_etude
+        string type_salle
+        boolean est_cours_cle
+        boolean est_en_ligne
+        boolean archive
+    }
+
+    PROFESSEURS {
+        int id_professeur PK
+        string matricule
+        string nom
+        string prenom
+        string specialite
+    }
+
+    PROFESSEUR_COURS {
+        int id_professeur_cours PK
+        int id_professeur FK
+        int id_cours FK
+    }
+
+    DISPONIBILITES_PROFESSEURS {
+        int id_disponibilite_professeur PK
+        int id_professeur FK
+        int jour_semaine
+        time heure_debut
+        time heure_fin
+        date date_debut_effet
+        date date_fin_effet
+    }
+
+    ABSENCES_PROFESSEURS {
+        int id PK
+        int id_professeur FK
+        date date_debut
+        date date_fin
+        string type
+    }
+
+    SALLES {
+        int id_salle PK
+        string code
+        string type
+        int capacite
+    }
+
+    SALLES_INDISPONIBLES {
+        int id PK
+        int id_salle FK
+        date date_debut
+        date date_fin
+        string raison
+    }
+
+    GROUPES_ETUDIANTS {
+        int id_groupes_etudiants PK
+        int id_session FK
+        string nom_groupe
+        string programme
+        string etape
+        int taille_max
+        boolean est_groupe_special
+    }
+
+    ETUDIANTS {
+        int id_etudiant PK
+        int id_groupes_etudiants FK
+        string matricule
+        string nom
+        string prenom
+        string programme
+        int etape
+        string session
+    }
+
+    PLAGES_HORAIRES {
+        int id_plage_horaires PK
+        date date
+        time heure_debut
+        time heure_fin
+    }
+
+    AFFECTATION_COURS {
+        int id_affectation_cours PK
+        int id_cours FK
+        int id_professeur FK
+        int id_salle FK
+        int id_plage_horaires FK
+    }
+
+    AFFECTATION_GROUPES {
+        int id_affectation_groupes PK
+        int id_groupes_etudiants FK
+        int id_affectation_cours FK
+    }
+
+    COURS_ECHOUES {
+        int id PK
+        int id_etudiant FK
+        int id_cours FK
+        int id_session FK
+        int id_groupe_reprise FK
+        string statut
+        float note_echec
+    }
+
+    AFFECTATION_ETUDIANTS {
+        int id_affectation_etudiant PK
+        int id_etudiant FK
+        int id_groupes_etudiants FK
+        int id_cours FK
+        int id_session FK
+        string source_type
+        int id_cours_echoue FK
+    }
+
+    PREREQUIS_COURS {
+        int id PK
+        int id_cours_prerequis FK
+        int id_cours_suivant FK
+        boolean est_bloquant
+    }
+
+    RAPPORTS_GENERATION {
+        int id PK
+        int id_session FK
+        int genere_par FK
+        int score_qualite
+        int nb_cours_planifies
+        int nb_cours_non_planifies
+        int nb_resolutions_manuelles
+        json details
+    }
+
+    JOURNAL_REPLANIFICATIONS_DISPONIBILITES {
+        int id_journal_replanification PK
+        int id_professeur FK
+        string statut
+        int seances_concernees
+        int seances_replanifiees
+        int seances_non_replanifiees
+        json resume_json
+    }
+
+    SESSIONS ||--o{ GROUPES_ETUDIANTS : scope
+    GROUPES_ETUDIANTS ||--o{ ETUDIANTS : contient
+    COURS ||--o{ PROFESSEUR_COURS : reference
+    PROFESSEURS ||--o{ PROFESSEUR_COURS : enseigne
+    PROFESSEURS ||--o{ DISPONIBILITES_PROFESSEURS : declare
+    PROFESSEURS ||--o{ ABSENCES_PROFESSEURS : subit
+    SALLES ||--o{ SALLES_INDISPONIBLES : bloque
+    PLAGES_HORAIRES ||--o{ AFFECTATION_COURS : positionne
+    COURS ||--o{ AFFECTATION_COURS : planifie
+    PROFESSEURS ||--o{ AFFECTATION_COURS : enseigne
+    SALLES o|--o{ AFFECTATION_COURS : accueille
+    AFFECTATION_COURS ||--o{ AFFECTATION_GROUPES : diffuse
+    GROUPES_ETUDIANTS ||--o{ AFFECTATION_GROUPES : recoit
+    ETUDIANTS ||--o{ COURS_ECHOUES : declare
+    COURS ||--o{ COURS_ECHOUES : concerne
+    SESSIONS ||--o{ COURS_ECHOUES : scope
+    GROUPES_ETUDIANTS o|--o{ COURS_ECHOUES : groupe_reprise
+    ETUDIANTS ||--o{ AFFECTATION_ETUDIANTS : rattache
+    GROUPES_ETUDIANTS ||--o{ AFFECTATION_ETUDIANTS : attribue
+    COURS ||--o{ AFFECTATION_ETUDIANTS : cible
+    SESSIONS ||--o{ AFFECTATION_ETUDIANTS : scope
+    COURS ||--o{ PREREQUIS_COURS : prerequis
+    COURS ||--o{ PREREQUIS_COURS : debouche_sur
+    SESSIONS ||--o{ RAPPORTS_GENERATION : historise
+    UTILISATEURS o|--o{ RAPPORTS_GENERATION : genere
+    PROFESSEURS ||--o{ JOURNAL_REPLANIFICATIONS_DISPONIBILITES : journalise

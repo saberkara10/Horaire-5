@@ -2,6 +2,7 @@ import { describe, expect, test } from "@jest/globals";
 import {
   calculerTaillesGroupesEquilibres,
   determinerCapaciteMaximaleGroupeCohorte,
+  recupererSallesCompatiblesPourCours,
 } from "../src/utils/groupes.js";
 
 describe("utils groupes", () => {
@@ -36,5 +37,20 @@ describe("utils groupes", () => {
 
     expect(capaciteProgrammation).toBe(28);
     expect(capaciteReseautique).toBe(24);
+  });
+
+  test("ne restreint plus les salles compatibles a la seule salle de reference", () => {
+    const salles = [
+      { id_salle: 3, type: "Laboratoire", capacite: 24 },
+      { id_salle: 8, type: "Laboratoire", capacite: 32 },
+      { id_salle: 9, type: "Salle de cours", capacite: 40 },
+    ];
+
+    expect(
+      recupererSallesCompatiblesPourCours(
+        { type_salle: "Laboratoire", id_salle_reference: 3 },
+        salles
+      ).map((salle) => salle.id_salle)
+    ).toEqual([3, 8]);
   });
 });

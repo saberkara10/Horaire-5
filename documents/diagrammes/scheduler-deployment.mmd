@@ -1,0 +1,47 @@
+flowchart LR
+    subgraph UserStation[Poste utilisateur]
+        browser[Navigateur web]
+    end
+
+    subgraph Frontend[Frontend React / Vite]
+        scheduler_page[SchedulerPage]
+        dispo_page[DisponibilitesProfesseursPage]
+        group_pages[Pages Groupes et Affectations]
+    end
+
+    subgraph Backend[Serveur Node.js / Express]
+        api[API REST + SSE]
+        scheduler_core[Moteur scheduler]
+        report_layer[Lecture et enrichissement des rapports]
+        replanning[Replanification locale]
+    end
+
+    subgraph Database[MySQL]
+        metier[(Ressources, groupes, etudiants)]
+        horaires[(Horaires et affectations)]
+        diagnostics[(Rapports et journaux)]
+    end
+
+    browser <--> scheduler_page
+    browser <--> dispo_page
+    browser <--> group_pages
+
+    scheduler_page -->|REST| api
+    scheduler_page -->|SSE| api
+    dispo_page -->|REST| api
+    group_pages -->|REST| api
+
+    api --> scheduler_core
+    api --> report_layer
+    api --> replanning
+
+    scheduler_core <--> metier
+    scheduler_core <--> horaires
+    scheduler_core <--> diagnostics
+
+    report_layer <--> metier
+    report_layer <--> diagnostics
+
+    replanning <--> metier
+    replanning <--> horaires
+    replanning <--> diagnostics

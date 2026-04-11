@@ -31,6 +31,35 @@ export async function recupererHoraireEtudiant(idEtudiant) {
   return apiRequest(`${BASE_URL}/${idEtudiant}/horaire`);
 }
 
+export async function recupererCoursCommunsEchangeables(idEtudiantA, idEtudiantB) {
+  const params = new URLSearchParams({
+    etudiant_a: String(idEtudiantA),
+    etudiant_b: String(idEtudiantB),
+  });
+
+  return apiRequest(`${BASE_URL}/echange-cours/options?${params.toString()}`);
+}
+
+export async function previsualiserEchangeCours(idEtudiantA, idEtudiantB, idCours) {
+  const params = new URLSearchParams({
+    etudiant_a: String(idEtudiantA),
+    etudiant_b: String(idEtudiantB),
+    id_cours: String(idCours),
+  });
+
+  return apiRequest(`${BASE_URL}/echange-cours/preview?${params.toString()}`);
+}
+
+export async function executerEchangeCours(payload) {
+  return apiRequest(`${BASE_URL}/echange-cours`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function importerEtudiants(fichier) {
   const formData = new FormData();
   formData.append("fichier", fichier);

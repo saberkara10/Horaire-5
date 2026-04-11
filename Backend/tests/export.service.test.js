@@ -133,6 +133,23 @@ const horaireEtudiantFusionne = [
     statut_reprise: "planifie",
     note_echec: 52,
   },
+  {
+    id_affectation_cours: 5,
+    id_plage_horaires: 15,
+    id_cours: 203,
+    code_cours: "POO302",
+    nom_cours: "Programmation objet avancee",
+    nom_professeur: "Nguyen",
+    prenom_professeur: "Hoa",
+    code_salle: "L-220",
+    type_salle: "Laboratoire",
+    date: "2026-01-16",
+    heure_debut: "12:00",
+    heure_fin: "15:00",
+    est_reprise: false,
+    source_horaire: "individuelle",
+    groupe_source: "GAD-E1-3",
+  },
 ];
 
 const horaireEtudiantReprises = horaireEtudiantFusionne.filter(
@@ -200,6 +217,7 @@ describe("ExportService", () => {
     expect(contenu).toContain("Horaire de l'etudiant");
     expect(contenu).toContain(enHex("Statistiques"));
     expect(contenu).toContain(enHex("GAD-E1-2"));
+    expect(contenu).toContain(enHex("GAD-E1-3"));
   });
 
   test("genere un Excel groupe avec vue hebdo et detail", () => {
@@ -257,6 +275,11 @@ describe("ExportService", () => {
     );
     expect(detailRows.some((row) => row.Reprise === "Oui")).toBe(true);
     expect(detailRows.some((row) => row["Groupe suivi"] === "GAD-E1-2")).toBe(true);
+    expect(
+      detailRows.some(
+        (row) => row.Type === "Exception individuelle" && row["Groupe suivi"] === "GAD-E1-3"
+      )
+    ).toBe(true);
     expect(repriseRows.some((row) => row["Code cours"] === "COM300")).toBe(true);
   });
 });

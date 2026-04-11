@@ -11,6 +11,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { RepriseStudentSearchField } from "../components/affectations/RepriseStudentSearchField.jsx";
 import { AppShell } from "../components/layout/AppShell.jsx";
 import { usePopup } from "../components/feedback/PopupProvider.jsx";
 import { recupererCours } from "../services/cours.api.js";
@@ -19,6 +20,10 @@ import { recupererGroupes } from "../services/groupes.api.js";
 import {
   creerAffectation,
   modifierAffectation,
+  planifierRepriseEtudiant,
+  recupererCoursEchouesEtudiant,
+  recupererEtudiantsPlanificationReprise,
+  recupererGroupesCompatiblesReprise,
   recupererHoraires,
   resetHoraires,
   supprimerAffectation,
@@ -31,7 +36,10 @@ import {
 } from "../services/scheduler.api.js";
 import { recupererSalles } from "../services/salles.api.js";
 import { creerDateLocale } from "../utils/calendar.js";
-import { ecouterSynchronisationPlanning } from "../utils/planningSync.js";
+import {
+  ecouterSynchronisationPlanning,
+  emettreSynchronisationPlanning,
+} from "../utils/planningSync.js";
 import {
   SESSIONS_ACADEMIQUES,
   formaterLibelleCohorte,
@@ -48,6 +56,23 @@ const ROOM_STATUS_ORDER = {
   INCOMPATIBLE_TYPE: 2,
   CAPACITY_TOO_SMALL: 3,
 };
+const PLANNING_SCOPE_OPTIONS = [
+  {
+    value: "single",
+    labelCreation: "Cette semaine uniquement",
+    labelEdition: "Cette occurrence uniquement",
+  },
+  {
+    value: "until_session_end",
+    labelCreation: "A partir de cette semaine jusqu'a la fin de la session",
+    labelEdition: "A partir de cette semaine jusqu'a la fin de la session",
+  },
+  {
+    value: "custom_range",
+    labelCreation: "Periode personnalisee",
+    labelEdition: "Periode personnalisee",
+  },
+];
 
 function normaliserTexte(texte) {
   return String(texte || "")
@@ -96,14 +121,28 @@ function dateCouranteLocale() {
 }
 
 function creerPlanificationInitiale() {
+  const dateReference = dateCouranteLocale();
+
   return {
     id_groupes_etudiants: "",
     id_cours: "",
     id_professeur: "",
     id_salle: "",
-    date: dateCouranteLocale(),
+    date: dateReference,
     heure_debut: "08:00",
     heure_fin: "11:00",
+    portee_mode: "single",
+    date_debut_portee: dateReference,
+    date_fin_portee: dateReference,
+    id_planification_serie: null,
+  };
+}
+
+function creerPlanificationRepriseInitiale() {
+  return {
+    id_etudiant: "",
+    id_cours_echoue: "",
+    id_groupes_etudiants: "",
   };
 }
 
@@ -129,14 +168,6 @@ function creerCleSalleDate(idSalle, date) {
 }
 
 function recupererSallesCompatiblesCours(cours, salles) {
-  const idSalleReference = Number(cours?.id_salle_reference);
-
-  if (Number.isInteger(idSalleReference) && idSalleReference > 0) {
-    return salles.filter(
-      (salle) => Number(salle.idSalleNombre ?? salle.id_salle) === idSalleReference
-    );
-  }
-
   const typeSalleCours =
     cours?.typeSalleNormalise || normaliserTexte(cours?.type_salle);
 
@@ -166,6 +197,51 @@ function determinerCapaciteMaximaleGroupes(cours, salles) {
   return Math.max(1, Math.min(CAPACITE_MAX_GROUPE, ...capacitesParCours));
 }
 
+function construirePayloadPortee(planification) {
+  const mode = String(planification?.portee_mode || "single");
+
+  if (mode === "custom_range") {
+    return {
+      mode,
+      date_debut: planification?.date_debut_portee || planification?.date || null,
+      date_fin: planification?.date_fin_portee || planification?.date || null,
+    };
+  }
+
+  return { mode };
+}
+
+function formaterNomEtudiant(etudiant) {
+  const nomComplet = `${etudiant?.prenom || ""} ${etudiant?.nom || ""}`.trim();
+  return nomComplet || `Etudiant #${etudiant?.id_etudiant || "?"}`;
+}
+
+function formaterEtapeEtudiant(etudiant) {
+  const etape = String(etudiant?.etape || "").trim();
+
+  if (!etape) {
+    return "-";
+  }
+
+  return /^e/i.test(etape) ? etape.toUpperCase() : `E${etape}`;
+}
+
+function formaterStatutRepriseEtudiant(etudiant) {
+  const resume = etudiant?.reprise_manuelle || {};
+  const nbNonPlanifies = Number(resume.nb_non_planifies || 0);
+  const nbTotal = Number(resume.nb_total || 0);
+
+  if (nbNonPlanifies > 0) {
+    return `${nbNonPlanifies} cours echoue${nbNonPlanifies > 1 ? "s" : ""} non planifie${nbNonPlanifies > 1 ? "s" : ""} a traiter`;
+  }
+
+  if (nbTotal > 0) {
+    return `${nbTotal} cours echoue${nbTotal > 1 ? "s" : ""} deja rattache${nbTotal > 1 ? "s" : ""}`;
+  }
+
+  return "Aucun cours echoue actif dans la session.";
+}
+
 function estimerGroupes(programme, etape, session, effectifTotal, capaciteMaximale) {
   if (!programme || !etape || !session || effectifTotal <= 0) {
     return [];
@@ -190,6 +266,8 @@ function estimerGroupes(programme, etape, session, effectifTotal, capaciteMaxima
 export function AffectationsPage({ utilisateur, onLogout }) {
   const [cours, setCours] = useState([]);
   const [etudiants, setEtudiants] = useState([]);
+  const [etudiantsPlanificationRepriseSource, setEtudiantsPlanificationRepriseSource] =
+    useState([]);
   const [groupes, setGroupes] = useState([]);
   const [professeurs, setProfesseurs] = useState([]);
   const [salles, setSalles] = useState([]);
@@ -212,6 +290,16 @@ export function AffectationsPage({ utilisateur, onLogout }) {
   const [planificationManuelle, setPlanificationManuelle] = useState(
     creerPlanificationInitiale
   );
+  const [planificationReprise, setPlanificationReprise] = useState(
+    creerPlanificationRepriseInitiale
+  );
+  const [coursEchouesEtudiant, setCoursEchouesEtudiant] = useState([]);
+  const [groupesCompatiblesReprise, setGroupesCompatiblesReprise] = useState([]);
+  const [chargementCoursEchoues, setChargementCoursEchoues] = useState(false);
+  const [chargementGroupesCompatibles, setChargementGroupesCompatibles] =
+    useState(false);
+  const [planificationRepriseEnCours, setPlanificationRepriseEnCours] =
+    useState(false);
   const [filtresAffectations, setFiltresAffectations] = useState({
     recherche: "",
     professeur: "",
@@ -233,6 +321,7 @@ export function AffectationsPage({ utilisateur, onLogout }) {
       const [
         coursData,
         etudiantsData,
+        etudiantsRepriseData,
         groupesData,
         professeursData,
         sallesData,
@@ -242,6 +331,7 @@ export function AffectationsPage({ utilisateur, onLogout }) {
       ] = await Promise.all([
         recupererCours(),
         recupererEtudiants({ sessionActive: true }),
+        recupererEtudiantsPlanificationReprise(),
         recupererGroupes(true, {
           sessionActive: true,
           seulementAvecEffectif: true,
@@ -255,6 +345,9 @@ export function AffectationsPage({ utilisateur, onLogout }) {
 
       setCours(Array.isArray(coursData) ? coursData : []);
       setEtudiants(Array.isArray(etudiantsData) ? etudiantsData : []);
+      setEtudiantsPlanificationRepriseSource(
+        Array.isArray(etudiantsRepriseData) ? etudiantsRepriseData : []
+      );
       setGroupes(Array.isArray(groupesData) ? groupesData : []);
       setProfesseurs(Array.isArray(professeursData) ? professeursData : []);
       setSalles(Array.isArray(sallesData) ? sallesData : []);
@@ -268,24 +361,24 @@ export function AffectationsPage({ utilisateur, onLogout }) {
     }
   }, [showError]);
 
-  const rechargerHorairesActifs = useCallback(async () => {
-    const horairesData = await recupererHoraires({ sessionActive: true });
-    setHoraires(Array.isArray(horairesData) ? horairesData : []);
-  }, []);
-
   const rechargerContexteActif = useCallback(async () => {
-    const [horairesData, groupesData, etudiantsData] = await Promise.all([
-      recupererHoraires({ sessionActive: true }),
-      recupererGroupes(true, {
-        sessionActive: true,
-        seulementAvecEffectif: true,
-      }),
-      recupererEtudiants({ sessionActive: true }),
-    ]);
+    const [horairesData, groupesData, etudiantsData, etudiantsRepriseData] =
+      await Promise.all([
+        recupererHoraires({ sessionActive: true }),
+        recupererGroupes(true, {
+          sessionActive: true,
+          seulementAvecEffectif: true,
+        }),
+        recupererEtudiants({ sessionActive: true }),
+        recupererEtudiantsPlanificationReprise(),
+      ]);
 
     setHoraires(Array.isArray(horairesData) ? horairesData : []);
     setGroupes(Array.isArray(groupesData) ? groupesData : []);
     setEtudiants(Array.isArray(etudiantsData) ? etudiantsData : []);
+    setEtudiantsPlanificationRepriseSource(
+      Array.isArray(etudiantsRepriseData) ? etudiantsRepriseData : []
+    );
   }, []);
 
   useEffect(() => {
@@ -294,9 +387,9 @@ export function AffectationsPage({ utilisateur, onLogout }) {
 
   useEffect(() => {
     return ecouterSynchronisationPlanning(() => {
-      rechargerHorairesActifs().catch(() => {});
+      rechargerContexteActif().catch(() => {});
     });
-  }, [rechargerHorairesActifs]);
+  }, [rechargerContexteActif]);
 
   const coursEnrichis = useMemo(
     () =>
@@ -319,6 +412,41 @@ export function AffectationsPage({ utilisateur, onLogout }) {
       })),
     [etudiants]
   );
+
+  const etudiantsPlanificationReprise = useMemo(
+    () =>
+      Array.isArray(etudiantsPlanificationRepriseSource)
+        ? etudiantsPlanificationRepriseSource
+        : [],
+    [etudiantsPlanificationRepriseSource]
+  );
+
+  const etudiantRepriseActif = useMemo(() => {
+    return (
+      etudiantsPlanificationReprise.find(
+        (etudiant) =>
+          String(etudiant.id_etudiant) === String(planificationReprise.id_etudiant)
+      ) || null
+    );
+  }, [etudiantsPlanificationReprise, planificationReprise.id_etudiant]);
+
+  const coursEchoueActif = useMemo(() => {
+    return (
+      coursEchouesEtudiant.find(
+        (element) => String(element.id) === String(planificationReprise.id_cours_echoue)
+      ) || null
+    );
+  }, [coursEchouesEtudiant, planificationReprise.id_cours_echoue]);
+
+  const groupeRepriseActif = useMemo(() => {
+    return (
+      groupesCompatiblesReprise.find(
+        (groupe) =>
+          String(groupe.id_groupes_etudiants) ===
+          String(planificationReprise.id_groupes_etudiants)
+      ) || null
+    );
+  }, [groupesCompatiblesReprise, planificationReprise.id_groupes_etudiants]);
 
   const groupesEnrichis = useMemo(
     () =>
@@ -689,9 +817,6 @@ export function AffectationsPage({ utilisateur, onLogout }) {
       heureVersMinutes(heureDebut) < heureVersMinutes(heureFin);
     const effectifGroupe = Number(groupePlanificationActif?.effectif) || 0;
     const typeSalleCours = coursPlanificationActif?.typeSalleNormalise || null;
-    const idSalleReference = coursPlanificationActif
-      ? Number(coursPlanificationActif.id_salle_reference)
-      : null;
     const resume = {
       disponibles: 0,
       occupees: 0,
@@ -704,16 +829,7 @@ export function AffectationsPage({ utilisateur, onLogout }) {
       const capacite = salle.capaciteNombre;
 
       // 1. Vérifier compatibilité de type
-      let typeCompatible = false;
-      if (
-        Number.isInteger(idSalleReference) &&
-        idSalleReference > 0 &&
-        salle.idSalleNombre === idSalleReference
-      ) {
-        typeCompatible = true;
-      } else if (typeSalleCours && typeSalle === typeSalleCours) {
-        typeCompatible = true;
-      }
+      const typeCompatible = Boolean(typeSalleCours && typeSalle === typeSalleCours);
 
       if (!typeCompatible) {
         resume.incompatibles += 1;
@@ -834,6 +950,15 @@ export function AffectationsPage({ utilisateur, onLogout }) {
     );
   }, [planificationManuelle.id_salle, sallesPlanificationManuelleAvecStatut]);
 
+  const editionRecurrenteDisponible =
+    !idAffectationEdition || Number(planificationManuelle.id_planification_serie) > 0;
+
+  const optionsPorteePlanification = useMemo(() => {
+    return PLANNING_SCOPE_OPTIONS.filter(
+      (option) => editionRecurrenteDisponible || option.value === "single"
+    );
+  }, [editionRecurrenteDisponible]);
+
 
   const professeursCompatibles = useMemo(() => {
     const idsCoursSelectionnes = new Set(
@@ -872,21 +997,10 @@ export function AffectationsPage({ utilisateur, onLogout }) {
   }, [coursFiltres]);
 
   const sallesCompatibles = useMemo(() => {
-    const idsSallesReference = new Set(
-      coursFiltres
-        .map((element) => Number(element.id_salle_reference))
-        .filter((idSalle) => Number.isInteger(idSalle) && idSalle > 0)
-    );
     const typesNormalises = new Set(typesSallesRequis.map((type) => normaliserTexte(type)));
 
     return sallesEnrichies
-      .filter((salle) => {
-        if (idsSallesReference.has(salle.idSalleNombre)) {
-          return true;
-        }
-
-        return typesNormalises.has(salle.typeNormalise);
-      })
+      .filter((salle) => typesNormalises.has(salle.typeNormalise))
       .sort((a, b) => {
         const compareType = String(a.type || "").localeCompare(String(b.type || ""), "fr");
         if (compareType !== 0) {
@@ -895,7 +1009,7 @@ export function AffectationsPage({ utilisateur, onLogout }) {
 
         return String(a.code || "").localeCompare(String(b.code || ""), "fr");
       });
-  }, [coursFiltres, sallesEnrichies, typesSallesRequis]);
+  }, [sallesEnrichies, typesSallesRequis]);
 
   const compteSallesCompatiblesParType = useMemo(() => {
     const compteurs = new Map();
@@ -1085,6 +1199,119 @@ export function AffectationsPage({ utilisateur, onLogout }) {
     });
   }, [sallesPlanificationManuelleAvecStatut]);
 
+  useEffect(() => {
+    let actif = true;
+
+    if (!planificationReprise.id_etudiant) {
+      setCoursEchouesEtudiant([]);
+      setGroupesCompatiblesReprise([]);
+      return () => {
+        actif = false;
+      };
+    }
+
+    setChargementCoursEchoues(true);
+
+    recupererCoursEchouesEtudiant(Number(planificationReprise.id_etudiant))
+      .then((data) => {
+        if (!actif) {
+          return;
+        }
+
+        const liste = Array.isArray(data) ? data : [];
+        setCoursEchouesEtudiant(liste);
+        setGroupesCompatiblesReprise([]);
+        setPlanificationReprise((actuel) => {
+          const coursExiste = liste.some(
+            (element) => String(element.id) === String(actuel.id_cours_echoue)
+          );
+
+          return {
+            ...actuel,
+            id_cours_echoue: coursExiste ? actuel.id_cours_echoue : "",
+            id_groupes_etudiants: "",
+          };
+        });
+      })
+      .catch((error) => {
+        if (!actif) {
+          return;
+        }
+
+        setCoursEchouesEtudiant([]);
+        setGroupesCompatiblesReprise([]);
+        showError(error.message || "Impossible de charger les cours echoues.");
+      })
+      .finally(() => {
+        if (actif) {
+          setChargementCoursEchoues(false);
+        }
+      });
+
+    return () => {
+      actif = false;
+    };
+  }, [planificationReprise.id_etudiant, showError]);
+
+  useEffect(() => {
+    let actif = true;
+
+    if (!planificationReprise.id_etudiant || !planificationReprise.id_cours_echoue) {
+      setGroupesCompatiblesReprise([]);
+      return () => {
+        actif = false;
+      };
+    }
+
+    setChargementGroupesCompatibles(true);
+
+    recupererGroupesCompatiblesReprise(
+      Number(planificationReprise.id_etudiant),
+      Number(planificationReprise.id_cours_echoue)
+    )
+      .then((data) => {
+        if (!actif) {
+          return;
+        }
+
+        const liste = Array.isArray(data) ? data : [];
+        setGroupesCompatiblesReprise(liste);
+        setPlanificationReprise((actuel) => {
+          const groupeExiste = liste.some(
+            (groupe) =>
+              String(groupe.id_groupes_etudiants) ===
+              String(actuel.id_groupes_etudiants)
+          );
+
+          return {
+            ...actuel,
+            id_groupes_etudiants: groupeExiste ? actuel.id_groupes_etudiants : "",
+          };
+        });
+      })
+      .catch((error) => {
+        if (!actif) {
+          return;
+        }
+
+        setGroupesCompatiblesReprise([]);
+        showError(error.message || "Impossible de charger les groupes compatibles.");
+      })
+      .finally(() => {
+        if (actif) {
+          setChargementGroupesCompatibles(false);
+        }
+      });
+
+    return () => {
+      actif = false;
+    };
+  }, [
+    planificationReprise.id_cours_echoue,
+    planificationReprise.id_etudiant,
+    showError,
+  ]);
+
   const handleChoisirSalle = useCallback((idSalle) => {
     setPlanificationManuelle((actuel) => ({
       ...actuel,
@@ -1128,16 +1355,89 @@ export function AffectationsPage({ utilisateur, onLogout }) {
     setPlanificationManuelle(creerPlanificationInitiale());
   }, []);
 
+  const reinitialiserPlanificationReprise = useCallback(() => {
+    setPlanificationReprise(creerPlanificationRepriseInitiale());
+    setCoursEchouesEtudiant([]);
+    setGroupesCompatiblesReprise([]);
+  }, []);
+
   const handleChangerPlanification = useCallback((event) => {
     const { name, value } = event.target;
 
-    setPlanificationManuelle((actuel) => ({
+    setPlanificationManuelle((actuel) => {
+      const prochainEtat = {
+        ...actuel,
+        [name]: value,
+        ...(name === "id_groupes_etudiants"
+          ? { id_cours: "", id_professeur: "", id_salle: "" }
+          : {}),
+        ...(name === "id_cours" ? { id_professeur: "", id_salle: "" } : {}),
+      };
+
+      if (name === "date" && actuel.portee_mode !== "custom_range") {
+        prochainEtat.date_debut_portee = value;
+        prochainEtat.date_fin_portee = value;
+      }
+
+      return prochainEtat;
+    });
+  }, []);
+
+  const handleChangerPorteePlanification = useCallback((event) => {
+    const { name, value } = event.target;
+
+    setPlanificationManuelle((actuel) => {
+      if (name !== "portee_mode") {
+        return {
+          ...actuel,
+          [name]: value,
+        };
+      }
+
+      const dateReference = actuel.date || dateCouranteLocale();
+
+      return {
+        ...actuel,
+        portee_mode: value,
+        date_debut_portee:
+          value === "custom_range"
+            ? actuel.date_debut_portee || dateReference
+            : dateReference,
+        date_fin_portee:
+          value === "custom_range"
+            ? actuel.date_fin_portee || dateReference
+            : dateReference,
+      };
+    });
+  }, []);
+
+  const handleChoisirEtudiantReprise = useCallback((idEtudiant) => {
+    setPlanificationReprise((actuel) => {
+      const prochainIdEtudiant = String(idEtudiant || "");
+
+      if (String(actuel.id_etudiant) === prochainIdEtudiant) {
+        return actuel;
+      }
+
+      return {
+        ...actuel,
+        id_etudiant: prochainIdEtudiant,
+        id_cours_echoue: "",
+        id_groupes_etudiants: "",
+      };
+    });
+  }, []);
+
+  const handleChangerPlanificationReprise = useCallback((event) => {
+    const { name, value } = event.target;
+
+    setPlanificationReprise((actuel) => ({
       ...actuel,
       [name]: value,
-      ...(name === "id_groupes_etudiants"
-        ? { id_cours: "", id_professeur: "", id_salle: "" }
+      ...(name === "id_etudiant"
+        ? { id_cours_echoue: "", id_groupes_etudiants: "" }
         : {}),
-      ...(name === "id_cours" ? { id_professeur: "", id_salle: "" } : {}),
+      ...(name === "id_cours_echoue" ? { id_groupes_etudiants: "" } : {}),
     }));
   }, []);
 
@@ -1157,6 +1457,10 @@ export function AffectationsPage({ utilisateur, onLogout }) {
       setResumeGeneration(resultat.rapport || null);
       showSuccess(resultat.message || "Generation terminee.");
       await rechargerContexteActif();
+      emettreSynchronisationPlanning({
+        type: "horaire_genere",
+        rapport: resultat.rapport || null,
+      });
     } catch (error) {
       showError(error.message || "Erreur lors de la generation.");
     } finally {
@@ -1178,6 +1482,24 @@ export function AffectationsPage({ utilisateur, onLogout }) {
       return;
     }
 
+    if (
+      planificationManuelle.portee_mode === "custom_range" &&
+      (!planificationManuelle.date_debut_portee ||
+        !planificationManuelle.date_fin_portee)
+    ) {
+      showError("Completer la date de debut et la date de fin de la periode.");
+      return;
+    }
+
+    if (
+      planificationManuelle.portee_mode === "custom_range" &&
+      String(planificationManuelle.date_debut_portee) >
+        String(planificationManuelle.date_fin_portee)
+    ) {
+      showError("La date de fin doit etre posterieure ou egale a la date de debut.");
+      return;
+    }
+
     setPlanificationEnCours(true);
 
     try {
@@ -1189,20 +1511,27 @@ export function AffectationsPage({ utilisateur, onLogout }) {
         date: planificationManuelle.date,
         heure_debut: planificationManuelle.heure_debut,
         heure_fin: planificationManuelle.heure_fin,
+        portee: construirePayloadPortee(planificationManuelle),
       };
 
+      let resultat = null;
       if (idAffectationEdition) {
-        await modifierAffectation(idAffectationEdition, payload);
+        resultat = await modifierAffectation(idAffectationEdition, payload);
       } else {
-        await creerAffectation(payload);
+        resultat = await creerAffectation(payload);
       }
 
-      await rechargerHorairesActifs();
+      await rechargerContexteActif();
       reinitialiserPlanification();
+      emettreSynchronisationPlanning({
+        type: idAffectationEdition ? "affectation_modifiee" : "affectation_creee",
+        ...resultat,
+      });
       showSuccess(
-        idAffectationEdition
-          ? "Affectation mise a jour."
-          : "Cours planifie avec succes."
+        resultat?.message ||
+          (idAffectationEdition
+            ? "Affectation mise a jour."
+            : "Cours planifie avec succes.")
       );
     } catch (error) {
       showError(error.message || "Erreur lors de la planification manuelle.");
@@ -1212,8 +1541,47 @@ export function AffectationsPage({ utilisateur, onLogout }) {
   }, [
     idAffectationEdition,
     planificationManuelle,
-    rechargerHorairesActifs,
+    rechargerContexteActif,
     reinitialiserPlanification,
+    showError,
+    showSuccess,
+  ]);
+
+  const handlePlanifierRepriseEtudiant = useCallback(async () => {
+    if (
+      !planificationReprise.id_etudiant ||
+      !planificationReprise.id_cours_echoue ||
+      !planificationReprise.id_groupes_etudiants
+    ) {
+      showError("Selectionner l'etudiant, le cours echoue et le groupe d'accueil.");
+      return;
+    }
+
+    setPlanificationRepriseEnCours(true);
+
+    try {
+      const resultat = await planifierRepriseEtudiant({
+        id_etudiant: Number(planificationReprise.id_etudiant),
+        id_cours_echoue: Number(planificationReprise.id_cours_echoue),
+        id_groupes_etudiants: Number(planificationReprise.id_groupes_etudiants),
+      });
+
+      await rechargerContexteActif();
+      reinitialiserPlanificationReprise();
+      emettreSynchronisationPlanning({
+        type: "reprise_planifiee",
+        ...resultat,
+      });
+      showSuccess(resultat?.message || "Reprise planifiee avec succes.");
+    } catch (error) {
+      showError(error.message || "Erreur lors de la planification de la reprise.");
+    } finally {
+      setPlanificationRepriseEnCours(false);
+    }
+  }, [
+    planificationReprise,
+    rechargerContexteActif,
+    reinitialiserPlanificationReprise,
     showError,
     showSuccess,
   ]);
@@ -1243,7 +1611,12 @@ export function AffectationsPage({ utilisateur, onLogout }) {
       setResumeGeneration(null);
       setHoraires([]);
       reinitialiserPlanification();
+      reinitialiserPlanificationReprise();
       await rechargerContexteActif();
+      emettreSynchronisationPlanning({
+        type: "horaires_reinitialises",
+        deleteStudents: suppressionEtudiantsActive,
+      });
       showSuccess(
         suppressionEtudiantsActive
           ? "Horaires et etudiants de la session active reinitialises."
@@ -1258,6 +1631,7 @@ export function AffectationsPage({ utilisateur, onLogout }) {
     confirm,
     rechargerContexteActif,
     reinitialiserPlanification,
+    reinitialiserPlanificationReprise,
     supprimerEtudiantsAuReset,
     showError,
     showSuccess,
@@ -1281,10 +1655,14 @@ export function AffectationsPage({ utilisateur, onLogout }) {
 
     try {
       await supprimerAffectation(idAffectation);
-      await rechargerHorairesActifs();
+      await rechargerContexteActif();
       if (Number(idAffectationEdition) === Number(idAffectation)) {
         reinitialiserPlanification();
       }
+      emettreSynchronisationPlanning({
+        type: "affectation_supprimee",
+        id_affectation_cours: Number(idAffectation),
+      });
       showSuccess("Affectation supprimee.");
     } catch (error) {
       showError(error.message || "Erreur lors de la suppression.");
@@ -1292,7 +1670,7 @@ export function AffectationsPage({ utilisateur, onLogout }) {
   }, [
     confirm,
     idAffectationEdition,
-    rechargerHorairesActifs,
+    rechargerContexteActif,
     reinitialiserPlanification,
     showError,
     showSuccess,
@@ -1308,6 +1686,10 @@ export function AffectationsPage({ utilisateur, onLogout }) {
       date: String(affectation.date || dateCouranteLocale()),
       heure_debut: formaterHeure(affectation.heure_debut) || "08:00",
       heure_fin: formaterHeure(affectation.heure_fin) || "10:00",
+      portee_mode: "single",
+      date_debut_portee: String(affectation.date || dateCouranteLocale()),
+      date_fin_portee: String(affectation.date || dateCouranteLocale()),
+      id_planification_serie: Number(affectation.id_planification_serie) || null,
     });
   }, []);
 
@@ -1578,6 +1960,187 @@ export function AffectationsPage({ utilisateur, onLogout }) {
         <section className="affectations-page__panel">
           <div className="affectations-page__panel-header">
             <div>
+              <h2>Planifier une reprise etudiant</h2>
+              <p>
+                Rattachez un etudiant a un cours echoue dans un groupe d'accueil sans
+                le convertir en membre regulier du groupe.
+              </p>
+            </div>
+          </div>
+
+          <div className="affectations-page__form">
+            <div className="affectations-page__row">
+              <RepriseStudentSearchField
+                etudiants={etudiantsPlanificationReprise}
+                selectedId={planificationReprise.id_etudiant}
+                onSelect={handleChoisirEtudiantReprise}
+                loading={loading}
+                disabled={planificationRepriseEnCours}
+              />
+
+              <label className="crud-page__field">
+                <span>Cours echoue</span>
+                <select
+                  name="id_cours_echoue"
+                  value={planificationReprise.id_cours_echoue}
+                  onChange={handleChangerPlanificationReprise}
+                  disabled={!planificationReprise.id_etudiant || chargementCoursEchoues}
+                >
+                  <option value="">
+                    {chargementCoursEchoues
+                      ? "Chargement..."
+                      : "Choisir un cours a reprendre"}
+                  </option>
+                  {coursEchouesEtudiant.map((coursEchoue) => (
+                    <option key={coursEchoue.id} value={coursEchoue.id}>
+                      {coursEchoue.code_cours} - {coursEchoue.nom_cours}
+                      {coursEchoue.est_non_planifie
+                        ? " - A traiter"
+                        : coursEchoue.groupe_reprise
+                          ? ` - Deja rattache a ${coursEchoue.groupe_reprise}`
+                          : " - Deja planifie"}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <div className="affectations-page__row">
+              <label className="crud-page__field">
+                <span>Groupe d'accueil</span>
+                <select
+                  name="id_groupes_etudiants"
+                  value={planificationReprise.id_groupes_etudiants}
+                  onChange={handleChangerPlanificationReprise}
+                  disabled={
+                    !planificationReprise.id_cours_echoue ||
+                    chargementGroupesCompatibles
+                  }
+                >
+                  <option value="">
+                    {chargementGroupesCompatibles
+                      ? "Recherche des groupes..."
+                      : "Choisir un groupe compatible"}
+                  </option>
+                  {groupesCompatiblesReprise.map((groupe) => (
+                    <option
+                      key={groupe.id_groupes_etudiants}
+                      value={groupe.id_groupes_etudiants}
+                    >
+                      {groupe.nom_groupe} - effectif reel projete:{" "}
+                      {groupe.effectif_reel_projete || groupe.effectif_regulier || 0}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <div className="affectations-page__cohort-preview">
+                {etudiantRepriseActif ? (
+                  <>
+                    <div className="affectations-page__cohort-preview-header">
+                      <strong>{formaterNomEtudiant(etudiantRepriseActif)}</strong>
+                      <span
+                        className={`affectations-page__student-badge${
+                          etudiantRepriseActif.reprise_manuelle?.a_traiter
+                            ? " affectations-page__student-badge--warning"
+                            : " affectations-page__student-badge--neutral"
+                        }`}
+                      >
+                        {formaterStatutRepriseEtudiant(etudiantRepriseActif)}
+                      </span>
+                    </div>
+                    <small>
+                      Matricule: {etudiantRepriseActif.matricule || "-"} - Groupe:{" "}
+                      {etudiantRepriseActif.groupe || "Non assigne"}
+                    </small>
+                    <small>
+                      Programme: {etudiantRepriseActif.programme || "-"} - Etape:{" "}
+                      {formaterEtapeEtudiant(etudiantRepriseActif)}
+                    </small>
+                    <small>
+                      {coursEchoueActif
+                        ? `${coursEchoueActif.code_cours} - ${coursEchoueActif.nom_cours}`
+                        : "Choisissez un cours echoue pour lancer le filtrage intelligent des groupes."}
+                    </small>
+                  </>
+                ) : (
+                  <>
+                    <strong>Aucun etudiant selectionne</strong>
+                    <small>
+                      Utilisez la recherche par nom, prenom, matricule, groupe,
+                      programme ou etape pour trouver rapidement le bon dossier.
+                    </small>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {planificationReprise.id_etudiant &&
+            !chargementCoursEchoues &&
+            coursEchouesEtudiant.length === 0 ? (
+              <p className="crud-page__state">
+                Aucun cours echoue planifiable n'a ete trouve pour cet etudiant dans la
+                session active.
+              </p>
+            ) : null}
+
+            {planificationReprise.id_cours_echoue &&
+            !chargementGroupesCompatibles &&
+            groupesCompatiblesReprise.length === 0 ? (
+              <p className="crud-page__state">
+                Aucun groupe pedagogiquement compatible n'est disponible pour cette reprise.
+              </p>
+            ) : null}
+
+            {groupeRepriseActif ? (
+              <div className="affectations-page__manual-summary">
+                <strong>{groupeRepriseActif.nom_groupe}</strong>
+                <span>
+                  Effectif regulier: {groupeRepriseActif.effectif_regulier || 0} etudiants
+                  {" - "}Effectif reel projete: {groupeRepriseActif.effectif_reel_projete || 0}
+                </span>
+                <span>
+                  Seances deja planifiees pour ce cours: {groupeRepriseActif.nb_seances_cours || 0}.
+                  L'etudiant restera hors groupe administratif et sera memorise comme
+                  reprise sur ce cours uniquement.
+                </span>
+              </div>
+            ) : null}
+
+            <div className="affectations-page__actions">
+              <button
+                className="crud-page__primary-button"
+                type="button"
+                onClick={handlePlanifierRepriseEtudiant}
+                disabled={
+                  planificationRepriseEnCours ||
+                  chargementCoursEchoues ||
+                  chargementGroupesCompatibles ||
+                  !planificationReprise.id_etudiant ||
+                  !planificationReprise.id_cours_echoue ||
+                  !planificationReprise.id_groupes_etudiants
+                }
+              >
+                {planificationRepriseEnCours
+                  ? "Planification..."
+                  : "Planifier la reprise"}
+              </button>
+
+              <button
+                className="crud-page__secondary-button"
+                type="button"
+                onClick={reinitialiserPlanificationReprise}
+                disabled={planificationRepriseEnCours}
+              >
+                Reinitialiser
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section className="affectations-page__panel">
+          <div className="affectations-page__panel-header">
+            <div>
               <h2>Planifier un cours manuellement</h2>
               <p>
                 Utilisez ce formulaire pour ajouter ou corriger une seance precise
@@ -1715,6 +2278,77 @@ export function AffectationsPage({ utilisateur, onLogout }) {
                 </label>
               </div>
 
+              <div className="affectations-page__scope-card">
+                <div className="affectations-page__scope-header">
+                  <strong>Portee de planification</strong>
+                  <span>
+                    {idAffectationEdition
+                      ? "Chaque occurrence ciblee sera revalidee contre les groupes, professeurs, salles et etudiants en reprise."
+                      : "Les occurrences hebdomadaires seront creees uniquement sur la periode demandee."}
+                  </span>
+                </div>
+
+                <div className="affectations-page__row">
+                  <label className="crud-page__field">
+                    <span>Portee</span>
+                    <select
+                      name="portee_mode"
+                      value={planificationManuelle.portee_mode}
+                      onChange={handleChangerPorteePlanification}
+                    >
+                      {optionsPorteePlanification.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {idAffectationEdition
+                            ? option.labelEdition
+                            : option.labelCreation}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <div className="affectations-page__scope-note">
+                    {editionRecurrenteDisponible ? (
+                      <span>
+                        {planificationManuelle.portee_mode === "single"
+                          ? "Une seule occurrence sera creee ou modifiee."
+                          : planificationManuelle.portee_mode === "until_session_end"
+                            ? "La recurrence sera appliquee chaque semaine jusqu'a la fin de la session active."
+                            : "Le backend generera ou replanifiera toutes les occurrences hebdomadaires comprises dans la periode choisie."}
+                      </span>
+                    ) : (
+                      <span>
+                        Cette seance ne fait pas partie d'une recurrence geree. Seule
+                        cette occurrence peut etre modifiee.
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {planificationManuelle.portee_mode === "custom_range" ? (
+                  <div className="affectations-page__row">
+                    <label className="crud-page__field">
+                      <span>Date de debut</span>
+                      <input
+                        type="date"
+                        name="date_debut_portee"
+                        value={planificationManuelle.date_debut_portee}
+                        onChange={handleChangerPorteePlanification}
+                      />
+                    </label>
+
+                    <label className="crud-page__field">
+                      <span>Date de fin</span>
+                      <input
+                        type="date"
+                        name="date_fin_portee"
+                        value={planificationManuelle.date_fin_portee}
+                        onChange={handleChangerPorteePlanification}
+                      />
+                    </label>
+                  </div>
+                ) : null}
+              </div>
+
               <div className="affectations-page__manual-summary">
                 <strong>
                   {groupePlanificationActif?.nom_groupe || "Aucun groupe sélectionné"}
@@ -1725,6 +2359,10 @@ export function AffectationsPage({ utilisateur, onLogout }) {
                   {coursPlanificationActif
                     ? `Type de salle requis : ${coursPlanificationActif.type_salle || "standard"}`
                     : "Sélectionner un cours"}
+                </span>
+                <span>
+                  La validation finale recontrole aussi les etudiants en reprise hors groupe
+                  et l'effectif reel de la seance avant insertion.
                 </span>
                 <div className="affectations-page__room-status-legend">
                   <span className="affectations-page__room-legend-item affectations-page__room-legend-item--available">

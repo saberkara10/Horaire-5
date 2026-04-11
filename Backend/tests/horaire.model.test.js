@@ -105,11 +105,11 @@ describe("Tests modele Horaire", () => {
     ).toBe(false);
   });
 
-  test("salleEstCompatibleAvecCours retourne true quand l'id de salle correspond", () => {
+  test("salleEstCompatibleAvecCours retourne true pour une salle du meme type meme si la salle de reference differe", () => {
     expect(
       salleEstCompatibleAvecCours(
         {
-          id_salle: 3,
+          id_salle: 8,
           type: "Laboratoire",
         },
         {
@@ -119,6 +119,22 @@ describe("Tests modele Horaire", () => {
         }
       )
     ).toBe(true);
+  });
+
+  test("salleEstCompatibleAvecCours retourne false si le type reel ne correspond pas", () => {
+    expect(
+      salleEstCompatibleAvecCours(
+        {
+          id_salle: 3,
+          type: "Salle de cours",
+        },
+        {
+          id_cours: 1,
+          type_salle: "Laboratoire",
+          id_salle_reference: 3,
+        }
+      )
+    ).toBe(false);
   });
 
   test("verifierDisponibiliteProfesseur retourne false quand le professeur n'est pas disponible", async () => {

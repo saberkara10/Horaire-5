@@ -10,13 +10,17 @@ import {
   userAuth,
 } from "../middlewares/auth.js";
 import {
-  creerAffectationValidee,
   deleteAffectation,
   deleteAllAffectations,
   genererHoraireAutomatiquement,
   getAffectationById,
   getAllAffectations,
-  updateAffectationValidee,
+  planifierAffectationManuelle,
+  planifierRepriseEtudiant,
+  recupererCoursEchouesEtudiantPlanifiables,
+  recupererEtudiantsPourPlanificationReprise,
+  recupererGroupesCompatiblesPourCoursEchoueEtudiant,
+  replanifierAffectationManuelle,
 } from "../src/model/horaire.js";
 
 /**
@@ -44,6 +48,16 @@ export default function horaireRoutes(app) {
     return /^\d{4}-\d{2}-\d{2}$/.test(String(date || ""));
   }
 
+  function extrairePortee(body = {}) {
+    const portee = body.portee || {};
+
+    return {
+      mode: portee.mode || portee.type || body.portee_mode || "single",
+      date_debut: portee.date_debut || body.date_debut_portee || null,
+      date_fin: portee.date_fin || body.date_fin_portee || null,
+    };
+  }
+
   /**
    * GET /api/horaires
    * Recuperer toutes les affectations de cours.
@@ -59,6 +73,22 @@ export default function horaireRoutes(app) {
       response.status(500).json({ message: "Erreur serveur." });
     }
   });
+
+  app.get(
+    "/api/horaires/reprises/etudiants",
+    ...accesLectureHoraires,
+    async (_request, response) => {
+      try {
+        const etudiants = await recupererEtudiantsPourPlanificationReprise();
+        return response.status(200).json(etudiants);
+      } catch (error) {
+        console.error("Erreur lecture etudiants planification reprise :", error);
+        return response
+          .status(error.statusCode || 500)
+          .json({ message: error.message || "Erreur serveur." });
+      }
+    }
+  );
 
   /**
    * GET /api/horaires/:id
@@ -113,7 +143,7 @@ export default function horaireRoutes(app) {
         return response.status(400).json({ message: "Champs manquants." });
       }
 
-      const resultat = await creerAffectationValidee({
+      const resultat = await planifierAffectationManuelle({
         idCours: Number(id_cours),
         idProfesseur: Number(id_professeur),
         idSalle: Number(id_salle),
@@ -121,6 +151,7 @@ export default function horaireRoutes(app) {
         date,
         heureDebut: heure_debut,
         heureFin: heure_fin,
+        portee: extrairePortee(request.body),
       });
 
       return response.status(201).json(resultat);
@@ -147,19 +178,106 @@ export default function horaireRoutes(app) {
           return response.status(400).json({ message: "Champs manquants." });
         }
 
-        const resultat = await updateAffectationValidee(idAffectation, {
-          idCours: Number(request.body.id_cours),
-          idProfesseur: Number(request.body.id_professeur),
-          idSalle: Number(request.body.id_salle),
-          idGroupeEtudiants: Number(request.body.id_groupes_etudiants),
-          date: request.body.date,
-          heureDebut: request.body.heure_debut,
-          heureFin: request.body.heure_fin,
-        });
+        const resultat = await replanifierAffectationManuelle(
+          idAffectation,
+          {
+            idCours: Number(request.body.id_cours),
+            idProfesseur: Number(request.body.id_professeur),
+            idSalle: Number(request.body.id_salle),
+            idGroupeEtudiants: Number(request.body.id_groupes_etudiants),
+            date: request.body.date,
+            heureDebut: request.body.heure_debut,
+            heureFin: request.body.heure_fin,
+            portee: extrairePortee(request.body),
+          }
+        );
 
         return response.status(200).json(resultat);
       } catch (error) {
         console.error("Erreur modification horaire :", error);
+        return response
+          .status(error.statusCode || 500)
+          .json({ message: error.message || "Erreur serveur." });
+      }
+    }
+  );
+
+  app.get(
+    "/api/horaires/etudiants/:id/cours-echoues",
+    ...accesLectureHoraires,
+    async (request, response) => {
+      try {
+        const idEtudiant = Number(request.params.id);
+
+        if (!Number.isInteger(idEtudiant) || idEtudiant <= 0) {
+          return response.status(400).json({ message: "Identifiant invalide." });
+        }
+
+        const reprises = await recupererCoursEchouesEtudiantPlanifiables(idEtudiant);
+        return response.status(200).json(reprises);
+      } catch (error) {
+        console.error("Erreur lecture cours echoues :", error);
+        return response
+          .status(error.statusCode || 500)
+          .json({ message: error.message || "Erreur serveur." });
+      }
+    }
+  );
+
+  app.get(
+    "/api/horaires/etudiants/:id/cours-echoues/:idCoursEchoue/groupes-compatibles",
+    ...accesLectureHoraires,
+    async (request, response) => {
+      try {
+        const idEtudiant = Number(request.params.id);
+        const idCoursEchoue = Number(request.params.idCoursEchoue);
+
+        if (!Number.isInteger(idEtudiant) || idEtudiant <= 0) {
+          return response.status(400).json({ message: "Identifiant invalide." });
+        }
+
+        if (!Number.isInteger(idCoursEchoue) || idCoursEchoue <= 0) {
+          return response.status(400).json({ message: "Identifiant invalide." });
+        }
+
+        const groupesCompatibles =
+          await recupererGroupesCompatiblesPourCoursEchoueEtudiant(
+            idEtudiant,
+            idCoursEchoue
+          );
+        return response.status(200).json(groupesCompatibles);
+      } catch (error) {
+        console.error("Erreur lecture groupes compatibles reprise :", error);
+        return response
+          .status(error.statusCode || 500)
+          .json({ message: error.message || "Erreur serveur." });
+      }
+    }
+  );
+
+  app.post(
+    "/api/horaires/reprises",
+    ...accesGestionHoraires,
+    async (request, response) => {
+      try {
+        const { id_etudiant, id_cours_echoue, id_groupes_etudiants } = request.body || {};
+
+        if (!id_etudiant || !id_cours_echoue || !id_groupes_etudiants) {
+          return response.status(400).json({
+            message:
+              "id_etudiant, id_cours_echoue et id_groupes_etudiants sont obligatoires.",
+          });
+        }
+
+        const resultat = await planifierRepriseEtudiant({
+          idEtudiant: Number(id_etudiant),
+          idCoursEchoue: Number(id_cours_echoue),
+          idGroupeEtudiants: Number(id_groupes_etudiants),
+        });
+
+        return response.status(201).json(resultat);
+      } catch (error) {
+        console.error("Erreur planification reprise etudiant :", error);
         return response
           .status(error.statusCode || 500)
           .json({ message: error.message || "Erreur serveur." });

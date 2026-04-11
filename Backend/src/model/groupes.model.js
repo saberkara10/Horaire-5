@@ -97,7 +97,6 @@ export async function recupererGroupes(details = false, options = {}) {
          LEFT JOIN affectation_etudiants ae
            ON ae.id_groupes_etudiants = ge.id_groupes_etudiants
           AND ae.id_session = ge.id_session
-          AND ae.source_type = 'reprise'
          LEFT JOIN sessions s
            ON s.id_session = ge.id_session
          ${clauseWhere}
@@ -149,7 +148,6 @@ export async function recupererGroupeParId(idGroupe) {
      LEFT JOIN affectation_etudiants ae
        ON ae.id_groupes_etudiants = ge.id_groupes_etudiants
       AND ae.id_session = ge.id_session
-      AND ae.source_type = 'reprise'
      LEFT JOIN sessions s
        ON s.id_session = ge.id_session
      WHERE ge.id_groupes_etudiants = ?

@@ -1,0 +1,86 @@
+classDiagram
+    class SchedulerEngine {
+        +generer(options)
+        +genererGroupe(options)
+        -_trouverSerieHebdomadaire()
+        -_trouverSerieAssouplie()
+        -_diagnosticPrecis()
+        -_calculerScoreQualite()
+    }
+
+    class SchedulerDataBootstrap {
+        +ensureOperationalDataset(options)
+        -_ensureSession()
+        -_ensureCourses()
+        -_ensureProfesseurs()
+        -_ensureStudentsForTargets()
+    }
+
+    class ContextLoader {
+        +charger(idSession, executor)
+    }
+
+    class GroupFormer {
+        +formerGroupes(etudiants, cours, echouesParEtudiant)
+        +lireEffectifCours(groupe, idCours)
+        +lireEffectifProjeteMax(groupe)
+    }
+
+    class ConstraintMatrix {
+        +salleLibre(idSalle, date, heureDebut, heureFin)
+        +profLibre(idProf, date, heureDebut, heureFin)
+        +groupeLibre(idGroupe, date, heureDebut, heureFin)
+        +etudiantsLibres(studentIds, date, heureDebut, heureFin)
+        +reserver(...)
+        +reserverEtudiants(...)
+    }
+
+    class AvailabilityChecker {
+        +profDisponible(...)
+        +salleDisponible(...)
+        +profCompatible(professeur, cours)
+        +salleCompatible(salle, cours, capaciteMinimale)
+        +genererJours(dateDebut, dateFin, inclureWeekend)
+    }
+
+    class FailedCourseEngine {
+        +rattacherCoursEchoues(options)
+    }
+
+    class SchedulerReportService {
+        +listerRapports(executor)
+        +lireRapport(idRapport, executor)
+    }
+
+    class SchedulerConfig {
+        +isOnlineCourseSchedulingEnabled()
+        +getSchedulerTargetGroupSize()
+        +getSchedulerMaxGroupCapacity()
+        +getSchedulerMaxGroupsPerProfessor()
+        +getSchedulerMaxWeeklySessionsPerProfessor()
+    }
+
+    class AcademicCatalog {
+        <<constants>>
+        REQUIRED_WEEKLY_SESSIONS_PER_GROUP
+        TARGET_ACTIVE_DAYS_PER_GROUP
+        MAX_GROUP_SESSIONS_PER_DAY
+        MAX_PROFESSOR_SESSIONS_PER_DAY
+        ACADEMIC_WEEKDAY_TIME_SLOTS
+    }
+
+    class AvailabilityRescheduler {
+        +replanifierSeancesImpacteesParDisponibilites(...)
+    }
+
+    SchedulerEngine ..> SchedulerDataBootstrap : prepare jeu de donnees
+    SchedulerEngine ..> ContextLoader : charge contexte
+    SchedulerEngine ..> GroupFormer : forme groupes
+    SchedulerEngine ..> ConstraintMatrix : reserve conflits
+    SchedulerEngine ..> AvailabilityChecker : verifie compatibilites
+    SchedulerEngine ..> FailedCourseEngine : rattache reprises
+    SchedulerEngine ..> SchedulerConfig : lit la configuration
+    SchedulerEngine ..> AcademicCatalog : applique les constantes
+    SchedulerReportService ..> FailedCourseEngine : enrichit le diagnostic
+    AvailabilityRescheduler ..> AvailabilityChecker : verifie disponibilites
+    AvailabilityRescheduler ..> AcademicCatalog : respecte les plafonds

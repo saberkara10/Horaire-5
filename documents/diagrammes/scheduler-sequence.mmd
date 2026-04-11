@@ -1,0 +1,34 @@
+sequenceDiagram
+    actor Admin
+    participant Frontend as SchedulerPage
+    participant Route as GET /api/scheduler/generer-stream
+    participant Engine as SchedulerEngine
+    participant Schema as academic-scheduler-schema
+    participant Bootstrap as SchedulerDataBootstrap
+    participant Context as ContextLoader
+    participant GroupFormer as GroupFormer
+    participant Retakes as FailedCourseEngine
+    participant DB as MySQL
+
+    Admin->>Frontend: Lance la generation de session
+    Frontend->>Route: GET /api/scheduler/generer-stream?id_session=...
+    Route->>Engine: generer({idSession, idUtilisateur, onProgress})
+    Engine->>Schema: assurerSchemaSchedulerAcademique()
+    Engine->>Bootstrap: ensureOperationalDataset()
+    Engine-->>Route: progress PHASE_1 a PHASE_3
+    Engine->>Context: charger(idSession)
+    Context->>DB: Lire session, cours, professeurs,<br/>salles, etudiants, reprises et affectations
+    DB-->>Context: Contexte normalise
+    Context-->>Engine: ctx
+    Engine->>GroupFormer: formerGroupes(...)
+    GroupFormer-->>Engine: groupesFormes + affectationsEtudiantGroupe
+    Engine-->>Route: progress PHASE_4
+    Engine->>DB: Supprimer l'horaire courant de la session
+    Engine->>Engine: Construire les series hebdomadaires stables
+    Engine->>Retakes: rattacherCoursEchoues(...)
+    Retakes-->>Engine: affectations + conflits
+    Engine->>DB: Inserer plages_horaires,<br/>affectation_cours,<br/>affectation_groupes,<br/>affectation_etudiants,<br/>rapports_generation
+    DB-->>Engine: Commit
+    Engine-->>Route: progress DONE + rapport
+    Route-->>Frontend: event done
+    Frontend-->>Admin: Affiche score, blocages et historique

@@ -55,3 +55,11 @@ Ce dossier regroupe les documents utiles du projet **Gestion des horaires**.
 ## Diagrammes
 
 - Tous les diagrammes UML et Mermaid sont regroupes dans le dossier [diagrammes](diagrammes).
+- [Scheduler - Use case](diagrammes/scheduler-use-case.svg)
+- [Scheduler - Architecture composants](diagrammes/scheduler-components.svg)
+- [Scheduler - Activite de generation](diagrammes/scheduler-activity.svg)
+- [Scheduler - Sequence de generation](diagrammes/scheduler-sequence.svg)
+- [Scheduler - Sequence de replanification](diagrammes/scheduler-replanification-sequence.svg)
+- [Scheduler - Modele de classes](diagrammes/scheduler-class.svg)
+- [Scheduler - Modele de donnees](diagrammes/scheduler-er.svg)
+- [Scheduler - Deploiement logique](diagrammes/scheduler-deployment.svg)

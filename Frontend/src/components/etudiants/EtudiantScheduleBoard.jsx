@@ -38,6 +38,36 @@ function formaterNomProfesseur(seance) {
     .replace(/\s+/g, " ");
 }
 
+function getPresentationSource(seance) {
+  if (String(seance?.source_horaire || "") === "individuelle") {
+    return {
+      badge: "Exception",
+      badgeCourt: "EXCEPTION",
+      pillClass: "status-pill--busy",
+      description: `Groupe d'accueil : ${seance.groupe_source || "non renseigne"}`,
+      classeSeance: "etudiant-schedule__seance--individuelle",
+    };
+  }
+
+  if (Boolean(seance?.est_reprise)) {
+    return {
+      badge: "Reprise",
+      badgeCourt: "REPRISE",
+      pillClass: "status-pill--warning",
+      description: `Groupe suivi : ${seance.groupe_source || "non renseigne"}`,
+      classeSeance: "etudiant-schedule__seance--reprise",
+    };
+  }
+
+  return {
+    badge: "Groupe principal",
+    badgeCourt: "TRONC COMMUN",
+    pillClass: "status-pill--success",
+    description: `Groupe principal : ${seance.groupe_source || "non renseigne"}`,
+    classeSeance: "",
+  };
+}
+
 function determinerLundiInitial(seances) {
   if (!Array.isArray(seances) || seances.length === 0) {
     return getDebutSemaine(new Date());
@@ -138,6 +168,7 @@ export function EtudiantScheduleBoard({
       <div className="etudiant-schedule__legend">
         <span className="status-pill status-pill--success">Cours normal</span>
         <span className="status-pill status-pill--warning">Cours repris</span>
+        <span className="status-pill status-pill--busy">Exception individuelle</span>
       </div>
 
       <div className="planning-table-wrapper">
@@ -155,7 +186,9 @@ export function EtudiantScheduleBoard({
           </thead>
           <tbody>
             {seances.map((seance) => (
-              <tr key={`${seance.source_horaire}-${seance.id_affectation_cours}-${seance.id_plage_horaires}`}>
+              <tr
+                key={`${seance.source_horaire}-${seance.id_affectation_cours}-${seance.id_plage_horaires}`}
+              >
                 <td>{formaterDateLongue(seance.date)}</td>
                 <td>{formaterHeure(seance.heure_debut)}</td>
                 <td>{formaterHeure(seance.heure_fin)}</td>
@@ -164,17 +197,11 @@ export function EtudiantScheduleBoard({
                   <span className="planning-nom-cours">{seance.nom_cours}</span>
                 </td>
                 <td>
-                  <span
-                    className={`status-pill ${
-                      seance.est_reprise ? "status-pill--warning" : "status-pill--success"
-                    }`}
-                  >
-                    {seance.est_reprise ? "Reprise" : "Groupe principal"}
+                  <span className={`status-pill ${getPresentationSource(seance).pillClass}`}>
+                    {getPresentationSource(seance).badge}
                   </span>
                   <div className="etudiant-schedule__source">
-                    {seance.est_reprise
-                      ? `Groupe suivi : ${seance.groupe_source || "non renseigne"}`
-                      : `Groupe principal : ${seance.groupe_source || "non renseigne"}`}
+                    {getPresentationSource(seance).description}
                   </div>
                 </td>
                 <td>
@@ -260,14 +287,12 @@ export function EtudiantScheduleBoard({
                     return (
                       <div
                         key={`${seance.source_horaire}-${seance.id_affectation_cours}-${seance.id_plage_horaires}-grid`}
-                        className={`cal-seance ${
-                          seance.est_reprise ? "etudiant-schedule__seance--reprise" : ""
-                        }`}
+                        className={`cal-seance ${getPresentationSource(seance).classeSeance}`}
                         style={{ top: `${top}px`, height: `${hauteur}px` }}
                       >
                         <span className="cal-seance-code">{seance.code_cours}</span>
                         <span className="etudiant-schedule__seance-badge">
-                          {seance.est_reprise ? "REPRISE" : "TRONC COMMUN"}
+                          {getPresentationSource(seance).badgeCourt}
                         </span>
                         <span className="cal-seance-nom">{seance.nom_cours}</span>
                         <span className="cal-seance-salle">
@@ -277,7 +302,7 @@ export function EtudiantScheduleBoard({
                           {formaterNomProfesseur(seance) || "Prof a confirmer"}
                         </span>
                         <span className="etudiant-schedule__source">
-                          {seance.groupe_source || "Groupe non renseigne"}
+                          {getPresentationSource(seance).description}
                         </span>
                       </div>
                     );

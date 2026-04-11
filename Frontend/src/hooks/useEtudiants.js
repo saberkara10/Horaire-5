@@ -167,7 +167,10 @@ export function useEtudiants() {
         horaire: consultationHoraire.horaire ?? [],
         horaireGroupe: consultationHoraire.horaire_groupe ?? [],
         horaireReprises: consultationHoraire.horaire_reprises ?? [],
+        horaireIndividuel: consultationHoraire.horaire_individuel ?? [],
         reprises: consultationHoraire.reprises ?? [],
+        exceptionsIndividuelles:
+          consultationHoraire.exceptions_individuelles ?? [],
         diagnosticReprises: consultationHoraire.diagnostic_reprises ?? [],
         resume: consultationHoraire.resume ?? null,
       };
@@ -214,6 +217,28 @@ export function useEtudiants() {
     }
   }
 
+  function invaliderConsultations(idsEtudiants = []) {
+    const ids = [...new Set(
+      (Array.isArray(idsEtudiants) ? idsEtudiants : [])
+        .map((idEtudiant) => Number(idEtudiant))
+        .filter((idEtudiant) => Number.isInteger(idEtudiant) && idEtudiant > 0)
+    )];
+
+    if (ids.length === 0) {
+      return;
+    }
+
+    setConsultationsParId((consultationsActuelles) => {
+      const prochainEtat = { ...consultationsActuelles };
+
+      for (const idEtudiant of ids) {
+        delete prochainEtat[idEtudiant];
+      }
+
+      return prochainEtat;
+    });
+  }
+
   return {
     etudiants,
     consultationsParId,
@@ -224,6 +249,7 @@ export function useEtudiants() {
     recharger: () => chargerEtudiants({ conserverListe: etudiants.length > 0 }),
     consulter,
     importer,
+    invaliderConsultations,
   };
 }
 

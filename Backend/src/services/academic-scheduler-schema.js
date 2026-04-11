@@ -178,6 +178,79 @@ async function assurerTableAffectationEtudiants(executor) {
   );
 }
 
+async function assurerEchangesCoursEtudiants(executor) {
+  await executor.query(
+    `CREATE TABLE IF NOT EXISTS echanges_cours_etudiants (
+      id_echange_cours INT NOT NULL AUTO_INCREMENT,
+      id_session INT NOT NULL,
+      id_cours INT NOT NULL,
+      id_etudiant_a INT NOT NULL,
+      id_groupe_a_avant INT NOT NULL,
+      id_groupe_a_apres INT NOT NULL,
+      id_etudiant_b INT NOT NULL,
+      id_groupe_b_avant INT NOT NULL,
+      id_groupe_b_apres INT NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (id_echange_cours),
+      KEY idx_echanges_cours_session (id_session),
+      KEY idx_echanges_cours_cours (id_cours),
+      KEY idx_echanges_cours_etudiant_a (id_etudiant_a),
+      KEY idx_echanges_cours_etudiant_b (id_etudiant_b),
+      CONSTRAINT fk_echanges_cours_session
+        FOREIGN KEY (id_session) REFERENCES sessions (id_session)
+        ON DELETE CASCADE,
+      CONSTRAINT fk_echanges_cours_cours
+        FOREIGN KEY (id_cours) REFERENCES cours (id_cours)
+        ON DELETE CASCADE,
+      CONSTRAINT fk_echanges_cours_etudiant_a
+        FOREIGN KEY (id_etudiant_a) REFERENCES etudiants (id_etudiant)
+        ON DELETE CASCADE,
+      CONSTRAINT fk_echanges_cours_etudiant_b
+        FOREIGN KEY (id_etudiant_b) REFERENCES etudiants (id_etudiant)
+        ON DELETE CASCADE,
+      CONSTRAINT fk_echanges_cours_groupe_a_avant
+        FOREIGN KEY (id_groupe_a_avant) REFERENCES groupes_etudiants (id_groupes_etudiants)
+        ON DELETE CASCADE,
+      CONSTRAINT fk_echanges_cours_groupe_a_apres
+        FOREIGN KEY (id_groupe_a_apres) REFERENCES groupes_etudiants (id_groupes_etudiants)
+        ON DELETE CASCADE,
+      CONSTRAINT fk_echanges_cours_groupe_b_avant
+        FOREIGN KEY (id_groupe_b_avant) REFERENCES groupes_etudiants (id_groupes_etudiants)
+        ON DELETE CASCADE,
+      CONSTRAINT fk_echanges_cours_groupe_b_apres
+        FOREIGN KEY (id_groupe_b_apres) REFERENCES groupes_etudiants (id_groupes_etudiants)
+        ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
+  );
+
+  await ajouterColonneSiAbsente(
+    executor,
+    "affectation_etudiants",
+    "id_echange_cours",
+    "INT NULL AFTER id_cours_echoue"
+  );
+
+  await creerIndexSiAbsent(
+    executor,
+    "affectation_etudiants",
+    "idx_affectation_etudiants_echange_cours",
+    `CREATE INDEX idx_affectation_etudiants_echange_cours
+     ON affectation_etudiants (id_echange_cours)`
+  );
+
+  await creerContrainteSiAbsente(
+    executor,
+    "affectation_etudiants",
+    "fk_affectation_etudiants_echange_cours",
+    `ALTER TABLE affectation_etudiants
+     ADD CONSTRAINT fk_affectation_etudiants_echange_cours
+     FOREIGN KEY (id_echange_cours)
+     REFERENCES echanges_cours_etudiants (id_echange_cours)
+     ON DELETE SET NULL`
+  );
+}
+
 async function assurerCoursEchouesEvolution(executor) {
   await ajouterColonneSiAbsente(
     executor,
@@ -206,9 +279,57 @@ async function assurerCoursEchouesEvolution(executor) {
   );
 }
 
+async function assurerPlanificationSeries(executor) {
+  await executor.query(
+    `CREATE TABLE IF NOT EXISTS planification_series (
+      id_planification_serie INT NOT NULL AUTO_INCREMENT,
+      id_session INT NOT NULL,
+      type_planification ENUM('groupe','reprise') NOT NULL DEFAULT 'groupe',
+      recurrence ENUM('hebdomadaire','ponctuelle') NOT NULL DEFAULT 'hebdomadaire',
+      date_debut DATE NOT NULL,
+      date_fin DATE NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (id_planification_serie),
+      KEY idx_planification_series_session (id_session),
+      CONSTRAINT fk_planification_series_session
+        FOREIGN KEY (id_session) REFERENCES sessions (id_session)
+        ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
+  );
+
+  await ajouterColonneSiAbsente(
+    executor,
+    "affectation_cours",
+    "id_planification_serie",
+    "INT NULL AFTER id_plage_horaires"
+  );
+
+  await creerIndexSiAbsent(
+    executor,
+    "affectation_cours",
+    "idx_affectation_cours_planification_serie",
+    `CREATE INDEX idx_affectation_cours_planification_serie
+     ON affectation_cours (id_planification_serie)`
+  );
+
+  await creerContrainteSiAbsente(
+    executor,
+    "affectation_cours",
+    "fk_affectation_cours_planification_serie",
+    `ALTER TABLE affectation_cours
+     ADD CONSTRAINT fk_affectation_cours_planification_serie
+     FOREIGN KEY (id_planification_serie)
+     REFERENCES planification_series (id_planification_serie)
+     ON DELETE SET NULL`
+  );
+}
+
 async function assurerSchema(executor) {
   await assurerTableAffectationEtudiants(executor);
+  await assurerEchangesCoursEtudiants(executor);
   await assurerCoursEchouesEvolution(executor);
+  await assurerPlanificationSeries(executor);
   await assurerIndexGroupesParSession(executor);
 }
 

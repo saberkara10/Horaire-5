@@ -249,7 +249,9 @@
 }
 
 .status-pill--busy {
-  color: #5962d9;
+  color: #0f4c81;
+  background: rgba(224, 242, 254, 0.98);
+  border-color: rgba(56, 189, 248, 0.32);
 }
 
 .status-pill--warning {
@@ -385,6 +387,11 @@
   background: rgba(255, 251, 235, 0.9);
 }
 
+.schedule-preview__item--individuelle {
+  border-color: rgba(45, 212, 191, 0.35);
+  background: rgba(240, 253, 250, 0.94);
+}
+
 .detail-card__reprise-header {
   display: flex;
   align-items: center;
@@ -434,6 +441,10 @@
   background: linear-gradient(135deg, #f59e0b, #ea580c);
 }
 
+.etudiant-schedule__seance--individuelle {
+  background: linear-gradient(135deg, #0f766e, #14b8a6);
+}
+
 .etudiant-schedule__seance-badge {
   display: inline-flex;
   width: fit-content;
@@ -444,6 +455,93 @@
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+}
+
+.course-exchange__form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.9rem;
+}
+
+.course-exchange__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.course-exchange__summary {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.course-exchange__preview {
+  display: grid;
+  gap: 1rem;
+}
+
+.course-exchange__preview-header h3,
+.course-exchange__column h4,
+.course-exchange__card h3 {
+  margin: 0;
+}
+
+.course-exchange__preview-header p,
+.course-exchange__card p {
+  margin: 0.3rem 0 0;
+  color: var(--muted);
+}
+
+.course-exchange__preview-header,
+.course-exchange__card-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.85rem;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.course-exchange__columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.course-exchange__column {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.course-exchange__card {
+  display: grid;
+  gap: 0.8rem;
+  padding: 1rem;
+  border-radius: 18px;
+  border: 1px solid rgba(188, 207, 228, 0.38);
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.course-exchange__occurrences {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.course-exchange__occurrences span {
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.course-exchange__conflicts {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: #9a3412;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.course-exchange__actions {
+  display: flex;
+  justify-content: flex-start;
 }
 
 @media (max-width: 1100px) {

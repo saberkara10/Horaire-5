@@ -1,7 +1,7 @@
 /**
  * run-migration-v3.js
- *
- * Applique la migration v3 du scheduler.
+ * 
+ * Applique la migration v3 (indices et contraintes optimizer du scheduler).
  * Usage : node Database/run-migration-v3.js
  */
 
@@ -30,18 +30,18 @@ console.log("Application de la migration v3...\n");
 
 try {
   await conn.query(sql);
-  console.log("Migration v3 appliquee avec succes.");
-  console.log("   - Index sur plages_horaires (date, heure_debut, heure_fin)");
-  console.log("   - Plus de blocage artificiel sur plusieurs cours au meme creneau");
+  console.log("Migration v3 appliquée avec succès !");
+  console.log("   - Contrainte UNIQUE sur plages_horaires (date, heure_debut, heure_fin)");
+  console.log("   - Index d'optimisation sur affectation_cours, groupes_etudiants, cours_echoues...");
 } catch (err) {
   console.error("Erreur migration v3:", err.message);
-
+  // Certaines erreurs sont normales (duplicate column, etc.)
   if (err.message.includes("Duplicate") || err.message.includes("already exists")) {
-    console.log("   (Certains elements existaient deja, c'est normal)");
+    console.log("   (Certains éléments existaient déjà — c'est normal)");
   } else {
     process.exit(1);
   }
 } finally {
   await conn.end();
-  console.log("\nTermine.");
+  console.log("\n✅ Terminé.");
 }

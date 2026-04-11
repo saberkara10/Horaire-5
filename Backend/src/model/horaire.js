@@ -22,6 +22,14 @@ import {
 import { MAX_WEEKLY_SESSIONS_PER_PROFESSOR } from "../services/scheduler/AcademicCatalog.js";
 import { disponibiliteCouvreDate } from "../services/professeurs/availability-temporal.js";
 import { assurerSchemaSchedulerAcademique } from "../services/academic-scheduler-schema.js";
+import {
+  listerEtudiantsPourPlanificationReprise,
+  listerCoursEchouesEtudiant,
+  listerGroupesCompatiblesPourCoursEchoue,
+  planifierCoursEchouePourEtudiant,
+  planifierCoursGroupeManuellement,
+  replanifierCoursGroupeManuellement,
+} from "../services/planning/manual-planning.service.js";
 
 const CRENEAUX_DEBUT = ["08:00:00", "10:00:00", "13:00:00", "15:00:00"];
 const NOMBRE_JOURS_GENERATION = 10;
@@ -151,12 +159,6 @@ function trierProfesseursPourCours(
 }
 
 export function salleEstCompatibleAvecCours(salle, cours) {
-  const idSalleReference = Number(cours?.id_salle_reference);
-
-  if (Number.isInteger(idSalleReference) && idSalleReference > 0) {
-    return Number(salle?.id_salle) === idSalleReference;
-  }
-
   return normaliserTexte(salle?.type) === normaliserTexte(cours?.type_salle);
 }
 
@@ -426,7 +428,6 @@ async function recupererContexteGroupe(idGroupeEtudiants, executor = pool) {
      LEFT JOIN affectation_etudiants ae
        ON ae.id_groupes_etudiants = ge.id_groupes_etudiants
       AND ae.id_session = ge.id_session
-      AND ae.source_type = 'reprise'
      WHERE ge.id_groupes_etudiants = ?
      GROUP BY ge.id_groupes_etudiants,
               ge.nom_groupe,
@@ -487,8 +488,7 @@ async function recupererEtudiantsAffectesIndividuellementAuGroupe(
   const [rows] = await executor.query(
     `SELECT DISTINCT ae.id_etudiant
      FROM affectation_etudiants ae
-     WHERE ae.id_groupes_etudiants = ?
-       AND ae.source_type = 'reprise'`,
+     WHERE ae.id_groupes_etudiants = ?`,
     [idGroupeEtudiants]
   );
 
@@ -511,13 +511,23 @@ async function verifierConflitEtudiantPlanifie(
      FROM (
        SELECT DISTINCT ac.id_affectation_cours
        FROM etudiants e
+       JOIN groupes_etudiants ge
+         ON ge.id_groupes_etudiants = e.id_groupes_etudiants
        JOIN affectation_groupes ag
-         ON ag.id_groupes_etudiants = e.id_groupes_etudiants
+         ON ag.id_groupes_etudiants = ge.id_groupes_etudiants
        JOIN affectation_cours ac
          ON ac.id_affectation_cours = ag.id_affectation_cours
        JOIN plages_horaires ph
          ON ph.id_plage_horaires = ac.id_plage_horaires
        WHERE e.id_etudiant = ?
+         AND NOT EXISTS (
+           SELECT 1
+           FROM affectation_etudiants ae_override
+           WHERE ae_override.id_etudiant = e.id_etudiant
+             AND ae_override.id_cours = ac.id_cours
+             AND ae_override.id_session = ge.id_session
+             AND ae_override.source_type = 'individuelle'
+         )
          AND ph.date = ?
          AND ph.heure_debut < ?
          AND ph.heure_fin > ?${filtreExclusion.clause}
@@ -534,7 +544,7 @@ async function verifierConflitEtudiantPlanifie(
        JOIN plages_horaires ph
          ON ph.id_plage_horaires = ac.id_plage_horaires
        WHERE ae.id_etudiant = ?
-         AND ae.source_type = 'reprise'
+         AND ae.source_type IN ('reprise', 'individuelle')
          AND ph.date = ?
          AND ph.heure_debut < ?
          AND ph.heure_fin > ?${filtreExclusion.clause}
@@ -621,6 +631,7 @@ export async function getAllAffectations(options = {}, executor = pool) {
             ac.id_cours,
             ac.id_professeur,
             ac.id_salle,
+            ac.id_planification_serie,
             c.code AS cours_code,
             c.nom AS cours_nom,
             c.duree AS cours_duree,
@@ -648,6 +659,7 @@ export async function getAllAffectations(options = {}, executor = pool) {
               ac.id_cours,
               ac.id_professeur,
               ac.id_salle,
+              ac.id_planification_serie,
               c.code,
               c.nom,
               c.duree,
@@ -676,6 +688,7 @@ export async function getAffectationById(idAffectation, executor = pool) {
             ac.id_professeur,
             ac.id_salle,
             ac.id_plage_horaires,
+            ac.id_planification_serie,
             c.code AS cours_code,
             c.nom AS cours_nom,
             p.nom AS professeur_nom,
@@ -702,6 +715,7 @@ export async function getAffectationById(idAffectation, executor = pool) {
               ac.id_professeur,
               ac.id_salle,
               ac.id_plage_horaires,
+              ac.id_planification_serie,
               c.code,
               c.nom,
               p.nom,
@@ -714,6 +728,51 @@ export async function getAffectationById(idAffectation, executor = pool) {
   );
 
   return rows[0];
+}
+
+export async function planifierAffectationManuelle(
+  affectation,
+  executor = pool
+) {
+  return planifierCoursGroupeManuellement(affectation, executor);
+}
+
+export async function replanifierAffectationManuelle(
+  idAffectation,
+  affectation,
+  executor = pool
+) {
+  return replanifierCoursGroupeManuellement(idAffectation, affectation, executor);
+}
+
+export async function recupererCoursEchouesEtudiantPlanifiables(
+  idEtudiant,
+  executor = pool
+) {
+  return listerCoursEchouesEtudiant(idEtudiant, executor);
+}
+
+export async function recupererEtudiantsPourPlanificationReprise(executor = pool) {
+  return listerEtudiantsPourPlanificationReprise(executor);
+}
+
+export async function recupererGroupesCompatiblesPourCoursEchoueEtudiant(
+  idEtudiant,
+  idCoursEchoue,
+  executor = pool
+) {
+  return listerGroupesCompatiblesPourCoursEchoue(
+    idEtudiant,
+    idCoursEchoue,
+    executor
+  );
+}
+
+export async function planifierRepriseEtudiant(
+  payload,
+  executor = pool
+) {
+  return planifierCoursEchouePourEtudiant(payload, executor);
 }
 
 /**
@@ -766,6 +825,14 @@ export async function addAffectation(
  * @returns {Promise<Object>} Le resultat de la suppression.
  */
 export async function deleteAffectation(idAffectation, executor = pool) {
+  const [series] = await executor.query(
+    `SELECT id_planification_serie
+     FROM affectation_cours
+     WHERE id_affectation_cours = ?`,
+    [idAffectation]
+  );
+  const idSerie = Number(series[0]?.id_planification_serie || 0);
+
   await executor.query(
     `DELETE FROM affectation_groupes
      WHERE id_affectation_cours = ?;`,
@@ -777,6 +844,18 @@ export async function deleteAffectation(idAffectation, executor = pool) {
      WHERE id_affectation_cours = ?;`,
     [idAffectation]
   );
+
+  if (idSerie > 0) {
+    await executor.query(
+      `DELETE ps
+       FROM planification_series ps
+       LEFT JOIN affectation_cours ac
+         ON ac.id_planification_serie = ps.id_planification_serie
+       WHERE ps.id_planification_serie = ?
+         AND ac.id_affectation_cours IS NULL`,
+      [idSerie]
+    );
+  }
 
   return result;
 }
@@ -824,6 +903,7 @@ export async function deleteAllAffectations(options = {}, executor = pool) {
            ON ac.id_plage_horaires = ph.id_plage_horaires
          WHERE ac.id_plage_horaires IS NULL`
       );
+      await transactionExecutor.query(`DELETE FROM planification_series`);
 
       await transactionExecutor.query(
         `UPDATE cours_echoues
@@ -854,6 +934,7 @@ export async function deleteAllAffectations(options = {}, executor = pool) {
     await transactionExecutor.query(`DELETE FROM affectation_groupes;`);
     await transactionExecutor.query(`DELETE FROM affectation_cours;`);
     await transactionExecutor.query(`DELETE FROM plages_horaires;`);
+    await transactionExecutor.query(`DELETE FROM planification_series;`);
     await transactionExecutor.query(
       `UPDATE cours_echoues
        SET statut = 'a_reprendre',
@@ -936,6 +1017,13 @@ async function deleteAffectationsPourGroupes(idsGroupes, executor = pool) {
     `DELETE FROM plages_horaires
      WHERE id_plage_horaires IN (${placeholdersSuppressionPlages})`,
     idsPlagesASupprimer
+  );
+  await executor.query(
+    `DELETE ps
+     FROM planification_series ps
+     LEFT JOIN affectation_cours ac
+       ON ac.id_planification_serie = ps.id_planification_serie
+     WHERE ac.id_affectation_cours IS NULL`
   );
 }
 

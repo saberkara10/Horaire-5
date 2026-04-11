@@ -107,6 +107,18 @@ function formaterLibelleReprise(reprise, diagnostic) {
   return "En attente de rattachement";
 }
 
+function formaterLibelleException(exception) {
+  if (!exception) {
+    return "";
+  }
+
+  if (exception.type_exception === "echange_cours" && exception.etudiant_echange) {
+    return `Echange de cours avec ${exception.etudiant_echange}`;
+  }
+
+  return "Exception individuelle de suivi";
+}
+
 export function EtudiantDetails({
   consultation,
   actionEnCours,
@@ -122,8 +134,8 @@ export function EtudiantDetails({
       <section className="panel panel--stacked detail-panel">
         <h2>Selectionnez un etudiant</h2>
         <p>
-          Le panneau de droite affiche le groupe principal, les reprises et
-          l'horaire fusionne de l'etudiant selectionne.
+          Le panneau de droite affiche le groupe principal, les reprises, les
+          exceptions individuelles et l'horaire fusionne de l'etudiant selectionne.
         </p>
       </section>
     );
@@ -134,7 +146,9 @@ export function EtudiantDetails({
     horaire = [],
     horaireGroupe = [],
     horaireReprises = [],
+    horaireIndividuel = [],
     reprises = [],
+    exceptionsIndividuelles = [],
     diagnosticReprises = [],
     resume = null,
   } = consultation;
@@ -142,7 +156,11 @@ export function EtudiantDetails({
   const horaireListe = Array.isArray(horaire) ? horaire : [];
   const horaireGroupeListe = Array.isArray(horaireGroupe) ? horaireGroupe : [];
   const horaireReprisesListe = Array.isArray(horaireReprises) ? horaireReprises : [];
+  const horaireIndividuelListe = Array.isArray(horaireIndividuel) ? horaireIndividuel : [];
   const reprisesListe = Array.isArray(reprises) ? reprises : [];
+  const exceptionsIndividuellesListe = Array.isArray(exceptionsIndividuelles)
+    ? exceptionsIndividuelles
+    : [];
   const diagnosticReprisesListe = Array.isArray(diagnosticReprises)
     ? diagnosticReprises
     : [];
@@ -152,6 +170,9 @@ export function EtudiantDetails({
   const nbReprises = Number(etudiant.nb_reprises || 0);
   const reprisePlanifiee = Number(resume?.nb_reprises_planifiees || 0);
   const repriseEnAttente = Number(resume?.nb_reprises_en_attente || 0);
+  const nbExceptionsIndividuelles = Number(
+    resume?.cours_exceptions_individuelles || exceptionsIndividuellesListe.length || 0
+  );
   const metaReprises = indexerMetaReprises(horaireReprisesListe);
   const diagnosticsIndex = indexerDiagnosticsReprises(diagnosticReprisesListe);
   const aDesReprisesEnAttente = reprisesListe.some(
@@ -161,7 +182,9 @@ export function EtudiantDetails({
     horaireEnChargement ||
     (horaireListe.length === 0 &&
       horaireReprisesListe.length === 0 &&
-      reprisesListe.length === 0);
+      horaireIndividuelListe.length === 0 &&
+      reprisesListe.length === 0 &&
+      exceptionsIndividuellesListe.length === 0);
 
   return (
     <section
@@ -226,6 +249,10 @@ export function EtudiantDetails({
           <div>
             <dt>Seances reprises</dt>
             <dd>{horaireReprisesListe.length}</dd>
+          </div>
+          <div>
+            <dt>Seances exceptions</dt>
+            <dd>{horaireIndividuelListe.length}</dd>
           </div>
         </dl>
 
@@ -300,6 +327,61 @@ export function EtudiantDetails({
                   </li>
                 );
               })}
+            </ul>
+          )}
+        </div>
+
+        <div className="detail-card__section">
+          <div className="table-header">
+            <div>
+              <h2>Exceptions individuelles de suivi</h2>
+              <p>
+                {nbExceptionsIndividuelles > 0
+                  ? `${nbExceptionsIndividuelles} cours actuellement suivis hors groupe principal.`
+                  : "Aucune exception individuelle active pour cet etudiant."}
+              </p>
+            </div>
+          </div>
+
+          {exceptionsIndividuellesListe.length === 0 ? (
+            <p className="detail-card__subtitle">
+              Tous les autres cours de cet etudiant restent rattaches a son groupe principal.
+            </p>
+          ) : (
+            <ul className="schedule-preview schedule-preview--compact">
+              {exceptionsIndividuellesListe.map((exception) => (
+                <li
+                  key={`exception-${exception.id_cours}-${exception.id_groupe_source}`}
+                  className="schedule-preview__item schedule-preview__item--individuelle"
+                >
+                  <div className="detail-card__reprise-header">
+                    <strong>{exception.code_cours}</strong>
+                    <span className="status-pill status-pill--busy">EXCEPTION</span>
+                  </div>
+                  <span>{exception.nom_cours}</span>
+                  <span>{formaterLibelleException(exception)}</span>
+                  <span>
+                    Groupe d&apos;accueil : {exception.groupe_source || "non renseigne"}
+                  </span>
+                  <span>
+                    Groupe principal : {exception.groupe_principal || "non renseigne"}
+                  </span>
+                  {(exception.occurrences || []).length > 0 ? (
+                    <span>
+                      {(exception.occurrences || [])
+                        .slice(0, 3)
+                        .map(
+                          (occurrence) =>
+                            `${occurrence.date} ${String(occurrence.heure_debut || "").slice(
+                              0,
+                              5
+                            )}-${String(occurrence.heure_fin || "").slice(0, 5)}`
+                        )
+                        .join(" | ")}
+                    </span>
+                  ) : null}
+                </li>
+              ))}
             </ul>
           )}
         </div>

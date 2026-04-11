@@ -1,0 +1,79 @@
+flowchart LR
+    subgraph Frontend
+        scheduler_page[SchedulerPage]
+        dispo_page[DisponibilitesProfesseursPage]
+        groupes_ui[Pages Groupes et Affectations]
+    end
+
+    subgraph API[Express API]
+        scheduler_routes[scheduler.routes.js]
+        groupes_routes[groupes.routes.js]
+        professeurs_routes[professeurs.routes.js]
+    end
+
+    subgraph Core[Scheduler core]
+        schema[assurerSchemaSchedulerAcademique]
+        bootstrap[SchedulerDataBootstrap]
+        engine[SchedulerEngine]
+        context[ContextLoader]
+        former[GroupFormer]
+        matrix[ConstraintMatrix]
+        availability[AvailabilityChecker]
+        failed[FailedCourseEngine]
+        reports[SchedulerReportService]
+        replanner[availability-rescheduler]
+        journal[availability-replanning-journal]
+    end
+
+    subgraph MySQL[MySQL]
+        sessions[(sessions)]
+        ressources[(cours / professeurs / professeur_cours / salles)]
+        cohortes[(etudiants / groupes_etudiants)]
+        planning[(plages_horaires / affectation_cours / affectation_groupes)]
+        reprises[(cours_echoues / affectation_etudiants)]
+        reporting[(rapports_generation / journal_replanifications_disponibilites)]
+    end
+
+    scheduler_page --> scheduler_routes
+    dispo_page --> professeurs_routes
+    groupes_ui --> groupes_routes
+
+    scheduler_routes --> engine
+    scheduler_routes --> bootstrap
+    scheduler_routes --> reports
+
+    groupes_routes --> engine
+    professeurs_routes --> replanner
+    professeurs_routes --> journal
+
+    engine --> schema
+    engine --> bootstrap
+    engine --> context
+    engine --> former
+    engine --> matrix
+    engine --> availability
+    engine --> failed
+
+    context --> sessions
+    context --> ressources
+    context --> cohortes
+    context --> planning
+    context --> reprises
+
+    bootstrap --> sessions
+    bootstrap --> ressources
+    bootstrap --> cohortes
+
+    engine --> planning
+    engine --> reprises
+    engine --> reporting
+
+    reports --> reporting
+    reports --> ressources
+    reports --> cohortes
+
+    replanner --> planning
+    replanner --> ressources
+    replanner --> cohortes
+    replanner --> reporting
+    journal --> reporting

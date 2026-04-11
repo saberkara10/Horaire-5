@@ -10,6 +10,9 @@ const queryMock = jest.fn();
 const getConnectionMock = jest.fn();
 const enregistrerEtudiantsImportesMock = jest.fn();
 const genererRapportDebugMock = jest.fn();
+const recupererSeancesGroupeEffectivesEtudiantMock = jest.fn();
+const recupererSeancesIndividuellesEtudiantMock = jest.fn();
+const recupererExceptionsIndividuellesEtudiantMock = jest.fn();
 
 await jest.unstable_mockModule("../db.js", () => ({
   default: {
@@ -28,12 +31,21 @@ await jest.unstable_mockModule("../src/services/scheduler/FailedCourseDebugServi
   },
 }));
 
+await jest.unstable_mockModule("../src/services/etudiants/student-course-exchange.service.js", () => ({
+  recupererSeancesGroupeEffectivesEtudiant: recupererSeancesGroupeEffectivesEtudiantMock,
+  recupererSeancesIndividuellesEtudiant: recupererSeancesIndividuellesEtudiantMock,
+  recupererExceptionsIndividuellesEtudiant: recupererExceptionsIndividuellesEtudiantMock,
+}));
+
 const etudiantsModel = await import("../src/model/etudiants.model.js");
 
 describe("Model etudiants", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     genererRapportDebugMock.mockResolvedValue({ diagnostics: [] });
+    recupererSeancesGroupeEffectivesEtudiantMock.mockResolvedValue([]);
+    recupererSeancesIndividuellesEtudiantMock.mockResolvedValue([]);
+    recupererExceptionsIndividuellesEtudiantMock.mockResolvedValue([]);
   });
 
   test("recupererEtudiantParId retourne un etudiant", async () => {
@@ -102,35 +114,6 @@ describe("Model etudiants", () => {
       ]])
       .mockResolvedValueOnce([[
         {
-          id_affectation_cours: 11,
-          id_cours: 101,
-          code_cours: "INF201",
-          nom_cours: "Programmation orientee objet",
-          date: "2026-01-12",
-          heure_debut: "08:00:00",
-          heure_fin: "11:00:00",
-          groupe_source: "INF-E2-1",
-          est_reprise: 0,
-        },
-      ]])
-      .mockResolvedValueOnce([[
-        {
-          id_affectation_cours: 31,
-          id_cours: 7,
-          code_cours: "INF107",
-          nom_cours: "Projet integre en programmation I",
-          date: "2026-01-13",
-          heure_debut: "14:00:00",
-          heure_fin: "17:00:00",
-          groupe_source: "INF-E1-2",
-          est_reprise: 1,
-          statut_reprise: "planifie",
-          note_echec: 53,
-          id_cours_echoue: 9001,
-        },
-      ]])
-      .mockResolvedValueOnce([[
-        {
           id: 9001,
           statut: "planifie",
           note_echec: 53,
@@ -142,27 +125,105 @@ describe("Model etudiants", () => {
           groupe_reprise: "INF-E1-2",
         },
       ]]);
+    recupererSeancesGroupeEffectivesEtudiantMock.mockResolvedValue([
+      {
+        id_affectation_cours: 11,
+        id_cours: 101,
+        code_cours: "INF201",
+        nom_cours: "Programmation orientee objet",
+        date: "2026-01-12",
+        heure_debut: "08:00:00",
+        heure_fin: "11:00:00",
+        groupe_source: "INF-E2-1",
+        est_reprise: 0,
+        source_horaire: "groupe",
+      },
+    ]);
+    recupererSeancesIndividuellesEtudiantMock.mockResolvedValue([
+      {
+        id_affectation_cours: 31,
+        id_cours: 7,
+        code_cours: "INF107",
+        nom_cours: "Projet integre en programmation I",
+        date: "2026-01-13",
+        heure_debut: "14:00:00",
+        heure_fin: "17:00:00",
+        groupe_source: "INF-E1-2",
+        est_reprise: 1,
+        source_horaire: "reprise",
+        statut_reprise: "planifie",
+        note_echec: 53,
+        id_cours_echoue: 9001,
+      },
+      {
+        id_affectation_cours: 41,
+        id_cours: 102,
+        code_cours: "INF202",
+        nom_cours: "Architecture logicielle",
+        date: "2026-01-16",
+        heure_debut: "12:00:00",
+        heure_fin: "15:00:00",
+        groupe_source: "INF-E2-2",
+        est_reprise: 0,
+        est_exception_individuelle: 1,
+        source_horaire: "individuelle",
+        type_exception: "echange_cours",
+        id_echange_cours: 77,
+        etudiant_echange: "Rayane Test",
+      },
+    ]);
+    recupererExceptionsIndividuellesEtudiantMock.mockResolvedValue([
+      {
+        id_cours: 102,
+        code_cours: "INF202",
+        nom_cours: "Architecture logicielle",
+        groupe_source: "INF-E2-2",
+        groupe_principal: "INF-E2-1",
+        type_exception: "echange_cours",
+        id_echange_cours: 77,
+        etudiant_echange: "Rayane Test",
+        occurrences: [
+          {
+            date: "2026-01-16",
+            heure_debut: "12:00:00",
+            heure_fin: "15:00:00",
+          },
+        ],
+      },
+    ]);
 
     const result = await etudiantsModel.recupererHoraireCompletEtudiant(1);
 
     expect(result.etudiant.charge_cible).toBe(8);
-    expect(result.horaire).toHaveLength(2);
+    expect(result.horaire).toHaveLength(3);
     expect(result.horaire_groupe).toHaveLength(1);
     expect(result.horaire_reprises).toHaveLength(1);
+    expect(result.horaire_individuel).toHaveLength(1);
     expect(result.horaire_reprises[0]).toMatchObject({
       est_reprise: true,
       source_horaire: "reprise",
       groupe_source: "INF-E1-2",
+    });
+    expect(result.horaire_individuel[0]).toMatchObject({
+      est_exception_individuelle: true,
+      source_horaire: "individuelle",
+      id_echange_cours: 77,
     });
     expect(result.reprises[0]).toMatchObject({
       code_cours: "INF107",
       groupe_reprise: "INF-E1-2",
       statut: "planifie",
     });
+    expect(result.exceptions_individuelles[0]).toMatchObject({
+      code_cours: "INF202",
+      type_exception: "echange_cours",
+      etudiant_echange: "Rayane Test",
+    });
     expect(result.resume).toMatchObject({
       cours_normaux: 1,
       cours_reprises: 1,
-      cours_total: 2,
+      cours_exceptions_individuelles: 1,
+      cours_total: 3,
       nb_reprises: 1,
       nb_reprises_planifiees: 1,
       nb_reprises_en_attente: 0,

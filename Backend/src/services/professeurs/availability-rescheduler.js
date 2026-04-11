@@ -891,7 +891,9 @@ async function recupererEtudiantsReprisesImpactes(
             e.prenom,
             ge_principal.id_groupes_etudiants AS id_groupe_principal,
             ge_principal.nom_groupe AS groupe_principal,
-            ae.id_cours_echoue
+            ae.id_cours_echoue,
+            ae.source_type,
+            ae.id_echange_cours
      FROM affectation_etudiants ae
      JOIN etudiants e
        ON e.id_etudiant = ae.id_etudiant
@@ -899,7 +901,6 @@ async function recupererEtudiantsReprisesImpactes(
        ON ge_principal.id_groupes_etudiants = e.id_groupes_etudiants
      WHERE ae.id_groupes_etudiants IN (${placeholders})
        AND ae.id_cours = ?
-       AND ae.source_type = 'reprise'
        AND (? IS NULL OR ae.id_session = ?)
      ORDER BY e.matricule ASC, e.nom ASC, e.prenom ASC`,
     [...idsValides, Number(idCours), Number(idSession) || null, Number(idSession) || null]
@@ -913,7 +914,9 @@ async function recupererEtudiantsReprisesImpactes(
     id_groupe_principal: Number(row.id_groupe_principal) || null,
     groupe_principal: row.groupe_principal || null,
     id_cours_echoue: Number(row.id_cours_echoue) || null,
-    type_impact: "reprise",
+    id_echange_cours: Number(row.id_echange_cours) || null,
+    type_impact:
+      String(row.source_type || "") === "reprise" ? "reprise" : "individuelle",
   }));
 }
 

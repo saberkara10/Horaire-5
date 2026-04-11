@@ -11,6 +11,11 @@ import { enregistrerEtudiantsImportes } from "./import-etudiants.model.js";
 import { normaliserNomProgramme } from "../utils/programmes.js";
 import { assurerSchemaSchedulerAcademique } from "../services/academic-scheduler-schema.js";
 import { FailedCourseDebugService } from "../services/scheduler/FailedCourseDebugService.js";
+import {
+  recupererExceptionsIndividuellesEtudiant,
+  recupererSeancesGroupeEffectivesEtudiant,
+  recupererSeancesIndividuellesEtudiant,
+} from "../services/etudiants/student-course-exchange.service.js";
 
 const SESSION_ACTIVE_SQL = `(
   SELECT id_session
@@ -50,6 +55,9 @@ function normaliserSeanceEtudiant(seance, overrides = {}) {
   return {
     ...seance,
     est_reprise: Boolean(Number(seance?.est_reprise || 0)),
+    est_exception_individuelle:
+      Boolean(Number(seance?.est_exception_individuelle || 0)) ||
+      String(seance?.source_horaire || overrides.source_horaire || "") === "individuelle",
     source_horaire: String(seance?.source_horaire || overrides.source_horaire || "groupe"),
     groupe_source:
       seance?.groupe_source || overrides.groupe_source || seance?.nom_groupe || null,
@@ -58,6 +66,9 @@ function normaliserSeanceEtudiant(seance, overrides = {}) {
       seance?.note_echec === null || seance?.note_echec === undefined
         ? null
         : Number(seance.note_echec),
+    type_exception: seance?.type_exception || overrides.type_exception || null,
+    id_echange_cours: Number(seance?.id_echange_cours || 0) || null,
+    etudiant_echange: seance?.etudiant_echange || null,
   };
 }
 
@@ -347,137 +358,54 @@ export async function recupererHoraireCompletEtudiant(idEtudiant) {
     return null;
   }
 
-  const [horaireGroupe, horaireReprises, reprises, diagnosticReprises] = await Promise.all([
-    pool.query(
-    `SELECT
-       ac.id_affectation_cours,
-       c.id_cours,
-       c.code AS code_cours,
-       c.nom AS nom_cours,
-       p.id_professeur,
-       p.nom AS nom_professeur,
-       p.prenom AS prenom_professeur,
-       s.id_salle,
-       s.code AS code_salle,
-       ph.id_plage_horaires,
-       DATE_FORMAT(ph.date, '%Y-%m-%d') AS date,
-       ph.heure_debut,
-       ph.heure_fin,
-       ge.id_groupes_etudiants AS id_groupe_source,
-       ge.nom_groupe AS groupe_source,
-       0 AS est_reprise,
-       'groupe' AS source_horaire,
-       NULL AS statut_reprise,
-       NULL AS note_echec,
-       NULL AS id_cours_echoue
-     FROM etudiants e
-     JOIN groupes_etudiants ge
-       ON ge.id_groupes_etudiants = e.id_groupes_etudiants
-     JOIN affectation_groupes ag
-       ON ag.id_groupes_etudiants = ge.id_groupes_etudiants
-     JOIN affectation_cours ac
-       ON ac.id_affectation_cours = ag.id_affectation_cours
-     JOIN cours c
-       ON c.id_cours = ac.id_cours
-     JOIN professeurs p
-       ON p.id_professeur = ac.id_professeur
-     LEFT JOIN salles s
-       ON s.id_salle = ac.id_salle
-     JOIN plages_horaires ph
-       ON ph.id_plage_horaires = ac.id_plage_horaires
-     WHERE e.id_etudiant = ?
-       AND ge.id_session = (
-         SELECT id_session
-         FROM sessions
-         WHERE active = TRUE
-         ORDER BY id_session DESC
-         LIMIT 1
-       )
-     ORDER BY ph.date ASC, ph.heure_debut ASC`,
-    [idEtudiant]
-    ),
-    pool.query(
-      `SELECT
-         ac.id_affectation_cours,
-         c.id_cours,
-         c.code AS code_cours,
-         c.nom AS nom_cours,
-         p.id_professeur,
-         p.nom AS nom_professeur,
-         p.prenom AS prenom_professeur,
-         s.id_salle,
-         s.code AS code_salle,
-         ph.id_plage_horaires,
-         DATE_FORMAT(ph.date, '%Y-%m-%d') AS date,
-         ph.heure_debut,
-         ph.heure_fin,
-         ge.id_groupes_etudiants AS id_groupe_source,
-         ge.nom_groupe AS groupe_source,
-         1 AS est_reprise,
-         'reprise' AS source_horaire,
-         ce.statut AS statut_reprise,
-         ce.note_echec,
-         ae.id_cours_echoue
-       FROM affectation_etudiants ae
-       JOIN groupes_etudiants ge
-         ON ge.id_groupes_etudiants = ae.id_groupes_etudiants
-       JOIN affectation_groupes ag
-         ON ag.id_groupes_etudiants = ge.id_groupes_etudiants
-       JOIN affectation_cours ac
-         ON ac.id_affectation_cours = ag.id_affectation_cours
-        AND ac.id_cours = ae.id_cours
-       JOIN cours c
-         ON c.id_cours = ac.id_cours
-       JOIN professeurs p
-         ON p.id_professeur = ac.id_professeur
-       LEFT JOIN salles s
-         ON s.id_salle = ac.id_salle
-       JOIN plages_horaires ph
-         ON ph.id_plage_horaires = ac.id_plage_horaires
-       LEFT JOIN cours_echoues ce
-         ON ce.id = ae.id_cours_echoue
-       WHERE ae.id_etudiant = ?
-         AND ae.id_session = ${SESSION_ACTIVE_SQL}
-         AND ge.id_session = ${SESSION_ACTIVE_SQL}
-         AND ae.source_type = 'reprise'
-       ORDER BY ph.date ASC, ph.heure_debut ASC`,
-      [idEtudiant]
-    ),
-    pool.query(
-      `SELECT
-         ce.id,
-         ce.statut,
-         ce.note_echec,
-         c.id_cours,
-         c.code AS code_cours,
-         c.nom AS nom_cours,
-         c.etape_etude,
-         ge.id_groupes_etudiants AS id_groupe_reprise,
-         ge.nom_groupe AS groupe_reprise
-       FROM cours_echoues ce
-       JOIN cours c
-         ON c.id_cours = ce.id_cours
-       LEFT JOIN groupes_etudiants ge
-         ON ge.id_groupes_etudiants = ce.id_groupe_reprise
-       WHERE ce.id_etudiant = ?
-         AND ce.id_session = ${SESSION_ACTIVE_SQL}
-         AND ce.statut IN (${STATUTS_REPRISES_ACTIFS_SQL})
-       ORDER BY c.etape_etude ASC, c.code ASC`,
-      [idEtudiant]
-    ),
-    FailedCourseDebugService.genererRapport({
-      idEtudiant: Number(idEtudiant),
-      statut: "resolution_manuelle",
-    }),
-  ]);
+  const [horaireGroupe, horaireIndividuel, reprises, diagnosticReprises, exceptionsIndividuelles] =
+    await Promise.all([
+      recupererSeancesGroupeEffectivesEtudiant(idEtudiant),
+      recupererSeancesIndividuellesEtudiant(idEtudiant, {
+        sourceTypes: ["reprise", "individuelle"],
+      }),
+      pool.query(
+        `SELECT
+           ce.id,
+           ce.statut,
+           ce.note_echec,
+           c.id_cours,
+           c.code AS code_cours,
+           c.nom AS nom_cours,
+           c.etape_etude,
+           ge.id_groupes_etudiants AS id_groupe_reprise,
+           ge.nom_groupe AS groupe_reprise
+         FROM cours_echoues ce
+         JOIN cours c
+           ON c.id_cours = ce.id_cours
+         LEFT JOIN groupes_etudiants ge
+           ON ge.id_groupes_etudiants = ce.id_groupe_reprise
+         WHERE ce.id_etudiant = ?
+           AND ce.id_session = ${SESSION_ACTIVE_SQL}
+           AND ce.statut IN (${STATUTS_REPRISES_ACTIFS_SQL})
+         ORDER BY c.etape_etude ASC, c.code ASC`,
+        [idEtudiant]
+      ),
+      FailedCourseDebugService.genererRapport({
+        idEtudiant: Number(idEtudiant),
+        statut: "resolution_manuelle",
+      }),
+      recupererExceptionsIndividuellesEtudiant(idEtudiant),
+    ]);
 
-  const horaireNormalise = (horaireGroupe[0] || [])
+  const horaireNormalise = (horaireGroupe || [])
     .map((seance) => normaliserSeanceEtudiant(seance, { source_horaire: "groupe" }));
-  const horaireReprisesNormalise = (horaireReprises[0] || [])
+  const horaireReprisesNormalise = (horaireIndividuel || [])
+    .filter((seance) => String(seance?.source_horaire || "") === "reprise")
     .map((seance) => normaliserSeanceEtudiant(seance, { source_horaire: "reprise" }));
-  const horaireFusionne = [...horaireNormalise, ...horaireReprisesNormalise].sort(
-    comparerSeancesEtudiant
-  );
+  const horaireExceptionsIndividuellesNormalise = (horaireIndividuel || [])
+    .filter((seance) => String(seance?.source_horaire || "") === "individuelle")
+    .map((seance) => normaliserSeanceEtudiant(seance, { source_horaire: "individuelle" }));
+  const horaireFusionne = [
+    ...horaireNormalise,
+    ...horaireReprisesNormalise,
+    ...horaireExceptionsIndividuellesNormalise,
+  ].sort(comparerSeancesEtudiant);
   const reprisesNormalisees = (reprises[0] || []).map((reprise) => ({
     ...reprise,
     note_echec:
@@ -485,10 +413,28 @@ export async function recupererHoraireCompletEtudiant(idEtudiant) {
         ? null
         : Number(reprise.note_echec),
   }));
+  const exceptionsIndividuellesNormalisees = (exceptionsIndividuelles || []).map((exception) => ({
+    ...exception,
+    occurrences: Array.isArray(exception.occurrences)
+      ? exception.occurrences.map((occurrence) => ({
+          ...occurrence,
+          heure_debut: occurrence.heure_debut || null,
+          heure_fin: occurrence.heure_fin || null,
+        }))
+      : [],
+  }));
 
   const coursGroupe = new Set(horaireNormalise.map((seance) => Number(seance.id_cours)));
   const coursReprises = new Set(
     reprisesNormalisees.map((reprise) => Number(reprise.id_cours)).filter((idCours) => idCours > 0)
+  );
+  const coursExceptionsIndividuelles = new Set(
+    exceptionsIndividuellesNormalisees
+      .map((exception) => Number(exception.id_cours))
+      .filter((idCours) => idCours > 0)
+  );
+  const coursFusionnes = new Set(
+    horaireFusionne.map((seance) => Number(seance.id_cours)).filter((idCours) => idCours > 0)
   );
 
   return {
@@ -496,15 +442,19 @@ export async function recupererHoraireCompletEtudiant(idEtudiant) {
     horaire: horaireFusionne,
     horaire_groupe: horaireNormalise,
     horaire_reprises: horaireReprisesNormalise,
+    horaire_individuel: horaireExceptionsIndividuellesNormalise,
     reprises: reprisesNormalisees,
+    exceptions_individuelles: exceptionsIndividuellesNormalisees,
     diagnostic_reprises: diagnosticReprises?.diagnostics || [],
     resume: {
       seances_groupe: horaireNormalise.length,
       seances_reprises: horaireReprisesNormalise.length,
+      seances_exceptions_individuelles: horaireExceptionsIndividuellesNormalise.length,
       seances_total: horaireFusionne.length,
       cours_normaux: coursGroupe.size,
       cours_reprises: coursReprises.size,
-      cours_total: coursGroupe.size + coursReprises.size,
+      cours_exceptions_individuelles: coursExceptionsIndividuelles.size,
+      cours_total: coursFusionnes.size,
       nb_reprises: Number(etudiant.nb_reprises || 0),
       nb_reprises_planifiees: reprisesNormalisees.filter(
         (reprise) => reprise.statut === "planifie" && reprise.id_groupe_reprise
