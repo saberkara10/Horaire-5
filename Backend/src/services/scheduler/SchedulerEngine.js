@@ -15,6 +15,9 @@ import { AvailabilityChecker } from "./AvailabilityChecker.js";
 import { FailedCourseEngine } from "./FailedCourseEngine.js";
 import { SimulatedAnnealing } from "./SimulatedAnnealing.js";
 import { SchedulerDataBootstrap } from "./SchedulerDataBootstrap.js";
+import { LocalSearchOptimizer } from "./optimization/LocalSearchOptimizer.js";
+import { PlacementEvaluator } from "./optimization/PlacementEvaluator.js";
+import { ScheduleScorer } from "./scoring/ScheduleScorer.js";
 import {
   getSchedulerMaxGroupsPerProfessor,
   getSchedulerMaxWeeklySessionsPerProfessor,
@@ -37,10 +40,14 @@ export class SchedulerEngine {
       idSession = null,
       idUtilisateur = null,
       inclureWeekend = false,
+      optimizationMode = "legacy",
       saParams = {},
       onProgress = null,
     } = options;
     const weekendAutorise = false;
+    // Legacy reste le filet de securite. Les autres profils reutilisent
+    // scoring_v1 des la construction de solution, pas seulement en post-analyse.
+    const modeOptimisation = PlacementEvaluator.normalizeMode(optimizationMode);
 
     await assurerSchemaSchedulerAcademique();
 
@@ -147,6 +154,10 @@ export class SchedulerEngine {
         session.id_session,
         connection
       );
+      const groupesFormesAvecIds = groupesFormes.map((groupe) => ({
+        ...groupe,
+        id_groupe: idGroupeParNom.get(groupe.nomGroupe) || null,
+      }));
       await SchedulerEngine._detacherEtudiantsHorsSession(
         session.id_session,
         sessionSaison,
@@ -373,6 +384,7 @@ export class SchedulerEngine {
               slotsParProfJour,
               numeroSeance,
               preferencesStabilite,
+              optimizationMode: modeOptimisation,
             });
 
             if (!serie) {
@@ -434,6 +446,7 @@ export class SchedulerEngine {
           slotsParGroupeJour,
           slotsParProfJour,
           effectifGroupe,
+          optimizationMode: modeOptimisation,
         });
 
         if (serie) {
@@ -524,7 +537,24 @@ export class SchedulerEngine {
 
       const saContext = { jours, dispParProf, absencesParProf, indispoParSalle };
       const scoreInitial = SimulatedAnnealing._evaluerSolution(solution, saContext);
-      const solutionOptimisee = solution;
+      const optimisationLocale = SchedulerEngine._executerOptimisationLocaleLectureSeule({
+        placements: solution,
+        cours,
+        groupesFormes: groupesFormesAvecIds,
+        affectationsEtudiantGroupe,
+        affectationsReprises,
+        salles,
+        datesParJourSemaine,
+        matrix,
+        dispParProf,
+        absencesParProf,
+        indispoParSalle,
+        optimizationMode: modeOptimisation,
+      });
+      const solutionOptimisee = optimisationLocale.placementsOptimises;
+      rapport.nb_cours_en_ligne_generes = solutionOptimisee.filter((placement) =>
+        Boolean(placement.est_en_ligne)
+      ).length;
       const scoreFinal = scoreInitial;
       const qualite = SchedulerEngine._calculerScoreQualite({
         solution: solutionOptimisee,
@@ -532,12 +562,14 @@ export class SchedulerEngine {
         nbResolutionsManuelles: conflitsReprises.length,
         preferencesStabilite,
       });
+      const modeScoringReference = PlacementEvaluator.resolveScoringMode(modeOptimisation);
 
       rapport.score_initial = SchedulerEngine._safeNum(scoreInitial, 0);
       rapport.iterations_sa = 0;
       rapport.score_qualite = qualite.score;
       rapport.details = {
         mode_planification: "hebdomadaire_recurrent",
+        modeOptimisationUtilise: modeOptimisation,
         semaine_type_repliquee: true,
         optimisation_simulated_annealing: false,
         weekend_autorise: weekendAutorise,
@@ -551,7 +583,23 @@ export class SchedulerEngine {
           ...statsReprises,
           conflits_details: conflitsReprises,
         },
+        optimisation_locale: {
+          modeOptimisationUtilise: modeOptimisation,
+          modeScoringReference,
+          scoreAvantOptimisationLocale:
+            optimisationLocale.scoringBefore?.modes?.[modeScoringReference]?.scoreGlobal || 0,
+          scoreApresOptimisationLocale:
+            optimisationLocale.scoringAfter?.modes?.[modeScoringReference]?.scoreGlobal || 0,
+          nombreAmeliorationsRetenues: optimisationLocale.improvementsRetained || 0,
+          principauxGainsConstates: optimisationLocale.gains || {},
+          mouvementsRetenus: optimisationLocale.improvements || [],
+          fallbackLectureSeule: Boolean(optimisationLocale.fallbackLectureSeule),
+          erreur: optimisationLocale.error || null,
+        },
       };
+      rapport.details.scoring_v1_avant_optimisation_locale =
+        optimisationLocale.scoringBefore;
+      rapport.details.scoring_v1 = optimisationLocale.scoringAfter;
 
       SchedulerEngine._progress(
         onProgress,
@@ -687,6 +735,7 @@ export class SchedulerEngine {
     slotsParProfJour,
     numeroSeance,
     preferencesStabilite,
+    optimizationMode = "legacy",
   }) {
     const MIN_COVERAGE = 0.60;
 
@@ -852,7 +901,6 @@ export class SchedulerEngine {
             }
 
             const coverageRatio = datesDisponibles.length / datesToutes.length;
-            const coverageBonus = Math.round((coverageRatio - MIN_COVERAGE) * 50);
 
             if (cours.est_en_ligne) {
               meilleurCandidat = SchedulerEngine._enregistrerMeilleurCandidatSerie({
@@ -876,7 +924,10 @@ export class SchedulerEngine {
                   indexStrategie,
                   indexProfesseur,
                   indexCreneau,
-                }) + coverageBonus,
+                  coverageRatio,
+                  roomCoverageRatio: 0,
+                  optimizationMode,
+                }),
                 payload: {
                   cours,
                   groupe,
@@ -920,10 +971,6 @@ export class SchedulerEngine {
                 continue;
               }
 
-              const salleCoverageBonus = Math.round(
-                ((datesAvecSalle.length / datesToutes.length) - MIN_COVERAGE * 0.7) * 30
-              );
-
               meilleurCandidat = SchedulerEngine._enregistrerMeilleurCandidatSerie({
                 meilleurCandidat,
                 score: SchedulerEngine._scoreCandidatSerie({
@@ -946,7 +993,10 @@ export class SchedulerEngine {
                   indexProfesseur,
                   indexCreneau,
                   indexSalle,
-                }) + coverageBonus + salleCoverageBonus,
+                  coverageRatio,
+                  roomCoverageRatio: datesAvecSalle.length / datesToutes.length,
+                  optimizationMode,
+                }),
                 payload: {
                   cours,
                   groupe,
@@ -1188,137 +1238,43 @@ export class SchedulerEngine {
     indexProfesseur = 0,
     indexCreneau = 0,
     indexSalle = 0,
+    indexJour = 0,
+    fallbackTypeIndex = 0,
+    coverageRatio = 0,
+    roomCoverageRatio = 0,
+    optimizationMode = "legacy",
+    phase = "weekly",
   }) {
-    let score = 0;
-    const chargeJourGroupe =
-      SchedulerEngine._lireChargeJour(chargeSeriesParGroupeJour, idGroupe, jourSemaine) +
-      1;
-    const chargeJourProf =
-      SchedulerEngine._lireChargeJour(
+    return PlacementEvaluator.evaluateCandidate({
+      mode: optimizationMode,
+      phase,
+      candidate: {
+        cours,
+        groupe,
+        idGroupe,
+        professeur,
+        salle,
+        jourSemaine,
+        creneau,
+        slotIndex,
+        preferenceSerie,
+        indexStrategie,
+        indexProfesseur,
+        indexCreneau,
+        indexSalle,
+        indexJour,
+        fallbackTypeIndex,
+        coverageRatio,
+        roomCoverageRatio,
+      },
+      context: {
+        chargeSeriesParJour,
+        chargeSeriesParGroupeJour,
         chargeSeriesParProfJour,
-        professeur.id_professeur,
-        jourSemaine
-      ) + 1;
-    const joursActifsGroupe = SchedulerEngine._compterJoursActifs(
-      chargeSeriesParGroupeJour,
-      idGroupe
-    );
-    const jourDejaActifPourGroupe =
-      SchedulerEngine._lireChargeJour(chargeSeriesParGroupeJour, idGroupe, jourSemaine) > 0;
-    const jourDejaActifPourProf =
-      SchedulerEngine._lireChargeJour(
-        chargeSeriesParProfJour,
-        professeur.id_professeur,
-        jourSemaine
-      ) > 0;
-    const slotsGroupe = SchedulerEngine._lireSlotsJour(
-      slotsParGroupeJour,
-      idGroupe,
-      jourSemaine
-    );
-    const slotsProf = SchedulerEngine._lireSlotsJour(
-      slotsParProfJour,
-      professeur.id_professeur,
-      jourSemaine
-    );
-    const distanceSlotGroupe = SchedulerEngine._distanceSlotAuxExistants(
-      slotIndex,
-      slotsGroupe
-    );
-    const distanceSlotProf = SchedulerEngine._distanceSlotAuxExistants(
-      slotIndex,
-      slotsProf
-    );
-    const effectifGroupe = GroupFormer.lireEffectifCours(groupe, cours?.id_cours);
-    const capaciteSalle = Number(salle?.capacite || 0);
-
-    if (chargeJourGroupe === 1) {
-      score += 18;
-    } else if (chargeJourGroupe === 2) {
-      score += 28;
-    } else {
-      score -= 80;
-    }
-
-    if (jourDejaActifPourGroupe) {
-      score += 20;
-    } else if (joursActifsGroupe < TARGET_ACTIVE_DAYS_PER_GROUP) {
-      score += 14;
-    } else {
-      score -= 35;
-    }
-
-    if (chargeJourProf === 1) {
-      score += 12;
-    } else if (chargeJourProf === 2) {
-      score += 18;
-    } else if (chargeJourProf === 3) {
-      score += 6;
-    } else {
-      score -= 50;
-    }
-
-    if (jourDejaActifPourProf) {
-      score += 10;
-    }
-
-    score -= distanceSlotGroupe * 6;
-    score -= distanceSlotProf * 4;
-    score -= (chargeSeriesParJour.get(jourSemaine) || 0) * 2;
-    score -= indexStrategie * 25;
-    score -= indexProfesseur * 4;
-    score -= indexCreneau * 3;
-    score -= indexSalle * 2;
-
-    if (capaciteSalle > 0 && effectifGroupe > 0) {
-      const margeCapacite = Math.max(0, capaciteSalle - effectifGroupe);
-      score += Math.max(0, 12 - margeCapacite);
-    }
-
-    if (preferenceSerie) {
-      const slotPreference = SchedulerEngine._trouverIndexSlotReference(
-        creneau.debut,
-        creneau.fin
-      );
-      const slotReferencePreference = SchedulerEngine._trouverIndexSlotReference(
-        preferenceSerie.heure_debut,
-        preferenceSerie.heure_fin
-      );
-
-      if (Number(preferenceSerie.jourSemaine) === Number(jourSemaine)) {
-        score += 90;
-      } else {
-        score -=
-          Math.abs(Number(preferenceSerie.jourSemaine) - Number(jourSemaine)) * 12;
-      }
-
-      if (
-        String(preferenceSerie.heure_debut) === String(creneau.debut) &&
-        String(preferenceSerie.heure_fin) === String(creneau.fin)
-      ) {
-        score += 110;
-      } else if (
-        slotReferencePreference >= 0 &&
-        slotPreference >= 0
-      ) {
-        score -= Math.abs(slotReferencePreference - slotPreference) * 18;
-      }
-
-      if (
-        Number(preferenceSerie.id_professeur) === Number(professeur.id_professeur)
-      ) {
-        score += 60;
-      }
-
-      if (
-        Number(preferenceSerie.id_salle || 0) > 0 &&
-        Number(preferenceSerie.id_salle) === Number(salle?.id_salle)
-      ) {
-        score += 35;
-      }
-    }
-
-    return score;
+        slotsParGroupeJour,
+        slotsParProfJour,
+      },
+    }).score;
   }
 
   static _progress(callback, phase, message, pct) {
@@ -2132,6 +2088,67 @@ export class SchedulerEngine {
     };
   }
 
+  static _calculerScoringLectureSeule(payload = {}) {
+    try {
+      return ScheduleScorer.scoreAllModes(payload);
+    } catch (error) {
+      console.warn("[Scheduler] Scoring V1 non bloquant:", error.message);
+      return {
+        version: "v1",
+        readOnly: true,
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * Execute l'optimisation locale avec un repli non bloquant.
+   *
+   * Le moteur principal doit continuer a produire un horaire valide meme si
+   * l'optimisation locale ou scoring_v1 rencontrent un incident. Cette
+   * methode encapsule donc l'appel a LocalSearchOptimizer et retourne un no-op
+   * stable en cas d'erreur.
+   *
+   * @param {Object} options - options transmises a l'optimiseur local.
+   *
+   * @returns {Object} Resultat d'optimisation locale ou resultat de repli.
+   *
+   * Effets secondaires : aucun sur les placements fournis.
+   * Cas particuliers :
+   * - conserve les placements initiaux en cas d'erreur ;
+   * - garde scoring_v1 avant/apres identique quand aucun mouvement n'est retenu ;
+   * - n'interrompt jamais la generation officielle.
+   */
+  static _executerOptimisationLocaleLectureSeule(options = {}) {
+    try {
+      return {
+        ...LocalSearchOptimizer.optimize(options),
+        fallbackLectureSeule: false,
+        error: null,
+      };
+    } catch (error) {
+      console.warn("[Scheduler] Optimisation locale non bloquante:", error.message);
+
+      const placements = Array.isArray(options?.placements) ? [...options.placements] : [];
+      const scoringReference = SchedulerEngine._calculerScoringLectureSeule({
+        placements,
+        affectationsEtudiantGroupe: options?.affectationsEtudiantGroupe,
+        affectationsReprises: options?.affectationsReprises,
+      });
+
+      return {
+        placementsOptimises: placements,
+        scoringBefore: scoringReference,
+        scoringAfter: scoringReference,
+        improvements: [],
+        improvementsRetained: 0,
+        gains: {},
+        fallbackLectureSeule: true,
+        error: error.message,
+      };
+    }
+  }
+
   /**
    * Passe 2 assouplie avec stabilite partielle.
    * Utilise le filtrage par date (meme approche que Phase 4) avec un seuil
@@ -2146,6 +2163,7 @@ export class SchedulerEngine {
     chargeSeriesParGroupeJour, chargeSeriesParProfJour,
     slotsParGroupeJour, slotsParProfJour,
     effectifGroupe,
+    optimizationMode = "legacy",
   }) {
     const onlineEnabled = isOnlineCourseSchedulingEnabled();
     if (!onlineEnabled && Boolean(cours?.est_en_ligne)) {
@@ -2172,13 +2190,15 @@ export class SchedulerEngine {
           .filter((s) => AvailabilityChecker.salleCompatible(s, cours, effectifGroupe))
           .sort((a, b) => a.capacite - b.capacite);
 
-    for (const jourSemaine of joursDisponibles) {
+    let meilleurCandidat = null;
+
+    for (const [indexJour, jourSemaine] of joursDisponibles.entries()) {
       const datesToutes = datesParJourSemaine.get(jourSemaine) || [];
       if (datesToutes.length === 0) continue;
       const etudiantsCours = SchedulerEngine._lireEtudiantsCours(groupe, cours.id_cours);
 
-      for (const prof of profsCompat) {
-        for (const creneau of creneaux) {
+      for (const [indexProfesseur, prof] of profsCompat.entries()) {
+        for (const [indexCreneau, creneau] of creneaux.entries()) {
           // Filtrage par date au lieu de .every()
           const datesDisponibles = datesToutes.filter((date) =>
             matrix.profLibre(prof.id_professeur, date, creneau.debut, creneau.fin) &&
@@ -2207,12 +2227,52 @@ export class SchedulerEngine {
                 AvailabilityChecker.salleDisponible(salle.id_salle, d, indispoParSalle)
               );
               if (datesAvecSalle.length >= seuil) {
-                return SchedulerEngine._reserverSerieFallback({
-                  cours, groupe, idGroupe, prof, datesSerie: datesAvecSalle, creneau, matrix,
-                  salle, estEnLigne: false,
-                  chargeSeriesParProf, chargeSeriesParJour,
-                  chargeSeriesParGroupeJour, chargeSeriesParProfJour,
-                  slotsParGroupeJour, slotsParProfJour, jourSemaine, slotIdx,
+                meilleurCandidat = SchedulerEngine._enregistrerMeilleurCandidatSerie({
+                  meilleurCandidat,
+                  score: SchedulerEngine._scoreCandidatSerie({
+                    cours,
+                    groupe,
+                    idGroupe,
+                    professeur: prof,
+                    salle,
+                    jourSemaine,
+                    creneau,
+                    slotIndex: slotIdx,
+                    chargeSeriesParJour,
+                    chargeSeriesParGroupeJour,
+                    chargeSeriesParProfJour,
+                    slotsParGroupeJour,
+                    slotsParProfJour,
+                    indexJour,
+                    indexProfesseur,
+                    indexCreneau,
+                    indexSalle: sallesCompat.indexOf(salle),
+                    fallbackTypeIndex: 0,
+                    coverageRatio: datesDisponibles.length / datesToutes.length,
+                    roomCoverageRatio: datesAvecSalle.length / datesToutes.length,
+                    optimizationMode,
+                    phase: "fallback",
+                  }),
+                  payload: {
+                    reservationType: "uniforme",
+                    cours,
+                    groupe,
+                    idGroupe,
+                    prof,
+                    datesSerie: datesAvecSalle,
+                    creneau,
+                    matrix,
+                    salle,
+                    estEnLigne: false,
+                    chargeSeriesParProf,
+                    chargeSeriesParJour,
+                    chargeSeriesParGroupeJour,
+                    chargeSeriesParProfJour,
+                    slotsParGroupeJour,
+                    slotsParProfJour,
+                    jourSemaine,
+                    slotIdx,
+                  },
                 });
               }
             }
@@ -2241,20 +2301,51 @@ export class SchedulerEngine {
                 est_groupe_special: false,
               };
             });
-            for (const p of placements) {
-              matrix.reserver(
-                p.id_salle, p.id_professeur, p.id_groupe, p.id_cours,
-                p.date, p.heure_debut, p.heure_fin,
-                { studentIds: SchedulerEngine._lireEtudiantsCours(groupe, cours.id_cours) }
-              );
-            }
-            chargeSeriesParProf.set(prof.id_professeur, (chargeSeriesParProf.get(prof.id_professeur) || 0) + 1);
-            chargeSeriesParJour.set(jourSemaine, (chargeSeriesParJour.get(jourSemaine) || 0) + 1);
-            SchedulerEngine._incrementerChargeJour(chargeSeriesParGroupeJour, idGroupe, jourSemaine);
-            SchedulerEngine._incrementerChargeJour(chargeSeriesParProfJour, prof.id_professeur, jourSemaine);
-            SchedulerEngine._memoriserSlotJour(slotsParGroupeJour, idGroupe, jourSemaine, slotIdx);
-            SchedulerEngine._memoriserSlotJour(slotsParProfJour, prof.id_professeur, jourSemaine, slotIdx);
-            return { placements, professeur: prof, salle: null, jourSemaine };
+            meilleurCandidat = SchedulerEngine._enregistrerMeilleurCandidatSerie({
+              meilleurCandidat,
+              score: SchedulerEngine._scoreCandidatSerie({
+                cours,
+                groupe,
+                idGroupe,
+                professeur: prof,
+                salle: null,
+                jourSemaine,
+                creneau,
+                slotIndex: slotIdx,
+                chargeSeriesParJour,
+                chargeSeriesParGroupeJour,
+                chargeSeriesParProfJour,
+                slotsParGroupeJour,
+                slotsParProfJour,
+                indexJour,
+                indexProfesseur,
+                indexCreneau,
+                fallbackTypeIndex: 1,
+                coverageRatio: datesDisponibles.length / datesToutes.length,
+                roomCoverageRatio:
+                  placements.filter((placement) => Number(placement.id_salle || 0) > 0).length /
+                  datesToutes.length,
+                optimizationMode,
+                phase: "fallback",
+              }),
+              payload: {
+                reservationType: "placements",
+                placements,
+                professeur: prof,
+                salle: null,
+                jourSemaine,
+                matrix,
+                chargeSeriesParProf,
+                chargeSeriesParJour,
+                chargeSeriesParGroupeJour,
+                chargeSeriesParProfJour,
+                slotsParGroupeJour,
+                slotsParProfJour,
+                slotIdx,
+                cours,
+                groupe,
+              },
+            });
           }
 
           // Tentative 3 : entierement en ligne
@@ -2270,25 +2361,59 @@ export class SchedulerEngine {
               est_cours_cle: Boolean(cours.est_cours_cle),
               est_groupe_special: false,
             }));
-            for (const p of placements) {
-              matrix.reserver(
-                null, p.id_professeur, p.id_groupe, p.id_cours,
-                p.date, p.heure_debut, p.heure_fin,
-                { studentIds: SchedulerEngine._lireEtudiantsCours(groupe, cours.id_cours) }
-              );
-            }
-            chargeSeriesParProf.set(prof.id_professeur, (chargeSeriesParProf.get(prof.id_professeur) || 0) + 1);
-            chargeSeriesParJour.set(jourSemaine, (chargeSeriesParJour.get(jourSemaine) || 0) + 1);
-            SchedulerEngine._incrementerChargeJour(chargeSeriesParGroupeJour, idGroupe, jourSemaine);
-            SchedulerEngine._incrementerChargeJour(chargeSeriesParProfJour, prof.id_professeur, jourSemaine);
-            SchedulerEngine._memoriserSlotJour(slotsParGroupeJour, idGroupe, jourSemaine, slotIdx);
-            SchedulerEngine._memoriserSlotJour(slotsParProfJour, prof.id_professeur, jourSemaine, slotIdx);
-            return { placements, professeur: prof, salle: null, jourSemaine };
+            meilleurCandidat = SchedulerEngine._enregistrerMeilleurCandidatSerie({
+              meilleurCandidat,
+              score: SchedulerEngine._scoreCandidatSerie({
+                cours,
+                groupe,
+                idGroupe,
+                professeur: prof,
+                salle: null,
+                jourSemaine,
+                creneau,
+                slotIndex: slotIdx,
+                chargeSeriesParJour,
+                chargeSeriesParGroupeJour,
+                chargeSeriesParProfJour,
+                slotsParGroupeJour,
+                slotsParProfJour,
+                indexJour,
+                indexProfesseur,
+                indexCreneau,
+                fallbackTypeIndex: 2,
+                coverageRatio: datesDisponibles.length / datesToutes.length,
+                roomCoverageRatio: 0,
+                optimizationMode,
+                phase: "fallback",
+              }),
+              payload: {
+                reservationType: "placements",
+                placements,
+                professeur: prof,
+                salle: null,
+                jourSemaine,
+                matrix,
+                chargeSeriesParProf,
+                chargeSeriesParJour,
+                chargeSeriesParGroupeJour,
+                chargeSeriesParProfJour,
+                slotsParGroupeJour,
+                slotsParProfJour,
+                slotIdx,
+                cours,
+                groupe,
+              },
+            });
           }
         }
       }
     }
-    return null;
+
+    if (!meilleurCandidat) {
+      return null;
+    }
+
+    return SchedulerEngine._reserverCandidatAssoupli(meilleurCandidat.payload);
   }
 
   static _reserverSerieFallback({
@@ -2324,6 +2449,80 @@ export class SchedulerEngine {
     SchedulerEngine._memoriserSlotJour(slotsParGroupeJour, idGroupe, jourSemaine, slotIdx);
     SchedulerEngine._memoriserSlotJour(slotsParProfJour, prof.id_professeur, jourSemaine, slotIdx);
     return { placements, professeur: prof, salle, jourSemaine };
+  }
+
+  static _reserverCandidatAssoupli(payload) {
+    if (payload?.reservationType === "uniforme") {
+      return SchedulerEngine._reserverSerieFallback(payload);
+    }
+
+    const {
+      placements,
+      professeur,
+      salle,
+      jourSemaine,
+      matrix,
+      chargeSeriesParProf,
+      chargeSeriesParJour,
+      chargeSeriesParGroupeJour,
+      chargeSeriesParProfJour,
+      slotsParGroupeJour,
+      slotsParProfJour,
+      slotIdx,
+      cours,
+      groupe,
+    } = payload;
+
+    for (const placement of placements) {
+      matrix.reserver(
+        placement.id_salle,
+        placement.id_professeur,
+        placement.id_groupe,
+        placement.id_cours,
+        placement.date,
+        placement.heure_debut,
+        placement.heure_fin,
+        { studentIds: SchedulerEngine._lireEtudiantsCours(groupe, cours.id_cours) }
+      );
+    }
+
+    chargeSeriesParProf.set(
+      professeur.id_professeur,
+      (chargeSeriesParProf.get(professeur.id_professeur) || 0) + 1
+    );
+    chargeSeriesParJour.set(
+      jourSemaine,
+      (chargeSeriesParJour.get(jourSemaine) || 0) + 1
+    );
+    SchedulerEngine._incrementerChargeJour(
+      chargeSeriesParGroupeJour,
+      placements[0]?.id_groupe,
+      jourSemaine
+    );
+    SchedulerEngine._incrementerChargeJour(
+      chargeSeriesParProfJour,
+      professeur.id_professeur,
+      jourSemaine
+    );
+    SchedulerEngine._memoriserSlotJour(
+      slotsParGroupeJour,
+      placements[0]?.id_groupe,
+      jourSemaine,
+      slotIdx
+    );
+    SchedulerEngine._memoriserSlotJour(
+      slotsParProfJour,
+      professeur.id_professeur,
+      jourSemaine,
+      slotIdx
+    );
+
+    return {
+      placements,
+      professeur,
+      salle,
+      jourSemaine,
+    };
   }
 
   static _diagnosticPrecis({
@@ -2561,12 +2760,21 @@ export class SchedulerEngine {
    * @param {number|null} options.idUtilisateur Utilisateur déclencheur
    * @returns {Promise<Object>} Rapport de génération
    */
-  static async genererGroupe({ idGroupe, idSession = null, idUtilisateur = null } = {}) {
+  static async genererGroupe({
+    idGroupe,
+    idSession = null,
+    idUtilisateur = null,
+    optimizationMode = "legacy",
+  } = {}) {
     if (!idGroupe || !Number.isInteger(Number(idGroupe))) {
       throw Object.assign(new Error("Identifiant de groupe invalide."), { statusCode: 400 });
     }
 
     await assurerSchemaSchedulerAcademique();
+    // La regeneration ciblee doit appliquer les memes profils que la
+    // generation globale, avec fallback legacy si le client envoie un alias
+    // ou une valeur inconnue.
+    const modeOptimisation = PlacementEvaluator.normalizeMode(optimizationMode);
 
     const connection = await pool.getConnection();
     const rapport = {
@@ -3006,6 +3214,7 @@ export class SchedulerEngine {
             slotsParProfJour,
             numeroSeance: n,
             preferencesStabilite,
+            optimizationMode: modeOptimisation,
           });
 
           if (serie) {
@@ -3031,6 +3240,7 @@ export class SchedulerEngine {
               slotsParGroupeJour,
               slotsParProfJour,
               effectifGroupe,
+              optimizationMode: modeOptimisation,
             });
 
             if (serieAssouplie) {
@@ -3050,8 +3260,31 @@ export class SchedulerEngine {
       }
 
       // Score qualité
+      const optimisationLocale = SchedulerEngine._executerOptimisationLocaleLectureSeule({
+        placements: solution,
+        cours: coursFiltres,
+        groupesFormes: [{ ...groupeForMoteur, id_groupe: Number(idGroupe) }],
+        affectationsEtudiantGroupe: new Map(
+          etudiants.map((etudiant) => [Number(etudiant.id_etudiant), [groupeDb.nom_groupe]])
+        ),
+        affectationsReprises: reprisesAttachees.map((row) => ({
+          ...row,
+          id_groupe: Number(idGroupe),
+          nom_groupe: groupeDb.nom_groupe,
+        })),
+        salles,
+        datesParJourSemaine,
+        matrix,
+        dispParProf,
+        absencesParProf,
+        indispoParSalle,
+        optimizationMode: modeOptimisation,
+      });
+      const solutionOptimisee = optimisationLocale.placementsOptimises;
+      const modeScoringReference = PlacementEvaluator.resolveScoringMode(modeOptimisation);
+
       const qualite = SchedulerEngine._calculerScoreQualite({
-        solution,
+        solution: solutionOptimisee,
         nonPlanifies,
         nbResolutionsManuelles: 0,
         preferencesStabilite,
@@ -3059,7 +3292,7 @@ export class SchedulerEngine {
       rapport.score_qualite = qualite.score;
 
       // Persister les nouvelles affectations pour ce groupe
-      for (const placement of solution) {
+      for (const placement of solutionOptimisee) {
         await connection.query(
           `INSERT IGNORE INTO plages_horaires (date, heure_debut, heure_fin) VALUES (?, ?, ?)`,
           [placement.date, placement.heure_debut, placement.heure_fin]
@@ -3089,11 +3322,12 @@ export class SchedulerEngine {
         });
       }
 
-      rapport.nb_cours_planifies = solution.length;
+      rapport.nb_cours_planifies = solutionOptimisee.length;
       rapport.nb_cours_non_planifies = nonPlanifies.length;
       rapport.non_planifies = nonPlanifies;
       rapport.details = {
         mode: "generation_ciblee_groupe",
+        modeOptimisationUtilise: modeOptimisation,
         nom_groupe: groupeDb.nom_groupe,
         programme: programmeGroupe,
         etape: etapeGroupe,
@@ -3103,7 +3337,23 @@ export class SchedulerEngine {
         effectif_projete_max: GroupFormer.lireEffectifProjeteMax(groupeForMoteur),
         nb_cours_catalogue: coursFiltres.length,
         qualite,
+        optimisation_locale: {
+          modeOptimisationUtilise: modeOptimisation,
+          modeScoringReference,
+          scoreAvantOptimisationLocale:
+            optimisationLocale.scoringBefore?.modes?.[modeScoringReference]?.scoreGlobal || 0,
+          scoreApresOptimisationLocale:
+            optimisationLocale.scoringAfter?.modes?.[modeScoringReference]?.scoreGlobal || 0,
+          nombreAmeliorationsRetenues: optimisationLocale.improvementsRetained || 0,
+          principauxGainsConstates: optimisationLocale.gains || {},
+          mouvementsRetenus: optimisationLocale.improvements || [],
+          fallbackLectureSeule: Boolean(optimisationLocale.fallbackLectureSeule),
+          erreur: optimisationLocale.error || null,
+        },
       };
+      rapport.details.scoring_v1_avant_optimisation_locale =
+        optimisationLocale.scoringBefore;
+      rapport.details.scoring_v1 = optimisationLocale.scoringAfter;
 
       await connection.commit();
 

@@ -2,38 +2,27 @@
 
 Ce document explique comment installer et lancer le projet.
 
----
+## 1. Recuperation du projet
 
-## 1. Récupération du projet
+```bash
+git clone https://github.com/bedreddinerafik-jpg/horaires-5.git
+cd horaires-5
+```
 
-Ouvrir un terminal :
+## 2. Installation des dependances
 
-git clone https://github.com/bedreddinerafik-jpg/horaires-5.git  
-cd horaires-5  
-
----
-
-## 2. Installation des dépendances
-
-### Backend
-cd Backend  
-npm install  
-
-### Frontend
-cd Frontend  
-npm install  
-
-### Projet global
-Revenir à la racine :
-
-cd ..  
-npm install  
-
+```bash
+npm install
+cd Backend && npm install
+cd ../Frontend && npm install
+cd ..
+```
 
 ## 3. Configuration du backend
 
-Créer un fichier `.env` dans le dossier Backend :
+Creer `Backend/.env` avec au minimum :
 
+```env
 PORT=3000
 SESSION_SECRET=gdh_session_secret_2026
 DB_HOST=127.0.0.1
@@ -42,54 +31,51 @@ DB_PASSWORD=
 DB_NAME=gdh5
 DB_PORT=3306
 CORS_ORIGIN=http://localhost:5173
+```
 
----
+## 4. Base de donnees
 
-## 4. Base de données
+Le mecanisme officiel est maintenant le moteur central de migrations.
 
-Démarrer MySQL puis , Importer le fichier `GDH5.sql` :
+Depuis la racine du projet :
 
-Méthode Workbench :
-- ouvrir MySQL Workbench  
-- importer le fichier SQL  
+```bash
+npm run migrate
+```
 
-Méthode terminal :
-mysql -u root -p < GDH5.sql  
+Cette commande :
 
----
+- cree la base si elle n'existe pas
+- cree la table `migrations`
+- detecte les versions deja appliquees
+- applique uniquement les migrations manquantes dans le bon ordre
+
+`Backend/Database/GDH5.sql` reste un snapshot historique, mais ce n'est plus
+la procedure normale d'installation.
 
 ## 5. Lancer le projet
 
-Le projet permet de lancer le backend et le frontend en même temps.
-
 Depuis la racine :
 
-npm run dev  
+```bash
+npm run dev
+```
 
+## 6. Acces
 
-## 6. Accès
+- Frontend : `http://localhost:5173`
+- Backend : `http://localhost:3000`
 
-Frontend : http://localhost:5173  
-Backend : http://localhost:3000  
+## 7. Comptes par defaut
 
----
+- Admin : `admin@ecole.ca` / `Admin123!`
+- Responsable : `responsable@ecole.ca` / `Resp123!`
 
-
-## 7. Compte administrateur
-
-Email : admin@ecole.ca  
-Mot de passe : Admin123!
-## changer le mot de passe après connexion
-
-
-## 7. Compte responsable
-
-Email :   responsable@ecole.ca ,
-Mot de passe : Resp123!
----
+Changer ces mots de passe apres la premiere connexion si l'environnement sort
+du cadre local.
 
 ## 8. Remarques
 
-- Vérifier que MySQL est démarré  
-- Vérifier le fichier `.env`  
-- Vérifier les dépendances avec `npm install`  
+- Verifier que MySQL est demarre.
+- Verifier `Backend/.env`.
+- Relancer `npm run migrate` apres toute nouvelle migration versionnee.

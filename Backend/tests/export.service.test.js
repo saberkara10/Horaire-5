@@ -1,3 +1,4 @@
+import ExcelJS from "exceljs";
 import * as XLSX from "xlsx";
 import {
   genererExcelEtudiant,
@@ -152,9 +153,7 @@ const horaireEtudiantFusionne = [
   },
 ];
 
-const horaireEtudiantReprises = horaireEtudiantFusionne.filter(
-  (seance) => seance.est_reprise
-);
+const horaireEtudiantReprises = horaireEtudiantFusionne.filter((seance) => seance.est_reprise);
 
 const reprises = [
   {
@@ -175,8 +174,94 @@ const reprises = [
   },
 ];
 
+const horaireEtudiantLong = [
+  {
+    id_affectation_cours: 11,
+    id_plage_horaires: 21,
+    id_cours: 301,
+    code_cours: "ADM450",
+    nom_cours:
+      "Architecture organisationnelle et transformation numerique des services academiques internationaux",
+    nom_professeur: "De La Roche-Lambert",
+    prenom_professeur: "Alexandrine Maximilienne",
+    code_salle: "PAV-401",
+    type_salle: "Classe",
+    date: "2026-01-13",
+    heure_debut: "09:00",
+    heure_fin: "12:00",
+    est_reprise: false,
+    source_horaire: "individuelle",
+    groupe_source: "GAD-E1-9",
+  },
+];
+
+const horaireEtudiantWeekend = [
+  {
+    id_affectation_cours: 21,
+    id_plage_horaires: 31,
+    id_cours: 401,
+    code_cours: "MAT410",
+    nom_cours: "Methodes quantitatives appliquees a la reprise academique intensive",
+    nom_professeur: "Beaulieu-Saint-Pierre",
+    prenom_professeur: "Catherine Elisabeth",
+    code_salle: "A-510",
+    type_salle: "Classe",
+    date: "2026-01-17",
+    heure_debut: "09:00",
+    heure_fin: "12:00",
+    est_reprise: true,
+    source_horaire: "reprise",
+    groupe_source: "GAD-E1-4",
+    statut_reprise: "planifie",
+    note_echec: 58,
+  },
+  {
+    id_affectation_cours: 22,
+    id_plage_horaires: 32,
+    id_cours: 402,
+    code_cours: "COM510",
+    nom_cours: "Communication professionnelle internationale",
+    nom_professeur: "Lafleur",
+    prenom_professeur: "Nadine",
+    code_salle: "B-620",
+    type_salle: "Classe",
+    date: "2026-01-18",
+    heure_debut: "13:00",
+    heure_fin: "16:00",
+    est_reprise: false,
+    source_horaire: "individuelle",
+    groupe_source: "GAD-E1-6",
+  },
+];
+
+const horaireEtudiantWeekendReprises = horaireEtudiantWeekend.filter((seance) => seance.est_reprise);
+
 function enHex(value) {
   return Buffer.from(String(value), "latin1").toString("hex");
+}
+
+async function chargerWorkbookExcelJs(buffer) {
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(buffer);
+  return workbook;
+}
+
+function trouverCelluleContenant(worksheet, texte) {
+  for (let rowIndex = 1; rowIndex <= worksheet.rowCount; rowIndex += 1) {
+    const row = worksheet.getRow(rowIndex);
+    for (let columnIndex = 1; columnIndex <= worksheet.columnCount; columnIndex += 1) {
+      const cell = row.getCell(columnIndex);
+      const value = cell.value === null || cell.value === undefined ? "" : String(cell.value);
+      if (value.includes(texte)) {
+        return cell;
+      }
+    }
+  }
+  return null;
+}
+
+function contientTextePdf(contenu, texte) {
+  return contenu.includes(texte) || contenu.includes(enHex(texte));
 }
 
 describe("ExportService", () => {
@@ -184,7 +269,7 @@ describe("ExportService", () => {
     const buffer = await genererPDFGroupe({ groupe, horaire: horaireGroupe });
     const contenu = buffer.toString("latin1");
 
-    expect(buffer.length).toBeGreaterThan(4000);
+    expect(buffer.length).toBeGreaterThan(4500);
     expect(contenu).toContain("HORAIRE 5");
     expect(contenu).toContain("Horaire du groupe");
     expect(contenu).toContain(enHex("INF101"));
@@ -197,7 +282,7 @@ describe("ExportService", () => {
     });
     const contenu = buffer.toString("latin1");
 
-    expect(buffer.length).toBeGreaterThan(4000);
+    expect(buffer.length).toBeGreaterThan(4500);
     expect(contenu).toContain("Horaire du professeur");
     expect(contenu).toContain(enHex("GAD-E1-1"));
     expect(contenu).toContain(enHex("INF220"));
@@ -213,64 +298,111 @@ describe("ExportService", () => {
     });
     const contenu = buffer.toString("latin1");
 
-    expect(buffer.length).toBeGreaterThan(5000);
+    expect(buffer.length).toBeGreaterThan(5500);
     expect(contenu).toContain("Horaire de l'etudiant");
     expect(contenu).toContain(enHex("Statistiques"));
     expect(contenu).toContain(enHex("GAD-E1-2"));
     expect(contenu).toContain(enHex("GAD-E1-3"));
   });
 
-  test("genere un Excel groupe avec vue hebdo et detail", () => {
-    const buffer = genererExcelGroupe({ groupe, horaire: horaireGroupe });
-    const workbook = XLSX.read(buffer, { type: "buffer" });
-    const detailRows = XLSX.utils.sheet_to_json(
-      workbook.Sheets["Seances detaillees"],
-      { range: 3 }
-    );
+  test("genere un PDF etudiant robuste avec des libelles longs", async () => {
+    const buffer = await genererPDFEtudiant({
+      etudiant,
+      horaire: horaireEtudiantLong,
+      horaire_reprises: [],
+      reprises: [],
+      resume: { charge_cible: 5 },
+    });
+    const contenu = buffer.toString("latin1");
 
-    expect(workbook.SheetNames).toEqual(
+    expect(buffer.length).toBeGreaterThan(4500);
+    expect(contenu).toContain("Horaire de l'etudiant");
+    expect(contenu).toContain(enHex("ADM450"));
+  });
+
+  test("genere un PDF etudiant avec les sept jours et des seances sur le week-end", async () => {
+    const buffer = await genererPDFEtudiant({
+      etudiant,
+      horaire: horaireEtudiantWeekend,
+      horaire_reprises: horaireEtudiantWeekendReprises,
+      reprises,
+      resume: { charge_cible: 5 },
+    });
+    const contenu = buffer.toString("latin1");
+
+    expect(buffer.length).toBeGreaterThan(5000);
+    expect(contientTextePdf(contenu, "Samedi")).toBe(true);
+    expect(contientTextePdf(contenu, "COM510")).toBe(true);
+  });
+
+  test("genere un Excel groupe avec fusion verticale et style d'entete", async () => {
+    const buffer = await genererExcelGroupe({ groupe, horaire: horaireGroupe });
+    const workbookSheetJs = XLSX.read(buffer, { type: "buffer" });
+    const workbookExcelJs = await chargerWorkbookExcelJs(buffer);
+    const detailRows = XLSX.utils.sheet_to_json(workbookSheetJs.Sheets["Seances detaillees"], {
+      range: 3,
+    });
+    const vueHebdo = workbookExcelJs.getWorksheet("Vue hebdo");
+    const details = workbookExcelJs.getWorksheet("Seances detaillees");
+
+    expect(workbookSheetJs.SheetNames).toEqual(
       expect.arrayContaining(["Vue hebdo", "Seances detaillees"])
     );
     expect(detailRows[0]["Code cours"]).toBe("INF101");
     expect(detailRows[1]["Professeur"]).toContain("Anne");
+    expect(vueHebdo.columnCount).toBe(8);
+    expect(vueHebdo.model.merges).toEqual(expect.arrayContaining(["B7:B10"]));
+    expect(vueHebdo.getCell("B7").value).toContain("INF101");
+    expect(vueHebdo.getCell("G6").value).toContain("Samedi");
+    expect(vueHebdo.getCell("H6").value).toContain("Dimanche");
+    expect(details.getCell("A4").fill.fgColor.argb).toBe("FF0F3D2E");
   });
 
-  test("genere un Excel professeur avec vue hebdo et detail", () => {
-    const buffer = genererExcelProfesseur({
+  test("genere un Excel professeur avec vue hebdo et detail lisible", async () => {
+    const buffer = await genererExcelProfesseur({
       professeur,
       horaire: horaireProfesseur,
     });
-    const workbook = XLSX.read(buffer, { type: "buffer" });
-    const detailRows = XLSX.utils.sheet_to_json(
-      workbook.Sheets["Seances detaillees"],
-      { range: 3 }
-    );
+    const workbookSheetJs = XLSX.read(buffer, { type: "buffer" });
+    const workbookExcelJs = await chargerWorkbookExcelJs(buffer);
+    const detailRows = XLSX.utils.sheet_to_json(workbookSheetJs.Sheets["Seances detaillees"], {
+      range: 3,
+    });
+    const vueHebdo = workbookExcelJs.getWorksheet("Vue hebdo");
 
-    expect(workbook.SheetNames).toEqual(
+    expect(workbookSheetJs.SheetNames).toEqual(
       expect.arrayContaining(["Vue hebdo", "Seances detaillees"])
     );
-    expect(detailRows.some((row) => row["Groupes"] === "GAD-E1-1")).toBe(true);
+    expect(detailRows.some((row) => row.Groupes === "GAD-E1-1")).toBe(true);
     expect(detailRows.some((row) => row["Code cours"] === "INF220")).toBe(true);
+    expect(vueHebdo.columnCount).toBe(8);
+    expect(vueHebdo.getCell("B7").value).toContain("INF101");
+    expect(vueHebdo.getCell("D11").value).toContain("INF220");
+    expect(vueHebdo.getCell("G6").value).toContain("Samedi");
+    expect(vueHebdo.getCell("H6").value).toContain("Dimanche");
   });
 
-  test("genere un Excel etudiant avec vue hebdo, detail et reprises", () => {
-    const buffer = genererExcelEtudiant({
+  test("genere un Excel etudiant avec orange reserve aux reprises et feuille de suivi coherente", async () => {
+    const buffer = await genererExcelEtudiant({
       etudiant,
       horaire: horaireEtudiantFusionne,
       horaire_reprises: horaireEtudiantReprises,
       reprises,
       resume: { charge_cible: 5 },
     });
-    const workbook = XLSX.read(buffer, { type: "buffer" });
-    const detailRows = XLSX.utils.sheet_to_json(
-      workbook.Sheets["Seances detaillees"],
-      { range: 3 }
-    );
-    const repriseRows = XLSX.utils.sheet_to_json(workbook.Sheets.Reprises, {
+    const workbookSheetJs = XLSX.read(buffer, { type: "buffer" });
+    const workbookExcelJs = await chargerWorkbookExcelJs(buffer);
+    const detailRows = XLSX.utils.sheet_to_json(workbookSheetJs.Sheets["Seances detaillees"], {
       range: 3,
     });
+    const repriseRows = XLSX.utils.sheet_to_json(workbookSheetJs.Sheets.Reprises, {
+      range: 3,
+    });
+    const vueHebdo = workbookExcelJs.getWorksheet("Vue hebdo");
+    const reprisesSheet = workbookExcelJs.getWorksheet("Reprises");
+    const celluleReprise = trouverCelluleContenant(vueHebdo, "MAT201");
 
-    expect(workbook.SheetNames).toEqual(
+    expect(workbookSheetJs.SheetNames).toEqual(
       expect.arrayContaining(["Vue hebdo", "Seances detaillees", "Reprises"])
     );
     expect(detailRows.some((row) => row.Reprise === "Oui")).toBe(true);
@@ -280,6 +412,61 @@ describe("ExportService", () => {
         (row) => row.Type === "Exception individuelle" && row["Groupe suivi"] === "GAD-E1-3"
       )
     ).toBe(true);
-    expect(repriseRows.some((row) => row["Code cours"] === "COM300")).toBe(true);
+    expect(vueHebdo.columnCount).toBe(8);
+    expect(repriseRows).toHaveLength(1);
+    expect(repriseRows[0]["Code cours"]).toBe("COM300");
+    expect(celluleReprise).not.toBeNull();
+    expect(celluleReprise.fill.fgColor.argb).toBe("FFFFF1E6");
+    expect(vueHebdo.getCell("G6").value).toContain("Samedi");
+    expect(vueHebdo.getCell("H6").value).toContain("Dimanche");
+    expect(reprisesSheet.getCell("A4").fill.fgColor.argb).toBe("FF0F3D2E");
+    expect(reprisesSheet.getCell("A5").fill.fgColor.argb).toBe("FFFFF1E6");
+  });
+
+  test("genere un Excel etudiant robuste avec contenu long sans lignes ecrasees", async () => {
+    const buffer = await genererExcelEtudiant({
+      etudiant,
+      horaire: horaireEtudiantLong,
+      horaire_reprises: [],
+      reprises: [],
+      resume: { charge_cible: 5 },
+    });
+    const workbook = await chargerWorkbookExcelJs(buffer);
+    const detailSheet = workbook.getWorksheet("Seances detaillees");
+    const vueHebdo = workbook.getWorksheet("Vue hebdo");
+    const detailRow = detailSheet.getRow(5);
+    const celluleLongue = trouverCelluleContenant(vueHebdo, "ADM450");
+
+    expect(detailSheet.getCell("F5").value).toContain("Architecture organisationnelle");
+    expect(detailRow.height).toBeGreaterThan(22);
+    expect(celluleLongue).not.toBeNull();
+    expect(String(celluleLongue.value)).toContain("Alexandrine Maximilienne");
+  });
+
+  test("genere un Excel etudiant avec samedi et dimanche utilises sans ecraser le contenu", async () => {
+    const buffer = await genererExcelEtudiant({
+      etudiant,
+      horaire: horaireEtudiantWeekend,
+      horaire_reprises: horaireEtudiantWeekendReprises,
+      reprises,
+      resume: { charge_cible: 5 },
+    });
+    const workbook = await chargerWorkbookExcelJs(buffer);
+    const vueHebdo = workbook.getWorksheet("Vue hebdo");
+    const celluleSamedi = trouverCelluleContenant(vueHebdo, "MAT410");
+    const celluleDimanche = trouverCelluleContenant(vueHebdo, "COM510");
+
+    expect(vueHebdo.columnCount).toBe(8);
+    expect(vueHebdo.getCell("G6").value).toContain("Samedi");
+    expect(vueHebdo.getCell("H6").value).toContain("Dimanche");
+    expect(celluleSamedi).not.toBeNull();
+    expect(String(celluleSamedi.value)).toContain("Groupe principal : GAD-E1-1");
+    expect(String(celluleSamedi.value)).toContain("Groupe suivi : GAD-E1-4");
+    expect(String(celluleSamedi.value)).toContain("Statut : REPRISE");
+    expect(String(celluleSamedi.value)).toContain("Professeur : Catherine Elisabeth");
+    expect(celluleSamedi.fill.fgColor.argb).toBe("FFFFF1E6");
+    expect(celluleDimanche).not.toBeNull();
+    expect(String(celluleDimanche.value)).toContain("COM510");
+    expect(String(celluleDimanche.value)).toContain("Groupe suivi : GAD-E1-6");
   });
 });

@@ -1,3 +1,13 @@
+/**
+ * Service de gestion des exceptions d'horaire cote etudiant.
+ *
+ * Ce module consolide trois responsabilites liees entre elles :
+ * - reconstituer l'horaire effectif d'un etudiant a partir des affectations de groupe
+ *   et des surcharges individuelles ;
+ * - exposer les exceptions individuelles visibles dans l'horaire etudiant ;
+ * - preparer et executer les echanges cibles de cours entre deux etudiants
+ *   sans violer les contraintes de conflit horaire.
+ */
 import pool from "../../../db.js";
 import { assurerSchemaSchedulerAcademique } from "../academic-scheduler-schema.js";
 
@@ -178,6 +188,14 @@ function normaliserSeance(row) {
   };
 }
 
+/**
+ * Recupere les seances issues du groupe principal de l'etudiant pour une session.
+ *
+ * @param {number} idEtudiant Identifiant de l'etudiant cible.
+ * @param {Object} [options={}] Options de session et d'exclusion de cours.
+ * @param {Object} [executor=pool] Executeur SQL ou connexion transactionnelle.
+ * @returns {Promise<Array<Object>>} Seances de groupe normalisees.
+ */
 export async function recupererSeancesGroupeEffectivesEtudiant(
   idEtudiant,
   options = {},
@@ -194,6 +212,9 @@ export async function recupererSeancesGroupeEffectivesEtudiant(
     options.exclureCoursIds
   );
 
+  // Cette requete reconstruit uniquement l'horaire "heritage du groupe".
+  // Les affectations individuelles sur le meme cours sont exclues pour eviter
+  // d'afficher simultanement la section d'origine et la section de remplacement.
   const [rows] = await executor.query(
     `SELECT
        ac.id_affectation_cours,
@@ -255,6 +276,14 @@ export async function recupererSeancesGroupeEffectivesEtudiant(
   return rows.map(normaliserSeance);
 }
 
+/**
+ * Recupere les seances individuelles appliquees a un etudiant.
+ *
+ * @param {number} idEtudiant Identifiant de l'etudiant cible.
+ * @param {Object} [options={}] Options de session, de filtres de source et d'exclusion.
+ * @param {Object} [executor=pool] Executeur SQL ou connexion transactionnelle.
+ * @returns {Promise<Array<Object>>} Seances de reprise ou d'exception individuelle.
+ */
 export async function recupererSeancesIndividuellesEtudiant(
   idEtudiant,
   options = {},
@@ -281,6 +310,9 @@ export async function recupererSeancesIndividuellesEtudiant(
     options.exclureCoursIds
   );
 
+  // Les exceptions individuelles passent par `affectation_etudiants`.
+  // On y retrouve les reprises, les rattachements individuels et les echanges
+  // de cours traces par `id_echange_cours`.
   const [rows] = await executor.query(
     `SELECT
        ac.id_affectation_cours,
@@ -359,6 +391,14 @@ export async function recupererSeancesIndividuellesEtudiant(
   return rows.map(normaliserSeance);
 }
 
+/**
+ * Recompose l'horaire effectif complet de l'etudiant.
+ *
+ * @param {number} idEtudiant Identifiant de l'etudiant cible.
+ * @param {Object} [options={}] Options de session et de filtrage.
+ * @param {Object} [executor=pool] Executeur SQL ou connexion transactionnelle.
+ * @returns {Promise<Array<Object>>} Fusion triee du groupe principal et des exceptions.
+ */
 export async function recupererSeancesEffectivesEtudiant(
   idEtudiant,
   options = {},
@@ -391,6 +431,13 @@ export async function recupererSeancesEffectivesEtudiant(
   return [...seancesGroupe, ...seancesIndividuelles].sort(trierSeances);
 }
 
+/**
+ * Agrege les seances par cours afin de produire une vue stable exploitable
+ * pour l'API et pour les validations d'echange.
+ *
+ * @param {Array<Object>} seances Liste de seances deja normalisees.
+ * @returns {Map<number, Object>} Index par `id_cours`.
+ */
 function agregerCoursDepuisSeances(seances = []) {
   const index = new Map();
 
@@ -444,6 +491,15 @@ function agregerCoursDepuisSeances(seances = []) {
   return index;
 }
 
+/**
+ * Retourne l'affectation effective d'un cours pour un etudiant donne.
+ *
+ * @param {number} idEtudiant Identifiant de l'etudiant.
+ * @param {number} idCours Identifiant du cours.
+ * @param {Object} [options={}] Options de session et de filtrage.
+ * @param {Object} [executor=pool] Executeur SQL ou connexion transactionnelle.
+ * @returns {Promise<Object|null>} Affectation agregee ou `null`.
+ */
 export async function recupererAffectationEffectiveCoursEtudiant(
   idEtudiant,
   idCours,
@@ -462,6 +518,17 @@ export async function recupererAffectationEffectiveCoursEtudiant(
   return index.get(Number(idCours)) || null;
 }
 
+/**
+ * Liste uniquement les exceptions individuelles visibles par l'etudiant.
+ *
+ * Cette vue sert surtout a l'ecran d'horaire et aux exports qui doivent
+ * distinguer les seances du groupe principal des surcharges ponctuelles.
+ *
+ * @param {number} idEtudiant Identifiant de l'etudiant.
+ * @param {Object} [options={}] Options de session et d'exclusion.
+ * @param {Object} [executor=pool] Executeur SQL ou connexion transactionnelle.
+ * @returns {Promise<Array<Object>>} Exceptions individuelles agregees par cours.
+ */
 export async function recupererExceptionsIndividuellesEtudiant(
   idEtudiant,
   options = {},
@@ -536,6 +603,17 @@ function enrichirOccurrencesAvecCours(affectation) {
   }));
 }
 
+/**
+ * Monte le projet d'echange complet sans rien persister.
+ *
+ * Le resultat sert a deux usages :
+ * - la previsualisation dans l'interface ;
+ * - la validation finale juste avant l'ecriture transactionnelle.
+ *
+ * @param {Object} payload Identifiants des deux etudiants, du cours et de la session.
+ * @param {Object} [executor=pool] Executeur SQL ou connexion transactionnelle.
+ * @returns {Promise<Object>} Projet d'echange, conflits et blocages metier.
+ */
 async function construireProjetEchange(
   { idEtudiantA, idEtudiantB, idCours, idSession = null },
   executor = pool
@@ -735,6 +813,15 @@ function agregerCoursCommuns(
     });
 }
 
+/**
+ * Liste les cours que deux etudiants suivent deja en commun et qui peuvent
+ * donc faire l'objet d'un echange de section.
+ *
+ * @param {number} idEtudiantA Identifiant du premier etudiant.
+ * @param {number} idEtudiantB Identifiant du second etudiant.
+ * @param {Object} [executor=pool] Executeur SQL ou connexion transactionnelle.
+ * @returns {Promise<Object>} Session active, etudiants et cours communs tries.
+ */
 export async function listerCoursCommunsEchangeables(
   idEtudiantA,
   idEtudiantB,
@@ -800,11 +887,29 @@ export async function listerCoursCommunsEchangeables(
   };
 }
 
+/**
+ * Retourne une simulation complete de l'echange sans modifier la base.
+ *
+ * @param {Object} payload Charge utile recue depuis l'API.
+ * @param {Object} [executor=pool] Executeur SQL ou connexion transactionnelle.
+ * @returns {Promise<Object>} Projet d'echange et diagnostic de faisabilite.
+ */
 export async function previsualiserEchangeCoursEtudiants(payload, executor = pool) {
   await assurerSchemaSchedulerAcademique(executor);
   return construireProjetEchange(payload, executor);
 }
 
+/**
+ * Cree ou retire l'override individuel d'un cours pour un etudiant.
+ *
+ * Si le groupe cible correspond au groupe principal, aucune affectation
+ * individuelle n'est conservee : l'etudiant retombe alors sur l'horaire
+ * de son groupe d'origine.
+ *
+ * @param {Object} payload Parametres d'affectation cible.
+ * @param {Object} [executor=pool] Executeur SQL ou connexion transactionnelle.
+ * @returns {Promise<number|null>} Identifiant cree ou `null` si aucun override n'est requis.
+ */
 async function appliquerAffectationIndividuelleCours(
   { idEtudiant, idCours, idSession, idGroupeCible, idEchangeCours },
   executor = pool
@@ -819,6 +924,8 @@ async function appliquerAffectationIndividuelleCours(
     );
   }
 
+  // On repart toujours d'un etat propre pour eviter plusieurs overrides
+  // individuels concurrents sur le meme couple etudiant/cours/session.
   await executor.query(
     `DELETE FROM affectation_etudiants
      WHERE id_etudiant = ?
@@ -857,6 +964,18 @@ async function appliquerAffectationIndividuelleCours(
   return Number(result.insertId || 0) || null;
 }
 
+/**
+ * Execute l'echange cible de cours entre deux etudiants.
+ *
+ * L'operation est entierement transactionnelle :
+ * - verification finale des conflits ;
+ * - creation de la trace dans `echanges_cours_etudiants` ;
+ * - mise a jour des affectations individuelles des deux etudiants.
+ *
+ * @param {Object} payload Charge utile recue depuis l'API.
+ * @param {Object} [executor=pool] Executeur SQL ou connexion transactionnelle.
+ * @returns {Promise<Object>} Resume metier et identifiants impactes.
+ */
 export async function executerEchangeCoursEtudiants(payload, executor = pool) {
   return executerDansTransactionSiNecessaire(async (transactionExecutor) => {
     await assurerSchemaSchedulerAcademique(transactionExecutor);
@@ -872,6 +991,8 @@ export async function executerEchangeCoursEtudiants(payload, executor = pool) {
       );
     }
 
+    // La table `echanges_cours_etudiants` joue le role de journal metier :
+    // elle conserve l'etat avant/apres de chaque etudiant pour audit futur.
     const [result] = await transactionExecutor.query(
       `INSERT INTO echanges_cours_etudiants (
          id_session,

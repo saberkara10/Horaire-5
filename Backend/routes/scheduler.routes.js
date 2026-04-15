@@ -1,15 +1,12 @@
 /**
- * ROUTES — Scheduler avancé
+ * Routes du scheduler academique.
  *
- * POST /api/scheduler/generer  — Lance la génération complète
- * GET  /api/scheduler/rapports — Historique des générations
- * GET  /api/scheduler/sessions — Gestion des sessions
- * POST /api/scheduler/sessions — Créer une session
- * POST /api/scheduler/cours-echoues — Enregistrer cours échoués
- * POST /api/scheduler/absences — Gérer absences professeurs
- * POST /api/scheduler/salles-indisponibles — Gérer salles HS
- * GET  /api/scheduler/prerequis — Prérequis cours
- * POST /api/scheduler/prerequis — Ajouter prérequis
+ * Ce fichier expose les flux d'administration et d'exploitation du moteur
+ * intelligent :
+ * - bootstrap du schema et du dataset operationnel ;
+ * - generation complete avec ou sans SSE ;
+ * - lecture des rapports ;
+ * - gestion des sessions, reprises, absences, indisponibilites et prerequis.
  */
 
 import { userAuth, userAdmin, userAdminOrResponsable } from "../middlewares/auth.js";
@@ -17,46 +14,65 @@ import { SchedulerEngine } from "../src/services/scheduler/SchedulerEngine.js";
 import { SchedulerDataBootstrap } from "../src/services/scheduler/SchedulerDataBootstrap.js";
 import { FailedCourseDebugService } from "../src/services/scheduler/FailedCourseDebugService.js";
 import { SchedulerReportService } from "../src/services/scheduler/SchedulerReportService.js";
+import { ScheduleModificationController } from "../src/controllers/scheduler/ScheduleModificationController.js";
+import { ScheduleModificationService } from "../src/services/scheduler/planning/ScheduleModificationService.js";
+import { ScenarioSimulator } from "../src/services/scheduler/simulation/ScenarioSimulator.js";
 import { assurerSchemaSchedulerAcademique } from "../src/services/academic-scheduler-schema.js";
 import pool from "../db.js";
 
-function getUser(req) {
-  return req.user || req.session?.user || null;
+function getUser(request) {
+  return request.user || request.session?.user || null;
+}
+
+/**
+ * Lit le mode d'optimisation d'un payload HTTP.
+ *
+ * La generation globale doit proposer les memes profils que les flux
+ * intelligents de modification. Le moteur reste responsable de la
+ * normalisation finale, mais les routes acceptent les alias historiques
+ * pour rester retrocompatibles.
+ *
+ * @param {Object} [source={}] - body ou query source.
+ * @returns {string} Mode demande ou fallback legacy.
+ */
+function readOptimizationMode(source = {}) {
+  return source.optimization_mode || source.mode_optimisation || "legacy";
 }
 
 export default function schedulerRoutes(app) {
-
-  // ── GET /api/scheduler/bootstrap ────────────────────────────────────────
-  app.post("/api/scheduler/bootstrap", userAuth, userAdmin, async (req, res) => {
+  // Bootstrap technique du schema et des donnees minimales du scheduler.
+  app.post("/api/scheduler/bootstrap", userAuth, userAdmin, async (request, response) => {
     try {
       const report = await SchedulerDataBootstrap.ensureOperationalDataset();
-      return res.json({ message: "Bootstrap terminé.", report });
+      return response.json({ message: "Bootstrap termine.", report });
     } catch (error) {
       console.error("ERREUR Bootstrap:", error);
-      return res.status(500).json({ message: error.message || "Erreur serveur." });
+      return response.status(500).json({ message: error.message || "Erreur serveur." });
     }
   });
 
-  // ── POST /api/scheduler/generer-stream (SSE) ────────────────────────────
-  app.get("/api/scheduler/generer-stream", userAuth, userAdmin, async (req, res) => {
-    res.setHeader("Content-Type", "text/event-stream");
-    res.setHeader("Cache-Control", "no-cache");
-    res.setHeader("Connection", "keep-alive");
-    res.flushHeaders();
+  // Generation complete avec suivi de progression SSE.
+  app.get("/api/scheduler/generer-stream", userAuth, userAdmin, async (request, response) => {
+    response.setHeader("Content-Type", "text/event-stream");
+    response.setHeader("Cache-Control", "no-cache");
+    response.setHeader("Connection", "keep-alive");
+    response.flushHeaders();
 
     const sendEvent = (data) => {
-      res.write(`data: ${JSON.stringify(data)}\n\n`);
+      response.write(`data: ${JSON.stringify(data)}\n\n`);
     };
 
-    const user = getUser(req);
-    const { id_session, inclure_weekend, sa_params } = req.query;
+    const user = getUser(request);
+    const { id_session, inclure_weekend, sa_params } = request.query;
     const saParams = sa_params ? JSON.parse(sa_params) : {};
+    const optimizationMode = readOptimizationMode(request.query || {});
 
     try {
       const rapport = await SchedulerEngine.generer({
         idSession: id_session ? Number(id_session) : null,
         idUtilisateur: user?.id || null,
         inclureWeekend: inclure_weekend === "true",
+        optimizationMode,
         saParams,
         onProgress: (info) => sendEvent({ type: "progress", ...info }),
       });
@@ -64,111 +80,205 @@ export default function schedulerRoutes(app) {
     } catch (error) {
       sendEvent({ type: "error", message: error.message || "Erreur serveur." });
     } finally {
-      res.end();
+      response.end();
     }
   });
 
-  // ── POST /api/scheduler/generer ─────────────────────────────────────────
-  app.post("/api/scheduler/generer", userAuth, userAdmin, async (req, res) => {
+  // Generation complete sans canal SSE.
+  app.post("/api/scheduler/generer", userAuth, userAdmin, async (request, response) => {
     try {
-      const user = getUser(req);
+      const user = getUser(request);
       const {
         id_session = null,
         inclure_weekend = false,
+        mode_optimisation = "legacy",
+        optimization_mode = undefined,
         sa_params = {},
-      } = req.body ?? {};
+      } = request.body ?? {};
 
       const rapport = await SchedulerEngine.generer({
         idSession: id_session ? Number(id_session) : null,
         idUtilisateur: user?.id || null,
         inclureWeekend: Boolean(inclure_weekend),
+        optimizationMode: optimization_mode || mode_optimisation || "legacy",
         saParams: sa_params,
         onProgress: null,
       });
 
-      return res.status(201).json({
-        message: `✅ ${rapport.nb_cours_planifies} affectations générées. Score qualité : ${rapport.score_qualite}/100`,
+      return response.status(201).json({
+        message: `OK ${rapport.nb_cours_planifies} affectations generees. Score qualite : ${rapport.score_qualite}/100`,
+        mode_optimisation_utilise:
+          rapport?.details?.modeOptimisationUtilise || "legacy",
         rapport,
       });
     } catch (error) {
-      console.error("ERREUR Génération:", error);
-      return res.status(error.statusCode || 500).json({ message: error.message || "Erreur serveur." });
+      console.error("ERREUR Generation:", error);
+      return response
+        .status(error.statusCode || 500)
+        .json({ message: error.message || "Erreur serveur." });
     }
   });
 
-  // ── GET /api/scheduler/rapports ─────────────────────────────────────────
-  app.get("/api/scheduler/rapports", userAuth, userAdminOrResponsable, async (req, res) => {
+  // Previsualisation read-only d'un scenario what-if.
+  app.post(
+    "/api/scheduler/what-if",
+    userAuth,
+    userAdminOrResponsable,
+    async (request, response) => {
+      try {
+        const {
+          id_session = null,
+          mode_optimisation = "legacy",
+          optimization_mode = undefined,
+          scenario = null,
+        } = request.body ?? {};
+
+        if (!scenario || typeof scenario !== "object") {
+          return response.status(400).json({
+            message: "Le body doit contenir un scenario valide.",
+            code: "SCENARIO_REQUIRED",
+          });
+        }
+
+        const scenarioType = String(
+          scenario.type || scenario.scenario_type || ""
+        )
+          .trim()
+          .toUpperCase();
+
+        if (scenarioType === "MODIFIER_AFFECTATION") {
+          const rapport = await ScheduleModificationService.previewAssignmentModification(
+            {
+              idSeance:
+                scenario.idSeance ||
+                scenario.id_seance ||
+                scenario.idAffectationCours ||
+                scenario.id_affectation_cours,
+              modifications: scenario.modifications || scenario.changements || {},
+              portee: scenario.portee || scenario.scope || scenario.scope_mode,
+              modeOptimisation:
+                optimization_mode ||
+                mode_optimisation ||
+                scenario.modeOptimisation ||
+                scenario.mode_optimisation ||
+                "legacy",
+            },
+            pool
+          );
+
+          return response.status(200).json(rapport);
+        }
+
+        const rapport = await ScenarioSimulator.simulateOfficialScenario(
+          {
+            idSession: id_session ? Number(id_session) : null,
+            optimizationMode: optimization_mode || mode_optimisation || "legacy",
+            scenario,
+          },
+          pool
+        );
+
+        return response.status(200).json(rapport);
+      } catch (error) {
+        return response.status(error.statusCode || 500).json({
+          message: error.message || "Erreur lors de la simulation what-if.",
+          ...(error.code ? { code: error.code } : {}),
+          ...(error.details?.simulation ? { simulation: error.details.simulation } : {}),
+          ...(error.details?.warnings ? { warnings: error.details.warnings } : {}),
+          ...(error.details ? { details: error.details } : {}),
+        });
+      }
+    }
+  );
+
+  // Replanification intelligente d'une affectation existante.
+  app.post(
+    "/api/scheduler/modify-assignment",
+    userAuth,
+    userAdmin,
+    (request, response) => ScheduleModificationController.modifyAssignment(request, response)
+  );
+
+  // Lecture des rapports historises du moteur.
+  app.get("/api/scheduler/rapports", userAuth, userAdminOrResponsable, async (request, response) => {
     try {
       const rapports = await SchedulerReportService.listerRapports(pool);
-      return res.json(rapports);
+      return response.json(rapports);
     } catch (error) {
-      return res.status(500).json({ message: "Erreur serveur." });
+      return response.status(500).json({ message: "Erreur serveur." });
     }
   });
 
-  app.get("/api/scheduler/rapports/:id", userAuth, userAdminOrResponsable, async (req, res) => {
+  app.get("/api/scheduler/rapports/:id", userAuth, userAdminOrResponsable, async (request, response) => {
     try {
       const rapport = await SchedulerReportService.lireRapport(
-        Number(req.params.id),
+        Number(request.params.id),
         pool
       );
 
       if (!rapport) {
-        return res.status(404).json({ message: "Rapport introuvable." });
+        return response.status(404).json({ message: "Rapport introuvable." });
       }
 
-      return res.json(rapport);
+      return response.json(rapport);
     } catch (error) {
-      return res.status(500).json({ message: error.message || "Erreur serveur." });
+      return response.status(500).json({ message: error.message || "Erreur serveur." });
     }
   });
 
-  // ── GET /api/scheduler/sessions ─────────────────────────────────────────
-  app.get("/api/scheduler/sessions", userAuth, userAdminOrResponsable, async (req, res) => {
+  // Gestion des sessions academiques.
+  app.get("/api/scheduler/sessions", userAuth, userAdminOrResponsable, async (request, response) => {
     try {
       const [sessions] = await pool.query(
         `SELECT id_session, nom, date_debut, date_fin, active, created_at
          FROM sessions ORDER BY date_debut DESC`
       );
-      return res.json(sessions);
+      return response.json(sessions);
     } catch (error) {
-      return res.status(500).json({ message: "Erreur serveur." });
+      return response.status(500).json({ message: "Erreur serveur." });
     }
   });
 
-  // ── POST /api/scheduler/sessions ────────────────────────────────────────
-  app.post("/api/scheduler/sessions", userAuth, userAdmin, async (req, res) => {
+  app.post("/api/scheduler/sessions", userAuth, userAdmin, async (request, response) => {
     try {
-      const { nom, date_debut, date_fin } = req.body ?? {};
+      const { nom, date_debut, date_fin } = request.body ?? {};
       if (!nom || !date_debut || !date_fin) {
-        return res.status(400).json({ message: "Champs requis : nom, date_debut, date_fin." });
+        return response.status(400).json({
+          message: "Champs requis : nom, date_debut, date_fin.",
+        });
       }
-      // Désactiver les autres sessions
+
       await pool.query(`UPDATE sessions SET active = FALSE`);
       const [result] = await pool.query(
         `INSERT INTO sessions (nom, date_debut, date_fin, active) VALUES (?, ?, ?, TRUE)`,
         [nom, date_debut, date_fin]
       );
-      return res.status(201).json({ id_session: result.insertId, nom, date_debut, date_fin, active: true });
+
+      return response.status(201).json({
+        id_session: result.insertId,
+        nom,
+        date_debut,
+        date_fin,
+        active: true,
+      });
     } catch (error) {
-      return res.status(500).json({ message: "Erreur serveur." });
+      return response.status(500).json({ message: "Erreur serveur." });
     }
   });
 
-  // ── PUT /api/scheduler/sessions/:id/activer ─────────────────────────────
-  app.put("/api/scheduler/sessions/:id/activer", userAuth, userAdmin, async (req, res) => {
+  app.put("/api/scheduler/sessions/:id/activer", userAuth, userAdmin, async (request, response) => {
     try {
-      const id = Number(req.params.id);
+      const id = Number(request.params.id);
       await pool.query(`UPDATE sessions SET active = FALSE`);
       await pool.query(`UPDATE sessions SET active = TRUE WHERE id_session = ?`, [id]);
-      return res.json({ message: "Session activée." });
+      return response.json({ message: "Session activee." });
     } catch (error) {
-      return res.status(500).json({ message: "Erreur serveur." });
+      return response.status(500).json({ message: "Erreur serveur." });
     }
   });
 
-  // ── GET /api/scheduler/cours-echoues ────────────────────────────────────
-  app.get("/api/scheduler/cours-echoues", userAuth, userAdminOrResponsable, async (req, res) => {
+  // Gestion des reprises / cours echoues.
+  app.get("/api/scheduler/cours-echoues", userAuth, userAdminOrResponsable, async (request, response) => {
     try {
       await assurerSchemaSchedulerAcademique();
       const [rows] = await pool.query(
@@ -182,58 +292,60 @@ export default function schedulerRoutes(app) {
            ON ge.id_groupes_etudiants = ce.id_groupe_reprise
          ORDER BY c.est_cours_cle DESC, e.nom, c.code`
       );
-      return res.json(rows);
+      return response.json(rows);
     } catch (error) {
-      return res.status(500).json({ message: "Erreur serveur." });
+      return response.status(500).json({ message: "Erreur serveur." });
     }
   });
 
-  // ── POST /api/scheduler/cours-echoues ───────────────────────────────────
-  app.get("/api/scheduler/debug/reprises", userAuth, userAdminOrResponsable, async (req, res) => {
+  app.get("/api/scheduler/debug/reprises", userAuth, userAdminOrResponsable, async (request, response) => {
     try {
       const rapport = await FailedCourseDebugService.genererRapport({
-        codes: req.query.codes,
-        matricules: req.query.matricules,
-        idEtudiant: req.query.id_etudiant,
-        statut: req.query.statut || "resolution_manuelle",
+        codes: request.query.codes,
+        matricules: request.query.matricules,
+        idEtudiant: request.query.id_etudiant,
+        statut: request.query.statut || "resolution_manuelle",
       });
-      return res.json(rapport);
+      return response.json(rapport);
     } catch (error) {
-      return res.status(500).json({ message: error.message || "Erreur serveur." });
+      return response.status(500).json({ message: error.message || "Erreur serveur." });
     }
   });
 
-  app.post("/api/scheduler/cours-echoues", userAuth, userAdmin, async (req, res) => {
+  app.post("/api/scheduler/cours-echoues", userAuth, userAdmin, async (request, response) => {
     try {
       await assurerSchemaSchedulerAcademique();
-      const { id_etudiant, id_cours, id_session, note_echec } = req.body ?? {};
+      const { id_etudiant, id_cours, id_session, note_echec } = request.body ?? {};
       if (!id_etudiant || !id_cours) {
-        return res.status(400).json({ message: "id_etudiant et id_cours requis." });
+        return response.status(400).json({ message: "id_etudiant et id_cours requis." });
       }
+
       const [result] = await pool.query(
         `INSERT INTO cours_echoues (id_etudiant, id_cours, id_session, note_echec, statut)
          VALUES (?, ?, ?, ?, 'a_reprendre')
          ON DUPLICATE KEY UPDATE note_echec = VALUES(note_echec), statut = 'a_reprendre'`,
         [Number(id_etudiant), Number(id_cours), id_session ? Number(id_session) : null, note_echec || null]
       );
-      return res.status(201).json({ message: "Cours échoué enregistré.", id: result.insertId });
+      return response.status(201).json({
+        message: "Cours echoue enregistre.",
+        id: result.insertId,
+      });
     } catch (error) {
-      return res.status(500).json({ message: "Erreur serveur." });
+      return response.status(500).json({ message: "Erreur serveur." });
     }
   });
 
-  // ── DELETE /api/scheduler/cours-echoues/:id ─────────────────────────────
-  app.delete("/api/scheduler/cours-echoues/:id", userAuth, userAdmin, async (req, res) => {
+  app.delete("/api/scheduler/cours-echoues/:id", userAuth, userAdmin, async (request, response) => {
     try {
-      await pool.query(`DELETE FROM cours_echoues WHERE id = ?`, [Number(req.params.id)]);
-      return res.json({ message: "Supprimé." });
+      await pool.query(`DELETE FROM cours_echoues WHERE id = ?`, [Number(request.params.id)]);
+      return response.json({ message: "Supprime." });
     } catch (error) {
-      return res.status(500).json({ message: "Erreur serveur." });
+      return response.status(500).json({ message: "Erreur serveur." });
     }
   });
 
-  // ── GET /api/scheduler/absences ─────────────────────────────────────────
-  app.get("/api/scheduler/absences", userAuth, userAdminOrResponsable, async (req, res) => {
+  // Gestion des absences professeurs.
+  app.get("/api/scheduler/absences", userAuth, userAdminOrResponsable, async (request, response) => {
     try {
       const [rows] = await pool.query(
         `SELECT ap.*, p.nom AS prof_nom, p.prenom AS prof_prenom, p.matricule
@@ -241,43 +353,47 @@ export default function schedulerRoutes(app) {
          JOIN professeurs p ON p.id_professeur = ap.id_professeur
          ORDER BY ap.date_debut DESC`
       );
-      return res.json(rows);
+      return response.json(rows);
     } catch (error) {
-      return res.status(500).json({ message: "Erreur serveur." });
+      return response.status(500).json({ message: "Erreur serveur." });
     }
   });
 
-  // ── POST /api/scheduler/absences ────────────────────────────────────────
-  app.post("/api/scheduler/absences", userAuth, userAdmin, async (req, res) => {
+  app.post("/api/scheduler/absences", userAuth, userAdmin, async (request, response) => {
     try {
-      const user = getUser(req);
-      const { id_professeur, date_debut, date_fin, type = "autre", commentaire } = req.body ?? {};
+      const user = getUser(request);
+      const { id_professeur, date_debut, date_fin, type = "autre", commentaire } = request.body ?? {};
       if (!id_professeur || !date_debut || !date_fin) {
-        return res.status(400).json({ message: "id_professeur, date_debut, date_fin requis." });
+        return response.status(400).json({
+          message: "id_professeur, date_debut, date_fin requis.",
+        });
       }
+
       const [result] = await pool.query(
         `INSERT INTO absences_professeurs (id_professeur, date_debut, date_fin, type, commentaire, approuve_par)
          VALUES (?, ?, ?, ?, ?, ?)`,
         [Number(id_professeur), date_debut, date_fin, type, commentaire || null, user?.id || null]
       );
-      return res.status(201).json({ message: "Absence enregistrée.", id: result.insertId });
+      return response.status(201).json({
+        message: "Absence enregistree.",
+        id: result.insertId,
+      });
     } catch (error) {
-      return res.status(500).json({ message: "Erreur serveur." });
+      return response.status(500).json({ message: "Erreur serveur." });
     }
   });
 
-  // ── DELETE /api/scheduler/absences/:id ──────────────────────────────────
-  app.delete("/api/scheduler/absences/:id", userAuth, userAdmin, async (req, res) => {
+  app.delete("/api/scheduler/absences/:id", userAuth, userAdmin, async (request, response) => {
     try {
-      await pool.query(`DELETE FROM absences_professeurs WHERE id = ?`, [Number(req.params.id)]);
-      return res.json({ message: "Absence supprimée." });
+      await pool.query(`DELETE FROM absences_professeurs WHERE id = ?`, [Number(request.params.id)]);
+      return response.json({ message: "Absence supprimee." });
     } catch (error) {
-      return res.status(500).json({ message: "Erreur serveur." });
+      return response.status(500).json({ message: "Erreur serveur." });
     }
   });
 
-  // ── GET /api/scheduler/salles-indisponibles ──────────────────────────────
-  app.get("/api/scheduler/salles-indisponibles", userAuth, userAdminOrResponsable, async (req, res) => {
+  // Gestion des indisponibilites de salles.
+  app.get("/api/scheduler/salles-indisponibles", userAuth, userAdminOrResponsable, async (request, response) => {
     try {
       const [rows] = await pool.query(
         `SELECT si.*, s.code AS salle_code, s.type AS salle_type
@@ -285,42 +401,46 @@ export default function schedulerRoutes(app) {
          JOIN salles s ON s.id_salle = si.id_salle
          ORDER BY si.date_debut DESC`
       );
-      return res.json(rows);
+      return response.json(rows);
     } catch (error) {
-      return res.status(500).json({ message: "Erreur serveur." });
+      return response.status(500).json({ message: "Erreur serveur." });
     }
   });
 
-  // ── POST /api/scheduler/salles-indisponibles ─────────────────────────────
-  app.post("/api/scheduler/salles-indisponibles", userAuth, userAdmin, async (req, res) => {
+  app.post("/api/scheduler/salles-indisponibles", userAuth, userAdmin, async (request, response) => {
     try {
-      const { id_salle, date_debut, date_fin, raison = "autre", commentaire } = req.body ?? {};
+      const { id_salle, date_debut, date_fin, raison = "autre", commentaire } = request.body ?? {};
       if (!id_salle || !date_debut || !date_fin) {
-        return res.status(400).json({ message: "id_salle, date_debut, date_fin requis." });
+        return response.status(400).json({
+          message: "id_salle, date_debut, date_fin requis.",
+        });
       }
+
       const [result] = await pool.query(
         `INSERT INTO salles_indisponibles (id_salle, date_debut, date_fin, raison, commentaire)
          VALUES (?, ?, ?, ?, ?)`,
         [Number(id_salle), date_debut, date_fin, raison, commentaire || null]
       );
-      return res.status(201).json({ message: "Salle marquée indisponible.", id: result.insertId });
+      return response.status(201).json({
+        message: "Salle marquee indisponible.",
+        id: result.insertId,
+      });
     } catch (error) {
-      return res.status(500).json({ message: "Erreur serveur." });
+      return response.status(500).json({ message: "Erreur serveur." });
     }
   });
 
-  // ── DELETE /api/scheduler/salles-indisponibles/:id ───────────────────────
-  app.delete("/api/scheduler/salles-indisponibles/:id", userAuth, userAdmin, async (req, res) => {
+  app.delete("/api/scheduler/salles-indisponibles/:id", userAuth, userAdmin, async (request, response) => {
     try {
-      await pool.query(`DELETE FROM salles_indisponibles WHERE id = ?`, [Number(req.params.id)]);
-      return res.json({ message: "Supprimé." });
+      await pool.query(`DELETE FROM salles_indisponibles WHERE id = ?`, [Number(request.params.id)]);
+      return response.json({ message: "Supprime." });
     } catch (error) {
-      return res.status(500).json({ message: "Erreur serveur." });
+      return response.status(500).json({ message: "Erreur serveur." });
     }
   });
 
-  // ── GET /api/scheduler/prerequis ────────────────────────────────────────
-  app.get("/api/scheduler/prerequis", userAuth, userAdminOrResponsable, async (req, res) => {
+  // Gestion des prerequis du catalogue.
+  app.get("/api/scheduler/prerequis", userAuth, userAdminOrResponsable, async (request, response) => {
     try {
       const [rows] = await pool.query(
         `SELECT p.id, cp.code AS code_prerequis, cp.nom AS nom_prerequis,
@@ -331,38 +451,42 @@ export default function schedulerRoutes(app) {
          JOIN cours cs ON cs.id_cours = p.id_cours_suivant
          ORDER BY cp.code, cs.code`
       );
-      return res.json(rows);
+      return response.json(rows);
     } catch (error) {
-      return res.status(500).json({ message: "Erreur serveur." });
+      return response.status(500).json({ message: "Erreur serveur." });
     }
   });
 
-  // ── POST /api/scheduler/prerequis ───────────────────────────────────────
-  app.post("/api/scheduler/prerequis", userAuth, userAdmin, async (req, res) => {
+  app.post("/api/scheduler/prerequis", userAuth, userAdmin, async (request, response) => {
     try {
-      const { id_cours_prerequis, id_cours_suivant, est_bloquant = true } = req.body ?? {};
+      const { id_cours_prerequis, id_cours_suivant, est_bloquant = true } = request.body ?? {};
       if (!id_cours_prerequis || !id_cours_suivant) {
-        return res.status(400).json({ message: "id_cours_prerequis et id_cours_suivant requis." });
+        return response.status(400).json({
+          message: "id_cours_prerequis et id_cours_suivant requis.",
+        });
       }
+
       const [result] = await pool.query(
         `INSERT INTO prerequis_cours (id_cours_prerequis, id_cours_suivant, est_bloquant)
          VALUES (?, ?, ?)
          ON DUPLICATE KEY UPDATE est_bloquant = VALUES(est_bloquant)`,
         [Number(id_cours_prerequis), Number(id_cours_suivant), est_bloquant ? 1 : 0]
       );
-      return res.status(201).json({ message: "Prérequis ajouté.", id: result.insertId });
+      return response.status(201).json({
+        message: "Prerequis ajoute.",
+        id: result.insertId,
+      });
     } catch (error) {
-      return res.status(500).json({ message: "Erreur serveur." });
+      return response.status(500).json({ message: "Erreur serveur." });
     }
   });
 
-  // ── DELETE /api/scheduler/prerequis/:id ─────────────────────────────────
-  app.delete("/api/scheduler/prerequis/:id", userAuth, userAdmin, async (req, res) => {
+  app.delete("/api/scheduler/prerequis/:id", userAuth, userAdmin, async (request, response) => {
     try {
-      await pool.query(`DELETE FROM prerequis_cours WHERE id = ?`, [Number(req.params.id)]);
-      return res.json({ message: "Prérequis supprimé." });
+      await pool.query(`DELETE FROM prerequis_cours WHERE id = ?`, [Number(request.params.id)]);
+      return response.json({ message: "Prerequis supprime." });
     } catch (error) {
-      return res.status(500).json({ message: "Erreur serveur." });
+      return response.status(500).json({ message: "Erreur serveur." });
     }
   });
 }

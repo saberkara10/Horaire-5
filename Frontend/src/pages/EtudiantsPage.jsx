@@ -137,6 +137,13 @@ export function EtudiantsPage({ utilisateur, onLogout }) {
 
       invaliderConsultations(etudiantsImpactes);
 
+      if (etudiantsImpactes.length > 0) {
+        // Un changement de groupe modifie le groupe principal affiche dans la
+        // liste, pas seulement le detail horaire. On recharge donc la liste
+        // pour garder l'UI alignée avec la base dès la synchronisation.
+        void recharger();
+      }
+
       if (!etudiantSelectionneId) {
         return;
       }
@@ -149,7 +156,7 @@ export function EtudiantsPage({ utilisateur, onLogout }) {
 
       chargerConsultationSelectionnee(idActif, { forcer: true });
     });
-  }, [chargerConsultationSelectionnee, etudiantSelectionneId, invaliderConsultations]);
+  }, [chargerConsultationSelectionnee, etudiantSelectionneId, invaliderConsultations, recharger]);
 
   const consultationSelectionnee = etudiantSelectionneId
     ? consultationsParId[etudiantSelectionneId] || {

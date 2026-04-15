@@ -1,5 +1,11 @@
 /**
- * ROUTES - Module Etudiants
+ * Routes du module etudiants.
+ *
+ * Ce point d'entree regroupe :
+ * - la consultation des etudiants ;
+ * - l'horaire etudiant consolide ;
+ * - l'import des cohortes ;
+ * - les flux d'echange cible de cours entre etudiants.
  */
 
 import { ImportEtudiantsError, importerEtudiantsDepuisFichier } from "../src/services/import-etudiants.service.js";
@@ -17,6 +23,7 @@ import {
 } from "../src/services/etudiants/student-course-exchange.service.js";
 
 export default function etudiantsRoutes(app) {
+  // Consultation globale des etudiants, avec filtre optionnel sur la session active.
   app.get("/api/etudiants", async (request, response) => {
     try {
       const etudiants = await recupererTousLesEtudiants({
@@ -30,6 +37,7 @@ export default function etudiantsRoutes(app) {
     }
   });
 
+  // Etape 1 du flux d'echange : lister les cours communs potentiellement echangeables.
   app.get("/api/etudiants/echange-cours/options", async (request, response) => {
     try {
       const resultat = await listerCoursCommunsEchangeables(
@@ -47,6 +55,7 @@ export default function etudiantsRoutes(app) {
     }
   });
 
+  // Etape 2 du flux d'echange : construire le diagnostic avant toute ecriture.
   app.get("/api/etudiants/echange-cours/preview", async (request, response) => {
     try {
       const resultat = await previsualiserEchangeCoursEtudiants({
@@ -65,6 +74,7 @@ export default function etudiantsRoutes(app) {
     }
   });
 
+  // Etape 3 du flux d'echange : persister l'echange transactionnel.
   app.post("/api/etudiants/echange-cours", async (request, response) => {
     try {
       const resultat = await executerEchangeCoursEtudiants({
@@ -99,6 +109,7 @@ export default function etudiantsRoutes(app) {
     }
   });
 
+  // Vue aggregatee de l'horaire effectif, incluant reprises et exceptions individuelles.
   app.get("/api/etudiants/:id/horaire", async (request, response) => {
     try {
       const resultat = await recupererHoraireCompletEtudiant(Number(request.params.id));

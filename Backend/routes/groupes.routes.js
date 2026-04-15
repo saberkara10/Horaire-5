@@ -52,6 +52,20 @@ function extraireSaison(nomSession, dateDebut) {
   return "Ete";
 }
 
+/**
+ * Lit le mode d'optimisation transmis par un client HTTP.
+ *
+ * Les flux de generation groupe/cohorte doivent exposer scoring_v1 comme la
+ * generation globale. Le moteur conserve la normalisation finale, mais la
+ * route accepte les aliases historiques pour rester retrocompatible.
+ *
+ * @param {Object} [source={}] - body HTTP.
+ * @returns {string} Mode demande ou fallback legacy.
+ */
+function lireModeOptimisation(source = {}) {
+  return source.optimization_mode || source.mode_optimisation || "legacy";
+}
+
 // ─── Routes ─────────────────────────────────────────────────────────────────
 export default function groupesRoutes(app) {
 
@@ -77,7 +91,7 @@ export default function groupesRoutes(app) {
       return res.json(enrichis);
     } catch (err) {
       console.error("[groupes] GET /api/groupes:", err);
-      return res.status(500).json({ message: "Erreur lors de la récupération des groupes." });
+      return res.status(500).json({ message: "Erreur lors de la recuperation des groupes." });
     }
   });
 
@@ -185,6 +199,7 @@ export default function groupesRoutes(app) {
   app.post("/api/groupes/generer-cible", userAuth, userAdminOrResponsable, async (req, res) => {
     try {
       const { programme, etape } = req.body;
+      const modeOptimisation = lireModeOptimisation(req.body || {});
       if (!programme && etape == null) {
         return res.status(400).json({ message: "Au moins un critère est requis : programme ou étape." });
       }
@@ -223,8 +238,19 @@ export default function groupesRoutes(app) {
           continue;
         }
         try {
-          const rapport = await SchedulerEngine.genererGroupe({ idGroupe: g.id_groupes_etudiants, idUtilisateur: user?.id || null });
-          resultats.push({ nom_groupe: g.nom_groupe, nb_cours_planifies: rapport.nb_cours_planifies, nb_cours_non_planifies: rapport.nb_cours_non_planifies, score_qualite: rapport.score_qualite });
+          const rapport = await SchedulerEngine.genererGroupe({
+            idGroupe: g.id_groupes_etudiants,
+            idUtilisateur: user?.id || null,
+            optimizationMode: modeOptimisation,
+          });
+          resultats.push({
+            nom_groupe: g.nom_groupe,
+            nb_cours_planifies: rapport.nb_cours_planifies,
+            nb_cours_non_planifies: rapport.nb_cours_non_planifies,
+            score_qualite: rapport.score_qualite,
+            mode_optimisation_utilise:
+              rapport?.details?.modeOptimisationUtilise || modeOptimisation,
+          });
         } catch (e) {
           erreurs.push({ nom_groupe: g.nom_groupe, raison: e.message });
         }
@@ -233,6 +259,7 @@ export default function groupesRoutes(app) {
       const totalPlanifies = resultats.reduce((s, r) => s + r.nb_cours_planifies, 0);
       return res.status(201).json({
         message: `Génération ciblée terminée : ${resultats.length} groupe(s) traité(s), ${totalPlanifies} séances planifiées.`,
+        mode_optimisation_utilise: modeOptimisation,
         nb_groupes_traites: resultats.length, nb_groupes_erreur: erreurs.length,
         total_planifies: totalPlanifies, resultats, erreurs,
       });
@@ -248,6 +275,7 @@ export default function groupesRoutes(app) {
   app.get("/api/groupes/:id", userAuth, async (req, res) => {
     try {
       const idGroupe = Number(req.params.id);
+      const modeOptimisation = lireModeOptimisation(req.body || {});
       if (!Number.isInteger(idGroupe) || idGroupe <= 0) return res.status(400).json({ message: "Identifiant invalide." });
 
       const groupe = await recupererGroupeParId(idGroupe);
@@ -280,6 +308,7 @@ export default function groupesRoutes(app) {
   app.get("/api/groupes/:id/planning", async (req, res) => {
     try {
       const idGroupe = Number(req.params.id);
+      const modeOptimisation = lireModeOptimisation(req.body || {});
       if (!Number.isInteger(idGroupe) || idGroupe <= 0) return res.status(400).json({ message: "Identifiant invalide." });
       const resultat = await recupererPlanningCompletGroupe(idGroupe);
       if (!resultat) return res.status(404).json({ message: "Groupe introuvable." });
@@ -295,6 +324,7 @@ export default function groupesRoutes(app) {
   app.get("/api/groupes/:id/etudiants", userAuth, async (req, res) => {
     try {
       const idGroupe = Number(req.params.id);
+      const modeOptimisation = lireModeOptimisation(req.body || {});
       if (!Number.isInteger(idGroupe) || idGroupe <= 0) return res.status(400).json({ message: "Identifiant invalide." });
 
       const [etudiants] = await pool.query(
@@ -631,8 +661,16 @@ export default function groupesRoutes(app) {
       return res.json({
         message: `${etudiant.prenom} ${etudiant.nom} déplacé vers "${gc.nom_groupe}".`,
         id_etudiant: idEtudiant,
+        id_groupe_source: idGroupeSource,
         id_groupe_cible: idGroupeCible,
         nom_groupe_cible: gc.nom_groupe,
+        etudiants_impactes: [idEtudiant],
+        groupes_impactes: [idGroupeSource, idGroupeCible],
+        synchronisation: {
+          type: "deplacement_etudiant_groupe",
+          etudiants_impactes: [idEtudiant],
+          groupes_impactes: [idGroupeSource, idGroupeCible],
+        },
       });
     } catch (err) {
       console.error("[groupes] PUT /:id/etudiants/:idEtudiant/deplacer:", err);
@@ -679,6 +717,7 @@ export default function groupesRoutes(app) {
   app.post("/api/groupes/:id/generer-horaire", userAuth, userAdminOrResponsable, async (req, res) => {
     try {
       const idGroupe = Number(req.params.id);
+      const modeOptimisation = lireModeOptimisation(req.body || {});
       if (!Number.isInteger(idGroupe) || idGroupe <= 0) return res.status(400).json({ message: "Identifiant invalide." });
 
       const [[groupe]] = await pool.query(
@@ -694,10 +733,19 @@ export default function groupesRoutes(app) {
 
       const { SchedulerEngine } = await import("../src/services/scheduler/SchedulerEngine.js");
       const user = req.user || req.session?.user || null;
-      const rapport = await SchedulerEngine.genererGroupe({ idGroupe, idUtilisateur: user?.id || null });
+      const rapport = await SchedulerEngine.genererGroupe({
+        idGroupe,
+        idUtilisateur: user?.id || null,
+        optimizationMode: modeOptimisation,
+      });
 
       return res.status(201).json({
         message: `Horaire généré pour "${groupe.nom_groupe}" : ${rapport.nb_cours_planifies} séances planifiées.`,
+        message:
+          `Horaire genere pour "${groupe.nom_groupe}" : ${rapport.nb_cours_planifies} seance(s) planifiee(s). ` +
+          `Mode ${rapport?.details?.modeOptimisationUtilise || modeOptimisation}.`,
+        mode_optimisation_utilise:
+          rapport?.details?.modeOptimisationUtilise || modeOptimisation,
         rapport,
         groupe: groupe.nom_groupe,
       });

@@ -112,11 +112,14 @@ export async function nettoyerGroupes(mode = "preview", inclureVides = true) {
  * Générer l'horaire pour un groupe précis (génération ciblée).
  * Les autres groupes restent intacts.
  */
-export async function genererHoraireGroupe(idGroupe) {
+export async function genererHoraireGroupe(idGroupe, options = {}) {
   return apiRequest(`${BASE}/${idGroupe}/generer-horaire`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({}),
+    body: JSON.stringify({
+      mode_optimisation:
+        options.modeOptimisation ?? options.mode_optimisation ?? "legacy",
+    }),
     credentials: "include",
   });
 }
@@ -124,13 +127,19 @@ export async function genererHoraireGroupe(idGroupe) {
 /**
  * Génération ciblée par programme et/ou étape.
  * Génère tous les groupes correspondant aux critères.
- * @param {Object} criteres - { programme?, etape? }
+ * @param {Object} criteres - { programme?, etape?, modeOptimisation? }
  */
 export async function genererParCriteres(criteres = {}) {
+  const payload = {
+    ...criteres,
+    mode_optimisation:
+      criteres.modeOptimisation ?? criteres.mode_optimisation ?? "legacy",
+  };
+
   return apiRequest(`${BASE}/generer-cible`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(criteres),
+    body: JSON.stringify(payload),
     credentials: "include",
   });
 }

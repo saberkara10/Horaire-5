@@ -11,6 +11,7 @@ import {
   getSalleByCode,
   getSalleById,
   modifySalle,
+  recupererOccupationSalle,
 } from "../src/model/salle.js";
 import {
   validerCreateSalle,
@@ -19,12 +20,17 @@ import {
   validerUpdateSalle,
   verifierSalleExiste,
 } from "../src/validations/salles.validation.js";
-import { userAdmin, userAuth } from "../middlewares/auth.js";
+import { userAdmin, userAdminOrResponsable, userAuth } from "../middlewares/auth.js";
+
+function dateReferenceValide(dateReference) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(dateReference || "").trim());
+}
 
 export default function sallesRoutes(app) {
+  const accesLectureSalles = [userAuth, userAdminOrResponsable];
   const accesGestionSalles = [userAuth, userAdmin];
 
-  app.get("/api/salles", ...accesGestionSalles, async (request, response) => {
+  app.get("/api/salles", ...accesLectureSalles, async (request, response) => {
     try {
       const salles = await getAllSalles();
       response.status(200).json(salles);
@@ -35,7 +41,7 @@ export default function sallesRoutes(app) {
 
   app.get(
     "/api/salles/:id",
-    ...accesGestionSalles,
+    ...accesLectureSalles,
     validerIdSalle,
     verifierSalleExiste,
     async (request, response) => {
@@ -43,6 +49,57 @@ export default function sallesRoutes(app) {
         response.status(200).json(request.salle);
       } catch (error) {
         response.status(500).json({ message: "Erreur serveur." });
+      }
+    }
+  );
+
+  /**
+   * GET /api/salles/:id/occupation
+   * Retourne l'occupation complete d'une salle pour une session academique.
+   *
+   * Query params supportes :
+   * - id_session     session explicite a consulter ;
+   * - date_reference semaine initiale au format YYYY-MM-DD.
+   */
+  app.get(
+    "/api/salles/:id/occupation",
+    ...accesLectureSalles,
+    validerIdSalle,
+    verifierSalleExiste,
+    async (request, response) => {
+      try {
+        const idSession = request.query.id_session
+          ? Number(request.query.id_session)
+          : null;
+        const dateReference = String(request.query.date_reference || "").trim() || null;
+
+        if (
+          request.query.id_session !== undefined &&
+          (!Number.isInteger(idSession) || idSession <= 0)
+        ) {
+          return response.status(400).json({ message: "Session invalide." });
+        }
+
+        if (dateReference && !dateReferenceValide(dateReference)) {
+          return response.status(400).json({
+            message: "La date_reference doit etre au format YYYY-MM-DD.",
+          });
+        }
+
+        const occupation = await recupererOccupationSalle(
+          Number(request.params.id),
+          {
+            id_session: idSession,
+            date_reference: dateReference,
+            salle: request.salle,
+          }
+        );
+
+        return response.status(200).json(occupation);
+      } catch (error) {
+        return response
+          .status(error.statusCode || 500)
+          .json({ message: error.message || "Erreur serveur." });
       }
     }
   );

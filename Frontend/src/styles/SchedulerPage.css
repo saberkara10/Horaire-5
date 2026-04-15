@@ -333,6 +333,86 @@
   color: #94a3b8;
 }
 
+.rapport-mode {
+  margin-bottom: 0.85rem;
+  padding: 0.65rem 0.8rem;
+  border-radius: 10px;
+  border: 1px solid rgba(96, 165, 250, 0.22);
+  background: rgba(96, 165, 250, 0.08);
+  color: #bfdbfe;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.scoring-summary-card {
+  margin-bottom: 1rem;
+  padding: 0.95rem 1rem;
+  border-radius: 12px;
+  border: 1px solid rgba(52, 211, 153, 0.18);
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.scoring-summary-card--historique {
+  margin-top: 1rem;
+}
+
+.scoring-summary-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.scoring-summary-header h3 {
+  margin: 0;
+  color: #e2e8f0;
+  font-size: 0.95rem;
+}
+
+.scoring-summary-header span {
+  color: #94a3b8;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.scoring-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.scoring-summary-item {
+  border-radius: 10px;
+  padding: 0.8rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  text-align: center;
+}
+
+.scoring-summary-item strong {
+  display: block;
+  color: #34d399;
+  font-size: 1.25rem;
+  font-weight: 800;
+}
+
+.scoring-summary-item span {
+  display: block;
+  color: #94a3b8;
+  font-size: 0.74rem;
+  margin-top: 0.2rem;
+}
+
+.scoring-summary-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  color: #cbd5e1;
+  font-size: 0.76rem;
+}
+
 .rapport-section { margin-top: 1rem; }
 .rapport-section h3 { font-size: 0.85rem; color: #94a3b8; margin: 0 0 0.5rem; }
 .rapport-section.warning h3 { color: #fb923c; }

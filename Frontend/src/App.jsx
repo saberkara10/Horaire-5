@@ -22,6 +22,7 @@ import {
 import { AffectationsPage } from "./pages/AffectationsPage.jsx";
 import { HorairesProfesseursPage } from "./pages/HorairesProfesseursPage.jsx";
 import { HorairesGroupesPage } from "./pages/HorairesGroupesPage.jsx";
+import { HorairesSallesPage } from "./pages/HorairesSallesPage.jsx";
 import { EtudiantsPage } from "./pages/EtudiantsPage.jsx";
 import { GestionGroupesPage } from "./pages/GestionGroupesPage.jsx";
 import { AdminsPage } from "./pages/AdminsPage.jsx";
@@ -195,6 +196,17 @@ export default function App() {
             element={
               utilisateur ? (
                 <HorairesGroupesPage utilisateur={utilisateur} onLogout={handleLogout} />
+              ) : (
+                <Navigate to="/login" replace />
+              )
+            }
+          />
+
+          <Route
+            path="/horaires-salles"
+            element={
+              utilisateur ? (
+                <HorairesSallesPage utilisateur={utilisateur} onLogout={handleLogout} />
               ) : (
                 <Navigate to="/login" replace />
               )

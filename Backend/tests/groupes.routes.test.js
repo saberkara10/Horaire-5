@@ -9,10 +9,12 @@ import request from "supertest";
 import { beforeEach, describe, expect, jest, test } from "@jest/globals";
 
 const recupererGroupesMock = jest.fn();
+const recupererGroupeParIdMock = jest.fn();
 const recupererPlanningCompletGroupeMock = jest.fn();
 
 await jest.unstable_mockModule("../src/model/groupes.model.js", () => ({
   recupererGroupes: recupererGroupesMock,
+  recupererGroupeParId: recupererGroupeParIdMock,
   recupererPlanningCompletGroupe: recupererPlanningCompletGroupeMock,
 }));
 
@@ -106,7 +108,7 @@ describe("Routes groupes", () => {
 
     expect(response.statusCode).toBe(500);
     expect(response.body).toEqual({
-      message: "Erreur lors de la recuperation du planning groupe.",
+      message: "Erreur lors de la récupération du planning.",
     });
   });
 });

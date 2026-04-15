@@ -1,5 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import { AppShell } from "../components/layout/AppShell.jsx";
+import { construireQueryGenerationScheduler } from "../services/scheduler.api.js";
+import {
+  OPTIMIZATION_MODE_OPTIONS,
+  formaterLibelleModeOptimisation,
+  resoudreOptionModeOptimisation,
+} from "../utils/optimizationModes.js";
 import "../styles/SchedulerPage.css";
 
 const API = "/api/scheduler";
@@ -34,11 +40,38 @@ const PHASES = [
   { id: "DONE",    label: "Terminé",                   icon: "✅", pct: 100},
 ];
 
+/**
+ * Mappe le mode moteur vers le mode scoring_v1 expose par les rapports.
+ *
+ * `legacy` reste un mode de generation, mais les rapports scoring_v1
+ * s'appuient sur `equilibre` comme lecture de reference.
+ *
+ * @param {string} mode
+ * @returns {string}
+ */
+function resolveScoringMode(mode) {
+  const normalizedMode = String(mode || "legacy").trim().toLowerCase();
+  return normalizedMode === "legacy" ? "equilibre" : normalizedMode;
+}
+
+/**
+ * Lit le resume scoring_v1 du mode reellement applique.
+ *
+ * @param {Object|null|undefined} scoringBundle
+ * @param {string} optimizationMode
+ * @returns {Object|null}
+ */
+function readScoringSummary(scoringBundle, optimizationMode) {
+  const scoringMode = resolveScoringMode(optimizationMode);
+  return scoringBundle?.modes?.[scoringMode] || null;
+}
+
 export function SchedulerPage({ utilisateur, onLogout }) {
   const [sessions, setSessions]             = useState([]);
   const [rapports, setRapports]             = useState([]);
   const [selectedSession, setSelectedSession] = useState("");
   const inclureWeekend = false;
+  const [optimizationMode, setOptimizationMode] = useState("legacy");
   const [saIterations, setSaIterations]     = useState(50);
   const [generating, setGenerating]         = useState(false);
   const [bootstrapping, setBootstrapping]   = useState(false);
@@ -59,6 +92,18 @@ export function SchedulerPage({ utilisateur, onLogout }) {
   const [sessionMsg, setSessionMsg]         = useState("");
 
   const sseRef = useRef(null);
+  const optimizationModeOption = resoudreOptionModeOptimisation(optimizationMode);
+  const scoringCourant = readScoringSummary(
+    rapport?.details?.scoring_v1,
+    rapport?.details?.modeOptimisationUtilise || optimizationMode
+  );
+  const scoringCourantDetails = rapport?.details?.scoring_v1?.details || null;
+  const scoringHistorique = readScoringSummary(
+    rapportHistoriqueDetail?.details_bruts?.details?.scoring_v1,
+    rapportHistoriqueDetail?.details_bruts?.details?.modeOptimisationUtilise || optimizationMode
+  );
+  const scoringHistoriqueDetails =
+    rapportHistoriqueDetail?.details_bruts?.details?.scoring_v1?.details || null;
 
   useEffect(() => {
     chargerDonnees();
@@ -134,10 +179,11 @@ export function SchedulerPage({ utilisateur, onLogout }) {
     setPct(5);
     setPhaseMsg("Démarrage…");
 
-    const params = new URLSearchParams({
-      sa_params: JSON.stringify({ maxIterParTemp: saIterations }),
+    const params = construireQueryGenerationScheduler({
+      id_session: selectedSession || null,
+      mode_optimisation: optimizationMode,
+      sa_params: { maxIterParTemp: saIterations },
     });
-    if (selectedSession) params.set("id_session", selectedSession);
 
     const es = new EventSource(`${API}/generer-stream?${params}`, { withCredentials: true });
     sseRef.current = es;
@@ -154,6 +200,11 @@ export function SchedulerPage({ utilisateur, onLogout }) {
           setPct(100);
           setPhase("DONE");
           setPhaseMsg("Génération terminée avec succès !");
+          setPhaseMsg(
+            `Generation terminee en mode ${formaterLibelleModeOptimisation(
+              data?.rapport?.details?.modeOptimisationUtilise || optimizationMode
+            )}.`
+          );
           setRapport(data.rapport);
           chargerDonnees();
           es.close();
@@ -282,6 +333,23 @@ export function SchedulerPage({ utilisateur, onLogout }) {
                       </option>
                     ))}
                   </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Mode d'optimisation</label>
+                  <select
+                    value={optimizationMode}
+                    onChange={(e) => setOptimizationMode(e.target.value)}
+                    className="form-select"
+                    disabled={generating || bootstrapping}
+                  >
+                    {OPTIMIZATION_MODE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <small>{optimizationModeOption.description}</small>
                 </div>
 
                 <div className="form-group">
@@ -423,6 +491,59 @@ export function SchedulerPage({ utilisateur, onLogout }) {
                         <span className="stat-lbl">Conflits reprises</span>
                       </div>
                     </div>
+
+                    <div className="rapport-mode">
+                      Generation executee en mode{" "}
+                      {formaterLibelleModeOptimisation(
+                        rapport?.details?.modeOptimisationUtilise || optimizationMode
+                      )}
+                    </div>
+
+                    {scoringCourant && (
+                      <div className="scoring-summary-card">
+                        <div className="scoring-summary-header">
+                          <h3>Scoring final</h3>
+                          <span>
+                            Lecture{" "}
+                            {formaterLibelleModeOptimisation(
+                              rapport?.details?.modeOptimisationUtilise || optimizationMode
+                            )}
+                          </span>
+                        </div>
+                        <div className="scoring-summary-grid">
+                          <div className="scoring-summary-item">
+                            <strong>{scoringCourant.scoreGlobal}</strong>
+                            <span>Score global</span>
+                          </div>
+                          <div className="scoring-summary-item">
+                            <strong>{scoringCourant.scoreEtudiant}</strong>
+                            <span>Score etudiant</span>
+                          </div>
+                          <div className="scoring-summary-item">
+                            <strong>{scoringCourant.scoreProfesseur}</strong>
+                            <span>Score professeur</span>
+                          </div>
+                        </div>
+                        <div className="scoring-summary-meta">
+                          <span>
+                            Pauses etudiants respectees :{" "}
+                            {scoringCourantDetails?.etudiant?.totals?.dynamicBreaksRespected ?? 0}
+                          </span>
+                          <span>
+                            Pauses etudiants manquees :{" "}
+                            {scoringCourantDetails?.etudiant?.totals?.dynamicBreaksMissed ?? 0}
+                          </span>
+                          <span>
+                            Pauses professeurs respectees :{" "}
+                            {scoringCourantDetails?.professeur?.totals?.pauseRespectedDays ?? 0}
+                          </span>
+                          <span>
+                            Pauses professeurs manquees :{" "}
+                            {scoringCourantDetails?.professeur?.totals?.pauseMissedDays ?? 0}
+                          </span>
+                        </div>
+                      </div>
+                    )}
 
                     <div className="rapport-meta">
                       <span>🔁 Itérations SA : {rapport.iterations_sa?.toLocaleString()}</span>
@@ -688,6 +809,53 @@ export function SchedulerPage({ utilisateur, onLogout }) {
                         <span>reprises non attribuées</span>
                       </div>
                     </div>
+
+                    {scoringHistorique && (
+                      <div className="scoring-summary-card scoring-summary-card--historique">
+                        <div className="scoring-summary-header">
+                          <h3>Scoring final</h3>
+                          <span>
+                            Lecture{" "}
+                            {formaterLibelleModeOptimisation(
+                              rapportHistoriqueDetail?.details_bruts?.details?.modeOptimisationUtilise ||
+                                optimizationMode
+                            )}
+                          </span>
+                        </div>
+                        <div className="scoring-summary-grid">
+                          <div className="scoring-summary-item">
+                            <strong>{scoringHistorique.scoreGlobal}</strong>
+                            <span>Score global</span>
+                          </div>
+                          <div className="scoring-summary-item">
+                            <strong>{scoringHistorique.scoreEtudiant}</strong>
+                            <span>Score etudiant</span>
+                          </div>
+                          <div className="scoring-summary-item">
+                            <strong>{scoringHistorique.scoreProfesseur}</strong>
+                            <span>Score professeur</span>
+                          </div>
+                        </div>
+                        <div className="scoring-summary-meta">
+                          <span>
+                            Pauses etudiants respectees :{" "}
+                            {scoringHistoriqueDetails?.etudiant?.totals?.dynamicBreaksRespected ?? 0}
+                          </span>
+                          <span>
+                            Pauses etudiants manquees :{" "}
+                            {scoringHistoriqueDetails?.etudiant?.totals?.dynamicBreaksMissed ?? 0}
+                          </span>
+                          <span>
+                            Pauses professeurs respectees :{" "}
+                            {scoringHistoriqueDetails?.professeur?.totals?.pauseRespectedDays ?? 0}
+                          </span>
+                          <span>
+                            Pauses professeurs manquees :{" "}
+                            {scoringHistoriqueDetails?.professeur?.totals?.pauseMissedDays ?? 0}
+                          </span>
+                        </div>
+                      </div>
+                    )}
 
                     <div className="historique-summary-grid">
                       <div className="historique-summary-card">

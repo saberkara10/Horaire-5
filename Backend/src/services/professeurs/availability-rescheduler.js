@@ -1,3 +1,11 @@
+/**
+ * Service de replanification locale des seances impactees par une modification
+ * de disponibilites professeur.
+ *
+ * Le but n'est pas de relancer tout le scheduler, mais de sauver localement
+ * les seances a venir du professeur en cherchant un nouveau creneau compatible
+ * avec les salles, les groupes et les reprises deja rattachees.
+ */
 import { recupererSallesCompatiblesPourCours } from "../../utils/groupes.js";
 import {
   MAX_WEEKLY_SESSIONS_PER_GROUP_WITH_RECOVERY,
@@ -173,6 +181,13 @@ function genererHeuresCandidates(date, disponibilites, dureeMinutes, heureRefere
     }));
 }
 
+/**
+ * Calcule la borne maximale de recherche d'un rattrapage automatique.
+ *
+ * @param {string} dateOrigine Date initiale de la seance.
+ * @param {string} dateFinSession Fin theorique de la session.
+ * @returns {string} Date limite de recherche en ISO.
+ */
 export function calculerDateFinRecherche(dateOrigine, dateFinSession) {
   const dateDebut = parseDateLocale(dateOrigine);
   const dateFinValide =
@@ -230,6 +245,13 @@ function classerTypeReplanification(dateOrigine, nouvelleDate) {
     : "semaines_suivantes";
 }
 
+/**
+ * Retourne la charge hebdomadaire maximale autorisee pour un groupe deplace.
+ *
+ * @param {string} dateOrigine Date initiale de la seance.
+ * @param {string} dateCandidate Date candidate retenue.
+ * @returns {number} Plafond hebdomadaire autorise.
+ */
 export function maximumHebdomadairePourCible(dateOrigine, dateCandidate) {
   return classerTypeReplanification(dateOrigine, dateCandidate) === "meme_semaine"
     ? REQUIRED_WEEKLY_SESSIONS_PER_GROUP
@@ -940,6 +962,8 @@ async function supprimerAffectationsInvalides(
   }
 
   const placeholdersAffectations = idsAffectations.map(() => "?").join(", ");
+  // On retire d'abord les liens de groupe, puis les affectations, puis
+  // les plages orphelines qui ne sont plus referencees nulle part.
   await connection.query(
     `DELETE FROM affectation_groupes
      WHERE id_affectation_cours IN (${placeholdersAffectations})`,
@@ -1125,6 +1149,17 @@ function trierSallesCompatiblesPourAffectation(
   return sallesCompatibles;
 }
 
+/**
+ * Cherche le meilleur creneau de remplacement pour une seance impactee.
+ *
+ * La recherche privilegie :
+ * - les semaines proches de l'origine ;
+ * - les heures les plus proches du creneau initial ;
+ * - la reutilisation de la salle courante si elle reste viable.
+ *
+ * @param {Object} payload Contexte complet de la seance a deplacer.
+ * @returns {Promise<Object>} Placement retenu ou raison de blocage.
+ */
 async function trouverNouveauPlacement({
   affectation,
   disponibilites,
@@ -1325,6 +1360,16 @@ async function trouverNouveauPlacement({
   };
 }
 
+/**
+ * Replanifie localement les seances a venir rendues invalides par une nouvelle
+ * disponibilite professeur.
+ *
+ * @param {number} idProfesseur Identifiant du professeur impacte.
+ * @param {Array<Object>} disponibilites Nouvelles disponibilites consolidees.
+ * @param {Object} connection Connexion SQL transactionnelle.
+ * @param {Object} [options={}] Bornes d'impact facultatives.
+ * @returns {Promise<Object>} Rapport complet de replanification locale.
+ */
 export async function replanifierSeancesImpacteesParDisponibilites(
   idProfesseur,
   disponibilites,

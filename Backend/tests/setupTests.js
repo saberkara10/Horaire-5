@@ -21,5 +21,7 @@ beforeAll(() => {
 });
 
 afterAll(() => {
-  console.log.mockRestore();
+  if (typeof console.log?.mockRestore === "function") {
+    console.log.mockRestore();
+  }
 });

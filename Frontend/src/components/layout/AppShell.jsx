@@ -121,6 +121,19 @@ function IconHorairesEtudiants() {
   );
 }
 
+function IconHorairesSalles() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none">
+      <rect x="4" y="4" width="16" height="16" rx="2" />
+      <path d="M8 8H16" />
+      <path d="M8 12H16" />
+      <path d="M8 16H12" />
+      <path d="M15.5 15.5L18.5 18.5" />
+      <circle cx="14.5" cy="14.5" r="2.5" />
+    </svg>
+  );
+}
+
 function IconGestionGroupes() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -314,6 +327,16 @@ export function AppShell({
           >
             <span className="app-shell__nav-icon"><IconHorairesGroupes /></span>
             <span>Horaires groupes</span>
+          </NavLink>
+
+          <NavLink
+            to="/horaires-salles"
+            className={({ isActive }) =>
+              `app-shell__nav-item ${isActive ? "app-shell__nav-item--active" : ""}`
+            }
+          >
+            <span className="app-shell__nav-icon"><IconHorairesSalles /></span>
+            <span>Occupation salles</span>
           </NavLink>
 
           <NavLink

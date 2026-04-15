@@ -16,9 +16,14 @@ const sallesModelMock = {
   modifySalle: jest.fn(),
   deleteSalle: jest.fn(),
   salleEstDejaAffectee: jest.fn(),
+  recupererOccupationSalle: jest.fn(),
 };
 
 await jest.unstable_mockModule("../src/model/salle.js", () => sallesModelMock);
+
+await jest.unstable_mockModule("../routes/export.routes.js", () => ({
+  default() {},
+}));
 
 await jest.unstable_mockModule("../middlewares/auth.js", () => ({
   userAuth(request, response, next) {
@@ -88,6 +93,105 @@ describe("Tests routes Salles", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.body).toEqual(salle);
+  });
+
+  test("GET /api/salles/1/occupation retourne la consultation d'occupation", async () => {
+    sallesModelMock.getSalleById.mockResolvedValue({
+      id_salle: 1,
+      code: "B201",
+      type: "Classe",
+      capacite: 30,
+    });
+    sallesModelMock.recupererOccupationSalle.mockResolvedValue({
+      salle: {
+        id_salle: 1,
+        code: "B201",
+        type: "Classe",
+        capacite: 30,
+      },
+      session: {
+        id_session: 3,
+        nom: "Automne 2026",
+      },
+      occupations: [
+        {
+          id_affectation_cours: 12,
+          groupes: "INF-A1",
+          code_cours: "INF301",
+          nom_cours: "Reseaux",
+          nom_professeur: "Dupont",
+          prenom_professeur: "Ali",
+          statut: "occupee",
+        },
+      ],
+      vue_hebdomadaire: {
+        debut_semaine: "2026-03-23",
+        fin_semaine: "2026-03-29",
+        jours: [],
+      },
+      resume: {
+        taux_occupation_pourcentage: 25,
+      },
+      temps_reel: {
+        statut: "libre",
+      },
+    });
+
+    const response = await request(app).get(
+      "/api/salles/1/occupation?id_session=3&date_reference=2026-03-23"
+    );
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body.session.id_session).toBe(3);
+    expect(response.body.occupations[0]).toMatchObject({
+      groupes: "INF-A1",
+      code_cours: "INF301",
+      nom_professeur: "Dupont",
+    });
+    expect(sallesModelMock.recupererOccupationSalle).toHaveBeenCalledWith(1, {
+      id_session: 3,
+      date_reference: "2026-03-23",
+      salle: {
+        id_salle: 1,
+        code: "B201",
+        type: "Classe",
+        capacite: 30,
+      },
+    });
+  });
+
+  test("GET /api/salles/1/occupation retourne 400 si la session est invalide", async () => {
+    sallesModelMock.getSalleById.mockResolvedValue({
+      id_salle: 1,
+      code: "B201",
+      type: "Classe",
+      capacite: 30,
+    });
+
+    const response = await request(app).get("/api/salles/1/occupation?id_session=abc");
+
+    expect(response.statusCode).toBe(400);
+    expect(response.body).toEqual({ message: "Session invalide." });
+    expect(sallesModelMock.recupererOccupationSalle).not.toHaveBeenCalled();
+  });
+
+  test("GET /api/salles/1/occupation retourne 400 si la date_reference est invalide", async () => {
+    sallesModelMock.getSalleById.mockResolvedValue({
+      id_salle: 1,
+      code: "B201",
+      type: "Classe",
+      capacite: 30,
+    });
+
+    const response = await request(app).get(
+      "/api/salles/1/occupation?date_reference=23-03-2026"
+    );
+
+    expect(response.statusCode).toBe(400);
+    expect(response.body).toEqual({
+      message: "La date_reference doit etre au format YYYY-MM-DD.",
+    });
+    expect(sallesModelMock.recupererOccupationSalle).not.toHaveBeenCalled();
   });
 
   test("GET /api/salles/999 retourne 404 si la salle est introuvable", async () => {

@@ -1,8 +1,11 @@
 /**
- * MODEL - Gestion des etudiants
+ * Modele de lecture et d'ecriture du domaine etudiant.
  *
- * Ce module gere la consultation
- * et l'import des etudiants.
+ * Ce fichier couvre principalement :
+ * - la consultation des etudiants et de leur charge academique ;
+ * - l'import transactionnel des cohortes ;
+ * - la composition de l'horaire effectif d'un etudiant a partir du groupe,
+ *   des reprises et des exceptions individuelles.
  */
 
 import pool from "../../db.js";
@@ -349,6 +352,17 @@ export async function supprimerTousLesEtudiants() {
   }
 }
 
+/**
+ * Recompose la vue complete de l'horaire d'un etudiant pour la session active.
+ *
+ * Le resultat fusionne :
+ * - l'horaire de groupe ;
+ * - les reprises planifiees ;
+ * - les exceptions individuelles, incluant les echanges de cours.
+ *
+ * @param {number} idEtudiant Identifiant de l'etudiant cible.
+ * @returns {Promise<Object|null>} Vue complete de l'horaire ou `null`.
+ */
 export async function recupererHoraireCompletEtudiant(idEtudiant) {
   await assurerSchemaSchedulerAcademique();
 
@@ -364,6 +378,8 @@ export async function recupererHoraireCompletEtudiant(idEtudiant) {
       recupererSeancesIndividuellesEtudiant(idEtudiant, {
         sourceTypes: ["reprise", "individuelle"],
       }),
+      // Cette requete recense les reprises declarees pour l'etudiant, meme si
+      // certaines n'ont pas encore d'affectation concrete dans l'horaire.
       pool.query(
         `SELECT
            ce.id,

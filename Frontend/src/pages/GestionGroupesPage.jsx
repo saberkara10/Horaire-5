@@ -13,6 +13,16 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { AppShell } from "../components/layout/AppShell.jsx";
 import { usePopup } from "../components/feedback/PopupProvider.jsx";
+import { emettreSynchronisationPlanning } from "../utils/planningSync.js";
+import {
+  genererHoraireGroupe,
+  genererParCriteres,
+} from "../services/groupes.api.js";
+import {
+  OPTIMIZATION_MODE_OPTIONS,
+  formaterLibelleModeOptimisation,
+  resoudreOptionModeOptimisation,
+} from "../utils/optimizationModes.js";
 import "../styles/GestionGroupesPage.css";
 
 // ─── helpers HTTP ─────────────────────────────────────────────────────────────
@@ -146,6 +156,7 @@ export function GestionGroupesPage({ utilisateur, onLogout }) {
   const [genRapport, setGenRapport] = useState(null);
   const [genProgr, setGenProgr] = useState("");
   const [genEtape, setGenEtape] = useState("");
+  const [generationMode, setGenerationMode] = useState("legacy");
 
   // ── State nettoyage ──
   const [nettoyageLoading, setNettoyageLoading] = useState(false);
@@ -258,6 +269,7 @@ export function GestionGroupesPage({ utilisateur, onLogout }) {
   const etudiantADeplacer = showDeplacer
     ? etudiantsGroupe.find((e) => e.id_etudiant === showDeplacer)
     : null;
+  const generationModeOption = resoudreOptionModeOptimisation(generationMode);
 
   // ─── Actions ──────────────────────────────────────────────────────────────
   async function handleCreerGroupe(e) {
@@ -354,11 +366,22 @@ export function GestionGroupesPage({ utilisateur, onLogout }) {
   async function handleDeplacer(idEtudiant) {
     if (!deplaceVers) { showError("Sélectionnez un groupe cible."); return; }
     try {
-      const res = await apiPut(`/api/groupes/${selectedId}/etudiants/${idEtudiant}/deplacer`, { id_groupe_cible: Number(deplaceVers) });
-      showSuccess(res.message);
+      const idGroupeSource = Number(selectedId);
+      const idGroupeCible = Number(deplaceVers);
+      const res = await apiPut(`/api/groupes/${idGroupeSource}/etudiants/${idEtudiant}/deplacer`, {
+        id_groupe_cible: idGroupeCible,
+      });
+      emettreSynchronisationPlanning({
+        type: "deplacement_etudiant_groupe",
+        ...(res.synchronisation || {}),
+        etudiants_impactes: res.etudiants_impactes || [Number(idEtudiant)],
+        groupes_impactes: res.groupes_impactes || [idGroupeSource, idGroupeCible],
+      });
+      showSuccess(res.message || "Etudiant deplace.");
       setShowDeplacer(null);
       setDeplaceVers("");
-      chargerMembres(selectedId);
+      setSelectedId(idGroupeCible);
+      chargerMembres(idGroupeCible);
       charger();
     } catch (e) {
       showError(e.message);
@@ -376,7 +399,9 @@ export function GestionGroupesPage({ utilisateur, onLogout }) {
     setGenLoading(true);
     setGenRapport(null);
     try {
-      const res = await apiPost(`/api/groupes/${selectedId}/generer-horaire`, {});
+      const res = await genererHoraireGroupe(selectedId, {
+        modeOptimisation: generationMode,
+      });
       setGenRapport(res.rapport || res);
       showSuccess(res.message || "Horaire généré.");
       charger();
@@ -396,7 +421,8 @@ export function GestionGroupesPage({ utilisateur, onLogout }) {
       const payload = {};
       if (genProgr) payload.programme = genProgr;
       if (genEtape) payload.etape = genEtape;
-      const res = await apiPost("/api/groupes/generer-cible", payload);
+      payload.modeOptimisation = generationMode;
+      const res = await genererParCriteres(payload);
       setGenRapport(res);
       showSuccess(res.message);
       charger();
@@ -647,6 +673,35 @@ export function GestionGroupesPage({ utilisateur, onLogout }) {
                 {/* ── Onglet GÉNÉRER ── */}
                 {onglet === "gen" && (
                   <div className="gg-tab-content gg-gen-section">
+                    <div className="gg-gen-card gg-gen-card--mode">
+                      <h4>Mode d'optimisation</h4>
+                      <p className="gg-muted">
+                        Le meme profil de scoring pilote la generation d'un
+                        groupe et la generation ciblee. `Legacy` reste le
+                        fallback sur pour les appels anciens.
+                      </p>
+                      <div className="gg-form-row">
+                        <div className="gg-form-group">
+                          <label>Mode</label>
+                          <select
+                            className="gg-select gg-select--full"
+                            value={generationMode}
+                            onChange={(e) => setGenerationMode(e.target.value)}
+                            disabled={genLoading || genCibleLoading}
+                          >
+                            {OPTIMIZATION_MODE_OPTIONS.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                      <div className="gg-mode-note">
+                        {generationModeOption.description}
+                      </div>
+                    </div>
+
                     <div className="gg-gen-card">
                       <h4>⚡ Générer l'horaire de ce groupe</h4>
                       <p className="gg-muted">Régénère l'horaire uniquement pour <strong>{groupeSelectionne?.nom_groupe}</strong>. Les autres groupes restent intacts.</p>
@@ -704,6 +759,14 @@ export function GestionGroupesPage({ utilisateur, onLogout }) {
                           )}
                         </div>
                         <p className="gg-rapport-message">{genRapport.message}</p>
+                        <div className="gg-mode-note gg-mode-note--report">
+                          Mode utilise :{" "}
+                          {formaterLibelleModeOptimisation(
+                            genRapport?.details?.modeOptimisationUtilise ||
+                              genRapport?.mode_optimisation_utilise ||
+                              generationMode
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>

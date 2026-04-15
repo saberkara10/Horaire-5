@@ -1,3 +1,13 @@
+/**
+ * Service de planification manuelle et de correction locale des horaires.
+ *
+ * Ce module complete le scheduler automatique pour les cas ou une intervention
+ * humaine reste necessaire :
+ * - planifier un cours de groupe sur une ou plusieurs occurrences ;
+ * - deplacer une serie existante sans rompre les contraintes metier ;
+ * - rattacher un cours echoue a un groupe reel compatible ;
+ * - maintenir les series recurrentes et les metadonnees de planification.
+ */
 import pool from "../../../db.js";
 import { assurerSchemaSchedulerAcademique } from "../academic-scheduler-schema.js";
 import { AvailabilityChecker } from "../scheduler/AvailabilityChecker.js";
@@ -182,10 +192,19 @@ function normaliserResumeRepriseManuelleEtudiant(etudiant) {
   };
 }
 
+/**
+ * Charge le contexte metier minimal requis pour valider une planification manuelle.
+ *
+ * @param {Object} payload Identifiants des ressources a verifier.
+ * @param {Object} [executor=pool] Executeur SQL ou connexion transactionnelle.
+ * @returns {Promise<Object>} Cours, professeur, salle et groupe eventuel.
+ */
 async function recupererContextePlanification(
   { idCours, idProfesseur, idSalle, idGroupeEtudiants = null },
   executor = pool
 ) {
+  // Les ressources sont chargees en parallele pour retourner un contexte
+  // coherent a la validation, sans disperser les erreurs de presence/existence.
   const requetes = [
     executor.query(
       `SELECT c.id_cours,
@@ -357,6 +376,19 @@ async function recupererEtudiantsAffectesCoursGroupe(
   return rows;
 }
 
+/**
+ * Calcule les participants reels d'une seance de groupe.
+ *
+ * Le resultat additionne les etudiants reguliers du groupe et les rattachements
+ * individuels deja planifies sur ce cours, afin que les controles de capacite
+ * et de conflit se basent sur l'effectif reel et non theorique.
+ *
+ * @param {number} idGroupeEtudiants Identifiant du groupe cible.
+ * @param {number} idCours Identifiant du cours cible.
+ * @param {number} idSession Identifiant de la session cible.
+ * @param {Object} [executor=pool] Executeur SQL ou connexion transactionnelle.
+ * @returns {Promise<Object>} Participants regroupes et effectif reel.
+ */
 async function recupererParticipantsSeance(
   idGroupeEtudiants,
   idCours,
@@ -483,6 +515,14 @@ function normaliserPortee(portee = {}) {
   return { mode: "single" };
 }
 
+/**
+ * Derive la liste exacte des dates a creer ou modifier selon la portee demandee.
+ *
+ * @param {string} dateAncre Date de reference au format ISO.
+ * @param {Object} portee Strategie de recurrence ou de plage.
+ * @param {Object} session Session active ou cible.
+ * @returns {Array<string>} Dates ISO valides pour l'operation.
+ */
 function resoudreDatesOccurrences(dateAncre, portee, session) {
   const ancre = parseDateIso(dateAncre);
   if (!ancre) {
@@ -948,6 +988,17 @@ async function supprimerAffectationComplete(idAffectation, executor = pool) {
   }
 }
 
+/**
+ * Valide une occurrence de planification de groupe avant persistence.
+ *
+ * Cette fonction concentre les controles metier les plus sensibles :
+ * compatibilite pedagogique, disponibilites, capacite, conflits de salle,
+ * de professeur, de groupe et de participants reels.
+ *
+ * @param {Object} payload Contexte complet de validation.
+ * @param {Object} [executor=pool] Executeur SQL ou connexion transactionnelle.
+ * @returns {Promise<void>} Ne retourne rien; leve une erreur explicite en cas de blocage.
+ */
 async function validerOccurrenceGroupe(
   {
     cours,
@@ -1191,6 +1242,15 @@ async function recupererAffectationDetaillee(idAffectation, executor = pool) {
   return rows[0] || null;
 }
 
+/**
+ * Recupere les occurrences affectees par une operation de replanification.
+ *
+ * @param {Object} affectationReference Occurrence servant de point d'ancrage.
+ * @param {Object} [portee={}] Portee de modification demandee.
+ * @param {Object} session Session active.
+ * @param {Object} [executor=pool] Executeur SQL ou connexion transactionnelle.
+ * @returns {Promise<Array<Object>>} Occurrences detaillees a modifier.
+ */
 async function recupererOccurrencesSerieParPortee(
   affectationReference,
   portee = {},
@@ -1290,6 +1350,13 @@ function construirePayloadOccurrence(affectation, overrides = {}) {
   };
 }
 
+/**
+ * Recharge le contexte complet d'une planification a partir du payload API.
+ *
+ * @param {Object} payload Charge utile normalisee.
+ * @param {Object} [executor=pool] Executeur SQL ou connexion transactionnelle.
+ * @returns {Promise<Object>} Session, ressources et participants reels.
+ */
 async function rechargerContexteParticipants(payload, executor = pool) {
   const session = await recupererSessionActive(executor);
   if (!session?.id_session) {
@@ -1322,6 +1389,13 @@ async function rechargerContexteParticipants(payload, executor = pool) {
   };
 }
 
+/**
+ * Cree manuellement une ou plusieurs occurrences pour un cours de groupe.
+ *
+ * @param {Object} payload Charge utile recue depuis l'API.
+ * @param {Object} [executor=pool] Executeur SQL ou connexion transactionnelle.
+ * @returns {Promise<Object>} Resume metier de la planification creee.
+ */
 export async function planifierCoursGroupeManuellement(payload, executor = pool) {
   return executerDansTransactionSiNecessaire(async (transactionExecutor) => {
     await assurerSchemaSchedulerAcademique(transactionExecutor);
@@ -1341,6 +1415,8 @@ export async function planifierCoursGroupeManuellement(payload, executor = pool)
     const dates = resoudreDatesOccurrences(basePayload.date, payload.portee, session);
     const idSerie =
       dates.length > 1
+        // Une serie n'est creee que lorsqu'on persiste plusieurs occurrences
+        // d'un meme motif; cela facilite ensuite la replanification ciblee.
         ? await creerSeriePlanification(
             {
               idSession: session.id_session,
@@ -1418,6 +1494,14 @@ export async function planifierCoursGroupeManuellement(payload, executor = pool)
   }, executor);
 }
 
+/**
+ * Deplace une affectation ou une serie existante selon la portee demandee.
+ *
+ * @param {number} idAffectation Identifiant de l'affectation de reference.
+ * @param {Object} payload Nouvelles valeurs et portee de modification.
+ * @param {Object} [executor=pool] Executeur SQL ou connexion transactionnelle.
+ * @returns {Promise<Object>} Resume de replanification et ressources impactees.
+ */
 export async function replanifierCoursGroupeManuellement(
   idAffectation,
   payload,
@@ -1592,6 +1676,13 @@ export async function replanifierCoursGroupeManuellement(
   }, executor);
 }
 
+/**
+ * Liste les cours echoues planifiables pour un etudiant dans la session active.
+ *
+ * @param {number} idEtudiant Identifiant de l'etudiant cible.
+ * @param {Object} [executor=pool] Executeur SQL ou connexion transactionnelle.
+ * @returns {Promise<Array<Object>>} Cours echoues normalises.
+ */
 export async function listerCoursEchouesEtudiant(idEtudiant, executor = pool) {
   await assurerSchemaSchedulerAcademique(executor);
 
@@ -1640,6 +1731,12 @@ export async function listerCoursEchouesEtudiant(idEtudiant, executor = pool) {
   }));
 }
 
+/**
+ * Retourne la liste des etudiants a traiter pour la planification manuelle des reprises.
+ *
+ * @param {Object} [executor=pool] Executeur SQL ou connexion transactionnelle.
+ * @returns {Promise<Array<Object>>} Etudiants enrichis avec un resume de reprise.
+ */
 export async function listerEtudiantsPourPlanificationReprise(executor = pool) {
   await assurerSchemaSchedulerAcademique(executor);
 
@@ -1761,6 +1858,14 @@ async function recupererContexteCoursEchoue(
   };
 }
 
+/**
+ * Propose les groupes reels compatibles pour absorber une reprise etudiante.
+ *
+ * @param {number} idEtudiant Identifiant de l'etudiant concerne.
+ * @param {number} idCoursEchoue Identifiant de la ligne `cours_echoues`.
+ * @param {Object} [executor=pool] Executeur SQL ou connexion transactionnelle.
+ * @returns {Promise<Array<Object>>} Groupes tries et enrichis avec la charge projetee.
+ */
 export async function listerGroupesCompatiblesPourCoursEchoue(
   idEtudiant,
   idCoursEchoue,
@@ -1904,6 +2009,13 @@ export async function listerGroupesCompatiblesPourCoursEchoue(
   return compatibles;
 }
 
+/**
+ * Planifie manuellement un cours echoue en rattachant l'etudiant a un groupe reel.
+ *
+ * @param {Object} payload Identifiant etudiant, cours echoue et groupe cible.
+ * @param {Object} [executor=pool] Executeur SQL ou connexion transactionnelle.
+ * @returns {Promise<Object>} Resume metier des impacts.
+ */
 export async function planifierCoursEchouePourEtudiant(payload, executor = pool) {
   return executerDansTransactionSiNecessaire(async (transactionExecutor) => {
     await assurerSchemaSchedulerAcademique(transactionExecutor);
@@ -1951,6 +2063,8 @@ export async function planifierCoursEchouePourEtudiant(payload, executor = pool)
       );
     }
 
+    // L'affectation individuelle de reprise devient la source de verite
+    // pour l'etudiant tant que la reprise reste planifiee sur ce groupe.
     await transactionExecutor.query(
       `INSERT INTO affectation_etudiants (
          id_etudiant,
@@ -2003,6 +2117,13 @@ export async function planifierCoursEchouePourEtudiant(payload, executor = pool)
   }, executor);
 }
 
+/**
+ * Supprime une affectation et remet en coherence les series recurrentes associees.
+ *
+ * @param {number} idAffectation Identifiant de l'affectation a retirer.
+ * @param {Object} [executor=pool] Executeur SQL ou connexion transactionnelle.
+ * @returns {Promise<Object|null>} Affectation supprimee ou `null` si inexistante.
+ */
 export async function supprimerAffectationEtSeriesOrphelines(
   idAffectation,
   executor = pool

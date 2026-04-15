@@ -28,9 +28,13 @@ La verification a ete faite a partir de :
 | Cours | `Backend/routes/cours.routes.js` | `documents/conception-cours.md` | `documents/documentation-gestion-cours.md` | Existant |
 | Professeurs | `Backend/routes/professeurs.routes.js` | `documents/conception-prof.md` | `documents/documentation-gestion-professeurs.md` | Existant |
 | Salles | `Backend/routes/salles.routes.js` | `documents/conception-salles.md` | `documents/documentation-salles.md` | Existant |
-| Horaires etudiants | `Backend/routes/etudiants.routes.js` | `documents/conception-horaires-etudiants.md` | `documents/documentation-horaires-etudiants.md` | Existant |
+| Horaires etudiants | `Backend/routes/etudiants.routes.js` | `documents/conception-horaires-etudiants.md` | `documents/documentation-horaires-etudiants.md` | Mise a jour |
+| Exceptions individuelles | `Backend/src/services/etudiants/student-course-exchange.service.js` | `documents/conception-exceptions-individuelles.md` | `documents/documentation-exceptions-individuelles.md` | Ajoute |
+| Echanges de cours etudiants | `Backend/src/services/etudiants/student-course-exchange.service.js` | `documents/conception-echanges-cours-etudiants.md` | `documents/documentation-echanges-cours-etudiants.md` | Ajoute |
 | Base de donnees | `Backend/Database/*.sql` | `documents/conception-base-de-donnees.md` | N/A | Existant |
 | Planification standard | `Backend/routes/horaire.routes.js` | `documents/conception-planification.md` | `documents/documentation-planification.md` | Mise a jour + ajoute |
+| Planification manuelle | `Backend/src/services/planning/manual-planning.service.js` | `documents/conception-planification-manuelle.md` | `documents/documentation-planification-manuelle.md` | Ajoute |
+| Migrations | `Backend/Database/run_migration.js` | `documents/conception-migrations.md` | `documents/documentation-migrations.md` | Ajoute |
 | Import etudiants | `Backend/src/services/import-etudiants.service.js` | `documents/conception-import-etudiants.md` | `documents/documentation-import-etudiants.md` | Ajoute + existant |
 | Etudiants | `Backend/routes/etudiants.routes.js` | `documents/conception-etudiants.md` | `documents/documentation-gestion-etudiants.md` | Ajoute |
 | Groupes | `Backend/routes/groupes.routes.js` | `documents/conception-groupes.md` | `documents/documentation-groupes.md` | Ajoute |
@@ -44,11 +48,25 @@ La verification a ete faite a partir de :
 Les modules qui n'avaient pas de couverture explicite disposent
 maintenant d'une conception et d'une documentation dediees.
 
+Les documents suivants ont aussi ete requalifies car ils existaient
+deja mais ne couvraient pas fidelement l'implementation reelle :
+
+- `horaires etudiants`
+- certains sous-modules transverses relies aux exceptions individuelles
+  et a la planification locale
+
 La distinction suivante est volontaire pour eviter toute ambiguite :
 
 - `planification standard` couvre le module `/api/horaires` ;
+- `planification manuelle` couvre les corrections locales, recurrences
+  explicites et reprises rattachees via `/api/horaires` ;
 - `moteur intelligent` couvre le module `/api/scheduler` ;
-- `horaires etudiants` couvre la lecture et l'agregation des horaires cote etudiant.
+- `horaires etudiants` couvre la lecture et l'agregation des horaires cote etudiant ;
+- `exceptions individuelles` couvre la couche d'override portee par
+  `affectation_etudiants` ;
+- `echanges de cours etudiants` couvre le flux de preview puis
+  d'execution transactionnelle ;
+- `migrations` couvre les scripts historiques et le bootstrap runtime.
 
 ## 5. Convention retenue pour les nouveaux documents
 

@@ -1,124 +1,129 @@
-# Documentation — Horaire étudiant
+# Documentation - Horaires etudiants
 
-## Présentation
-Cette partie du projet permet de consulter l’horaire d’un étudiant.
+## 1. Objet
 
-Elle aide le professeur et toute personne qui utilise le projet pour la première fois à comprendre rapidement comment fonctionne cette fonctionnalité.
+Cette documentation decrit le module qui expose la vue complete de l'horaire
+d'un etudiant.
 
-## Tâches couvertes
-Ce document regroupe les tâches suivantes :
-- Comprendre l’horaire d’un étudiant
-- Expliquer la consultation de l’horaire étudiant
-- Préparer les informations de l’horaire d’un étudiant
+Le point important est que l'horaire retourne n'est pas limite au groupe
+principal. Il fusionne aussi :
 
-## But du module
-Le but du module est de permettre la consultation simple et claire de l’horaire d’un étudiant.
+- les reprises planifiees ;
+- les exceptions individuelles ;
+- les echanges de cours deja executes.
 
-Cette consultation se fait en lecture seule.
+## 2. Fichiers de reference
 
-## Source des étudiants
-Les étudiants sont importés à partir d’un fichier Excel fourni par l’administration.
+- `Backend/routes/etudiants.routes.js`
+- `Backend/src/model/etudiants.model.js`
+- `Backend/src/services/etudiants/student-course-exchange.service.js`
+- `Frontend/src/pages/EtudiantsPage.jsx`
+- `Frontend/src/components/etudiants/EtudiantScheduleBoard.jsx`
+- `Frontend/src/components/etudiants/CourseExchangePanel.jsx`
 
-Le fichier Excel contient les informations suivantes :
-- nom
-- prénom
-- groupe
-- programme
-- étape
-- matricule
+## 3. Endpoints concernes
 
-## Point important sur le groupe
-Le groupe est d’abord lu dans le fichier Excel lors de l’importation.
+| Methode | Route | Usage |
+|---|---|---|
+| `GET` | `/api/etudiants` | Liste les etudiants, avec option `session_active=1` |
+| `GET` | `/api/etudiants/:id` | Retourne la fiche de base d'un etudiant |
+| `GET` | `/api/etudiants/:id/horaire` | Retourne la vue complete de l'horaire effectif |
+| `GET` | `/api/etudiants/echange-cours/options` | Liste les cours communs echangeables entre deux etudiants |
+| `GET` | `/api/etudiants/echange-cours/preview` | Simule un echange de cours sans l'executer |
+| `POST` | `/api/etudiants/echange-cours` | Execute l'echange cible de cours |
 
-Ensuite, ce groupe doit correspondre à un groupe reconnu dans le système afin de retrouver l’horaire associé.
+## 4. Sources de donnees
 
-Cela veut dire que :
-- le fichier Excel fournit le groupe de l’étudiant
-- le système utilise ce groupe pour retrouver l’horaire correspondant
+Le module compose la reponse a partir de plusieurs sources :
 
-## Comprendre l’horaire d’un étudiant
-L’horaire d’un étudiant dépend principalement de son groupe.
+- `etudiants` pour l'identite, la cohorte et le groupe principal ;
+- `groupes_etudiants` pour le groupe reel de la session active ;
+- `affectation_groupes` + `affectation_cours` + `plages_horaires` pour l'horaire
+  de groupe ;
+- `affectation_etudiants` pour les surcharges individuelles ;
+- `cours_echoues` pour les reprises encore a traiter ou deja planifiees ;
+- `echanges_cours_etudiants` pour tracer les echanges cibles deja appliques.
 
-Le système suit cette logique :
+## 5. Structure de la reponse horaire
 
-**Étudiant importé depuis Excel → groupe de l’étudiant → horaire du groupe**
+`GET /api/etudiants/:id/horaire` retourne un objet qui contient :
 
-Cela signifie que l’horaire n’est pas créé séparément pour chaque étudiant.
-Le système récupère l’horaire déjà lié au groupe de l’étudiant.
+- `etudiant` : fiche de base et metadonnees de charge ;
+- `horaire` : fusion triee de toutes les seances visibles ;
+- `horaire_groupe` : seances heritees du groupe principal ;
+- `horaire_reprises` : seances ajoutees via `source_type = 'reprise'` ;
+- `horaire_individuel` : seances ajoutees via `source_type = 'individuelle'` ;
+- `reprises` : liste des cours echoues encore suivis par l'etudiant ;
+- `exceptions_individuelles` : vue agregee des cours detaches du groupe principal ;
+- `diagnostic_reprises` : blocages du scheduler pour les reprises non resolues ;
+- `resume` : compteurs consolides pour l'ecran.
 
-## Expliquer la consultation de l’horaire étudiant
-Pour consulter l’horaire d’un étudiant, le fonctionnement attendu est le suivant :
+## 6. Regles metier importantes
 
-1. les étudiants sont importés depuis le fichier Excel
-2. le système dispose de la liste des étudiants importés
-3. l’utilisateur recherche ou sélectionne un étudiant
-4. le système lit les informations de cet étudiant
-5. le système récupère son groupe
-6. le système retrouve l’horaire associé à ce groupe
-7. le système affiche l’horaire de l’étudiant
+### 6.1 Priorite des exceptions individuelles
 
-## Informations nécessaires
-### Informations de l’étudiant
-- matricule
-- nom
-- prénom
-- groupe
-- programme
-- étape
+Si un etudiant possede une affectation individuelle sur un cours, l'horaire du
+groupe principal pour ce meme cours n'est plus affiche.
 
-### Informations de l’horaire
-- cours
-- professeur
-- salle
-- date
-- heure de début
-- heure de fin
+Cette regle evite d'exposer simultanement :
 
-## Rôle des informations
-### Matricule
-Permet d’identifier l’étudiant.
+- la section d'origine ;
+- la section de remplacement.
 
-### Nom et prénom
-Permettent l’affichage et la recherche.
+### 6.2 Distinction entre reprise et exception individuelle
 
-### Groupe
-Permet de faire le lien avec l’horaire.
+Le backend distingue deux natures de surcharge :
 
-### Programme et étape
-Permettent de vérifier la cohérence des données et peuvent aider dans les filtres.
+- `reprise` : rattachement a un groupe pour refaire un cours echoue ;
+- `individuelle` : exception creee pour une correction manuelle ou un echange.
 
-## Affichage attendu
-Le système doit afficher un horaire simple à lire.
+### 6.3 Tri de l'horaire
 
-L’affichage peut contenir :
-- le nom du cours
-- le professeur
-- la salle
-- la date
-- l’heure de début
-- l’heure de fin
+Les seances sont triees selon :
 
-L’horaire peut aussi être présenté en vue calendrier pour faciliter la lecture.
+1. la date ;
+2. l'heure de debut ;
+3. le type de seance ;
+4. l'identifiant d'affectation.
 
-## Vérifications importantes
-Avant d’afficher l’horaire d’un étudiant, il faut vérifier que :
-- le fichier Excel a bien été importé
-- les colonnes nécessaires sont présentes
-- l’étudiant possède un matricule
-- l’étudiant possède un groupe
-- le groupe peut être reconnu dans le système
-- un horaire existe pour ce groupe
+L'objectif est d'obtenir un affichage stable et reproductible.
 
-## Cas particuliers
-Les cas suivants doivent être pris en compte :
-- étudiant sans matricule
-- étudiant sans groupe
-- doublon de matricule
-- groupe présent dans le fichier Excel mais non reconnu dans le système
-- groupe reconnu mais sans horaire associé
-- incohérence entre groupe, programme et étape
+## 7. Echanges de cours
 
-## Résumé
-Le module de consultation de l’horaire étudiant permet d’afficher l’horaire d’un étudiant importé depuis un fichier Excel.
+Le flux d'echange se fait en trois etapes :
 
-Le groupe est lu dans le fichier Excel, puis utilisé par le système pour retrouver l’horaire correspondant.
+1. lister les cours communs entre deux etudiants ;
+2. previsualiser les conflits potentiels ;
+3. executer l'echange si aucun blocage n'est detecte.
+
+La previsualisation verifie notamment :
+
+- que les deux etudiants partagent bien le cours cible ;
+- qu'ils ne sont pas deja dans la meme section ;
+- qu'aucune seance du groupe cible n'entre en conflit avec le reste de leur horaire.
+
+## 8. Codes d'erreur utiles
+
+Quelques codes applicatifs remontes par le backend :
+
+- `COURSE_EXCHANGE_NO_ACTIVE_SESSION`
+- `COURSE_EXCHANGE_STUDENT_NOT_FOUND`
+- `COURSE_EXCHANGE_NOT_SHARED`
+- `COURSE_EXCHANGE_SAME_STUDENT`
+- `COURSE_EXCHANGE_NOT_ALLOWED`
+
+## 9. Points de vigilance
+
+- la vue horaire depend de la session active si aucun `id_session` n'est fourni ;
+- les echanges de cours reposent sur `affectation_etudiants` comme source de verite ;
+- une reprise peut exister dans `cours_echoues` sans encore apparaitre dans
+  l'horaire effectif ;
+- les exports et les ecrans frontend doivent lire `source_horaire` et non
+  supposer que tout provient du groupe principal.
+
+## 10. Conclusion
+
+Le module horaires etudiants n'est plus une simple lecture du groupe.
+Il constitue aujourd'hui une vue consolidee des affectations reelles d'un
+etudiant, y compris les ajustements individuels introduits apres la generation
+initiale de l'horaire.

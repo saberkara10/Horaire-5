@@ -11,6 +11,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { AssignmentModificationSimulationPanel } from "../components/affectations/AssignmentModificationSimulationPanel.jsx";
 import { RepriseStudentSearchField } from "../components/affectations/RepriseStudentSearchField.jsx";
 import { AppShell } from "../components/layout/AppShell.jsx";
 import { usePopup } from "../components/feedback/PopupProvider.jsx";
@@ -19,7 +20,6 @@ import { recupererEtudiants } from "../services/etudiantsService.js";
 import { recupererGroupes } from "../services/groupes.api.js";
 import {
   creerAffectation,
-  modifierAffectation,
   planifierRepriseEtudiant,
   recupererCoursEchouesEtudiant,
   recupererEtudiantsPlanificationReprise,
@@ -32,7 +32,9 @@ import { recupererProfesseurs } from "../services/professeurs.api.js";
 import { recupererProgrammes } from "../services/programmes.api.js";
 import {
   genererSessionScheduler,
+  modifierAffectationIntelligemment,
   recupererSessionsScheduler,
+  simulerModificationAffectation,
 } from "../services/scheduler.api.js";
 import { recupererSalles } from "../services/salles.api.js";
 import { creerDateLocale } from "../utils/calendar.js";
@@ -44,6 +46,11 @@ import {
   SESSIONS_ACADEMIQUES,
   formaterLibelleCohorte,
 } from "../utils/sessions.js";
+import {
+  OPTIMIZATION_MODE_OPTIONS,
+  formaterLibelleModeOptimisation,
+  resoudreOptionModeOptimisation,
+} from "../utils/optimizationModes.js";
 import "../styles/AffectationsPage.css";
 
 const ETAPES_REFERENCE = ["1", "2", "3", "4", "5", "6", "7", "8"];
@@ -61,19 +68,31 @@ const PLANNING_SCOPE_OPTIONS = [
     value: "single",
     labelCreation: "Cette semaine uniquement",
     labelEdition: "Cette occurrence uniquement",
+    backendMode: "THIS_OCCURRENCE",
   },
   {
     value: "until_session_end",
     labelCreation: "A partir de cette semaine jusqu'a la fin de la session",
-    labelEdition: "A partir de cette semaine jusqu'a la fin de la session",
+    labelEdition: "Cette occurrence et les suivantes",
+    backendMode: "THIS_AND_FOLLOWING",
+    requiresSeries: true,
+  },
+  {
+    value: "all_occurrences",
+    labelCreation: null,
+    labelEdition: "Toute la serie",
+    backendMode: "ALL_OCCURRENCES",
+    requiresSeries: true,
+    editOnly: true,
   },
   {
     value: "custom_range",
     labelCreation: "Periode personnalisee",
-    labelEdition: "Periode personnalisee",
+    labelEdition: "Plage de dates",
+    backendMode: "DATE_RANGE",
+    requiresSeries: true,
   },
 ];
-
 function normaliserTexte(texte) {
   return String(texte || "")
     .toLowerCase()
@@ -211,6 +230,318 @@ function construirePayloadPortee(planification) {
   return { mode };
 }
 
+/**
+ * Mappe la portee UI du formulaire vers la portee backend de replanification
+ * intelligente. La creation manuelle et la modification intelligente n'utilisent
+ * pas exactement le meme contrat : on conserve donc deux mappings separes pour
+ * ne pas casser le flux de creation existant.
+ *
+ * @param {Object} planification - etat du formulaire.
+ * @returns {string|Object|null} Portee attendue par `/api/scheduler/modify-assignment`.
+ */
+function construirePayloadPorteeModificationIntelligente(planification) {
+  const option = PLANNING_SCOPE_OPTIONS.find(
+    (entry) => entry.value === String(planification?.portee_mode || "single")
+  );
+
+  if (!option) {
+    return "THIS_OCCURRENCE";
+  }
+
+  if (option.backendMode === "DATE_RANGE") {
+    return {
+      mode: "DATE_RANGE",
+      dateDebut: planification?.date_debut_portee || planification?.date || null,
+      dateFin: planification?.date_fin_portee || planification?.date || null,
+    };
+  }
+
+  return option.backendMode;
+}
+
+/**
+ * Detecte uniquement les champs reellement modifiables dans le flux intelligent.
+ *
+ * Le backend distingue strictement creation et modification : groupe et cours
+ * restent donc figes en edition intelligente. Cette fonction n'envoie que les
+ * changements autorises afin de garder la simulation et l'application coherentes.
+ *
+ * @param {Object|null} affectation - affectation de reference.
+ * @param {Object} planification - etat courant du formulaire.
+ * @returns {Object} Objet `modifications` compatible backend.
+ */
+function construireModificationsIntelligentes(affectation, planification) {
+  if (!affectation) {
+    return {};
+  }
+
+  const modifications = {};
+  const professeurCourant = String(affectation.id_professeur || "");
+  const salleCourante = String(affectation.id_salle || "");
+  const dateCourante = String(affectation.date || "");
+  const heureDebutCourante = formaterHeure(affectation.heure_debut);
+  const heureFinCourante = formaterHeure(affectation.heure_fin);
+
+  if (
+    planification?.id_professeur &&
+    String(planification.id_professeur) !== professeurCourant
+  ) {
+    modifications.id_professeur = Number(planification.id_professeur);
+  }
+
+  if (planification?.id_salle && String(planification.id_salle) !== salleCourante) {
+    modifications.id_salle = Number(planification.id_salle);
+  }
+
+  const dateChanged = String(planification?.date || "") !== dateCourante;
+  const timeChanged =
+    String(planification?.heure_debut || "") !== heureDebutCourante ||
+    String(planification?.heure_fin || "") !== heureFinCourante;
+
+  if (dateChanged) {
+    modifications.date = planification.date;
+  }
+
+  if (timeChanged) {
+    modifications.heure_debut = planification.heure_debut;
+    modifications.heure_fin = planification.heure_fin;
+  }
+
+  return modifications;
+}
+
+/**
+ * Construit la requete frontend partagee entre simulation et application.
+ *
+ * @param {Object|null} affectation - affectation actuellement editee.
+ * @param {Object} planification - etat courant du formulaire.
+ * @param {string} modeOptimisation - mode d'optimisation choisi en UI.
+ * @returns {Object|null} Requete backend normalisee ou `null`.
+ */
+function construireRequeteModificationIntelligente(
+  affectation,
+  planification,
+  modeOptimisation
+) {
+  if (!affectation) {
+    return null;
+  }
+
+  return {
+    idSeance: Number(affectation.id_affectation_cours),
+    modifications: construireModificationsIntelligentes(affectation, planification),
+    portee: construirePayloadPorteeModificationIntelligente(planification),
+    modeOptimisation: modeOptimisation || "legacy",
+  };
+}
+
+/**
+ * Produit une cle stable de simulation.
+ *
+ * Cette cle permet d'invalider la simulation des que l'utilisateur modifie le
+ * formulaire. On ne supprime pas necessairement le rapport precedent, mais il
+ * ne doit plus etre considere comme applicable tant qu'une nouvelle simulation
+ * n'a pas ete executee.
+ *
+ * @param {Object|null} payload - requete de simulation.
+ * @returns {string} Cle stable.
+ */
+function construireCleSimulationModification(payload) {
+  return payload ? JSON.stringify(payload) : "";
+}
+
+/**
+ * Construit les validations UX locales du flux intelligent.
+ *
+ * Ces controles ameliorent la lisibilite avant simulation, mais ne remplacent
+ * jamais la validation d'autorite du backend.
+ *
+ * @param {Object} options - contexte local.
+ * @returns {Object[]} Issues locales.
+ */
+function construireIssuesLocalesModification({
+  enEdition,
+  planification,
+  sessionActive,
+  salleSelectionnee,
+  editionRecurrenteDisponible,
+  requeteModification,
+}) {
+  if (!enEdition) {
+    return [];
+  }
+
+  const issues = [];
+
+  if (
+    !planification?.id_professeur ||
+    !planification?.id_salle ||
+    !planification?.date ||
+    !planification?.heure_debut ||
+    !planification?.heure_fin
+  ) {
+    issues.push({
+      code: "FIELDS_REQUIRED",
+      level: "error",
+      message:
+        "Completer le professeur, la salle, la date et l'horaire avant de lancer la simulation.",
+    });
+  }
+
+  if (
+    planification?.heure_debut &&
+    planification?.heure_fin &&
+    heureVersMinutes(planification.heure_debut) >= heureVersMinutes(planification.heure_fin)
+  ) {
+    issues.push({
+      code: "INVALID_TIME_RANGE",
+      level: "error",
+      message: "L'heure de fin doit etre posterieure a l'heure de debut.",
+    });
+  }
+
+  if (
+    planification?.portee_mode === "custom_range" &&
+    (!planification?.date_debut_portee || !planification?.date_fin_portee)
+  ) {
+    issues.push({
+      code: "DATE_RANGE_REQUIRED",
+      level: "error",
+      message: "La plage de dates exige une date de debut et une date de fin.",
+    });
+  }
+
+  if (
+    planification?.portee_mode === "custom_range" &&
+    planification?.date_debut_portee &&
+    planification?.date_fin_portee &&
+    String(planification.date_debut_portee) > String(planification.date_fin_portee)
+  ) {
+    issues.push({
+      code: "DATE_RANGE_INVALID",
+      level: "error",
+      message: "La date de fin doit etre posterieure ou egale a la date de debut.",
+    });
+  }
+
+  if (!editionRecurrenteDisponible && String(planification?.portee_mode || "single") !== "single") {
+    issues.push({
+      code: "SCOPE_NOT_AVAILABLE",
+      level: "error",
+      message:
+        "Cette seance n'appartient pas a une recurrence exploitable. Seule cette occurrence peut etre modifiee.",
+    });
+  }
+
+  if (sessionActive?.date_debut && planification?.date && String(planification.date) < String(sessionActive.date_debut)) {
+    issues.push({
+      code: "DATE_BEFORE_SESSION",
+      level: "error",
+      message: "La date cible precede le debut de la session active.",
+    });
+  }
+
+  if (sessionActive?.date_fin && planification?.date && String(planification.date) > String(sessionActive.date_fin)) {
+    issues.push({
+      code: "DATE_AFTER_SESSION",
+      level: "error",
+      message: "La date cible depasse la fin de la session active.",
+    });
+  }
+
+  if (salleSelectionnee && salleSelectionnee.disponible === false) {
+    issues.push({
+      code: "ROOM_LOCALLY_BLOCKED",
+      level: "warning",
+      message: `La salle selectionnee semble indisponible localement : ${salleSelectionnee.raison}`,
+    });
+  }
+
+  if (
+    requeteModification &&
+    Object.keys(requeteModification.modifications || {}).length === 0
+  ) {
+    issues.push({
+      code: "NO_EFFECTIVE_CHANGE",
+      level: "error",
+      message:
+        "Aucune difference detectee entre l'affectation actuelle et la modification proposee.",
+    });
+  }
+
+  return issues;
+}
+
+/**
+ * Produit le message de confirmation avant application.
+ *
+ * @param {Object|null} report - resultat de simulation courant.
+ * @returns {string} Message de confirmation ou chaine vide.
+ */
+function construireMessageConfirmationModification(report) {
+  if (!report) {
+    return "";
+  }
+
+  const messages = [];
+  const warnings = Array.isArray(report.warnings) ? report.warnings : [];
+
+  for (const warning of warnings) {
+    if (warning?.message) {
+      messages.push(warning.message);
+    }
+  }
+
+  const deltaGlobal = Number(report?.difference?.scoreGlobal || 0);
+  const deltaEtudiant = Number(report?.difference?.scoreEtudiant || 0);
+  const deltaProfesseur = Number(report?.difference?.scoreProfesseur || 0);
+
+  if (deltaGlobal <= -5) {
+    messages.push(
+      `Le score global baisse de ${Math.abs(deltaGlobal).toFixed(2)} point(s).`
+    );
+  }
+
+  if (deltaEtudiant <= -8) {
+    messages.push(
+      `Le score etudiant baisse de ${Math.abs(deltaEtudiant).toFixed(2)} point(s).`
+    );
+  }
+
+  if (deltaProfesseur <= -8) {
+    messages.push(
+      `Le score professeur baisse de ${Math.abs(deltaProfesseur).toFixed(2)} point(s).`
+    );
+  }
+
+  return messages.join(" ");
+}
+
+/**
+ * Construit le message de succes affiche apres application.
+ *
+ * @param {Object|null} resultat - reponse backend de modification.
+ * @returns {string} Message lisible pour l'utilisateur.
+ */
+function construireResumeSuccesModification(resultat) {
+  const message = resultat?.message || "Affectation replanifiee avec succes.";
+  const historyId =
+    resultat?.result?.historique?.id_journal_modification_affectation || null;
+  const occurrencesModifiees = Array.isArray(resultat?.result?.occurrences_modifiees)
+    ? resultat.result.occurrences_modifiees.length
+    : 0;
+
+  if (historyId && occurrencesModifiees > 0) {
+    return `${message} ${occurrencesModifiees} occurrence(s) tracee(s) dans l'historique #${historyId}.`;
+  }
+
+  if (historyId) {
+    return `${message} Historique #${historyId}.`;
+  }
+
+  return message;
+}
+
 function formaterNomEtudiant(etudiant) {
   const nomComplet = `${etudiant?.prenom || ""} ${etudiant?.nom || ""}`.trim();
   return nomComplet || `Etudiant #${etudiant?.id_etudiant || "?"}`;
@@ -278,9 +609,21 @@ export function AffectationsPage({ utilisateur, onLogout }) {
   const [loading, setLoading] = useState(true);
   const [generationEnCours, setGenerationEnCours] = useState(false);
   const [planificationEnCours, setPlanificationEnCours] = useState(false);
+  const [simulationModificationEnCours, setSimulationModificationEnCours] =
+    useState(false);
+  const [applicationModificationIntelligenteEnCours, setApplicationModificationIntelligenteEnCours] =
+    useState(false);
   const [resetEnCours, setResetEnCours] = useState(false);
   const [supprimerEtudiantsAuReset, setSupprimerEtudiantsAuReset] = useState(false);
   const [idAffectationEdition, setIdAffectationEdition] = useState(null);
+  const [modeOptimisationGeneration, setModeOptimisationGeneration] =
+    useState("legacy");
+  const [modeOptimisationModification, setModeOptimisationModification] =
+    useState("legacy");
+  const [simulationModification, setSimulationModification] = useState(null);
+  const [cleSimulationModification, setCleSimulationModification] = useState("");
+  const [resumeModificationIntelligente, setResumeModificationIntelligente] =
+    useState(null);
   const { confirm, showError, showSuccess } = usePopup();
   const [filtresGeneration, setFiltresGeneration] = useState({
     programme: "",
@@ -505,6 +848,19 @@ export function AffectationsPage({ utilisateur, onLogout }) {
       }),
     [horaires]
   );
+
+  const affectationEnEdition = useMemo(() => {
+    if (!idAffectationEdition) {
+      return null;
+    }
+
+    return (
+      horairesEnrichis.find(
+        (affectation) =>
+          Number(affectation.id_affectation_cours) === Number(idAffectationEdition)
+      ) || null
+    );
+  }, [horairesEnrichis, idAffectationEdition]);
 
   const horairesParSalleDate = useMemo(() => {
     const index = new Map();
@@ -955,9 +1311,86 @@ export function AffectationsPage({ utilisateur, onLogout }) {
 
   const optionsPorteePlanification = useMemo(() => {
     return PLANNING_SCOPE_OPTIONS.filter(
-      (option) => editionRecurrenteDisponible || option.value === "single"
+      (option) => {
+        if (!idAffectationEdition && option.editOnly) {
+          return false;
+        }
+
+        return editionRecurrenteDisponible || !option.requiresSeries;
+      }
     );
-  }, [editionRecurrenteDisponible]);
+  }, [editionRecurrenteDisponible, idAffectationEdition]);
+
+  const optionModeOptimisationSelectionnee = useMemo(() => {
+    return resoudreOptionModeOptimisation(modeOptimisationModification);
+  }, [modeOptimisationModification]);
+
+  const optionModeOptimisationGenerationSelectionnee = useMemo(() => {
+    return resoudreOptionModeOptimisation(modeOptimisationGeneration);
+  }, [modeOptimisationGeneration]);
+
+  const requeteModificationIntelligente = useMemo(() => {
+    return construireRequeteModificationIntelligente(
+      affectationEnEdition,
+      planificationManuelle,
+      modeOptimisationModification
+    );
+  }, [
+    affectationEnEdition,
+    modeOptimisationModification,
+    planificationManuelle,
+  ]);
+
+  const cleRequeteModificationIntelligente = useMemo(() => {
+    return construireCleSimulationModification(requeteModificationIntelligente);
+  }, [requeteModificationIntelligente]);
+
+  const simulationModificationCourante = Boolean(
+    simulationModification &&
+      cleSimulationModification &&
+      cleSimulationModification === cleRequeteModificationIntelligente
+  );
+
+  const issuesLocalesModificationIntelligente = useMemo(() => {
+    return construireIssuesLocalesModification({
+      enEdition: Boolean(idAffectationEdition),
+      planification: planificationManuelle,
+      sessionActive,
+      salleSelectionnee: sallePlanificationSelectionnee,
+      editionRecurrenteDisponible,
+      requeteModification: requeteModificationIntelligente,
+    });
+  }, [
+    editionRecurrenteDisponible,
+    idAffectationEdition,
+    planificationManuelle,
+    requeteModificationIntelligente,
+    sallePlanificationSelectionnee,
+    sessionActive,
+  ]);
+
+  const modificationIntelligenteBloqueeLocalement = useMemo(() => {
+    return issuesLocalesModificationIntelligente.some(
+      (issue) => issue.level === "error"
+    );
+  }, [issuesLocalesModificationIntelligente]);
+
+  useEffect(() => {
+    setPlanificationManuelle((actuel) => {
+      const optionActive = optionsPorteePlanification.some(
+        (option) => option.value === actuel.portee_mode
+      );
+
+      if (optionActive) {
+        return actuel;
+      }
+
+      return {
+        ...actuel,
+        portee_mode: "single",
+      };
+    });
+  }, [optionsPorteePlanification]);
 
 
   const professeursCompatibles = useMemo(() => {
@@ -1352,6 +1785,9 @@ export function AffectationsPage({ utilisateur, onLogout }) {
 
   const reinitialiserPlanification = useCallback(() => {
     setIdAffectationEdition(null);
+    setModeOptimisationModification("legacy");
+    setSimulationModification(null);
+    setCleSimulationModification("");
     setPlanificationManuelle(creerPlanificationInitiale());
   }, []);
 
@@ -1381,6 +1817,14 @@ export function AffectationsPage({ utilisateur, onLogout }) {
 
       return prochainEtat;
     });
+  }, []);
+
+  const handleChangerModeOptimisationGeneration = useCallback((event) => {
+    setModeOptimisationGeneration(String(event.target.value || "legacy"));
+  }, []);
+
+  const handleChangerModeOptimisationModification = useCallback((event) => {
+    setModeOptimisationModification(String(event.target.value || "legacy"));
   }, []);
 
   const handleChangerPorteePlanification = useCallback((event) => {
@@ -1452,10 +1896,15 @@ export function AffectationsPage({ utilisateur, onLogout }) {
     try {
       const resultat = await genererSessionScheduler({
         id_session: sessionActive.id_session,
+        modeOptimisation: modeOptimisationGeneration,
       });
 
       setResumeGeneration(resultat.rapport || null);
-      showSuccess(resultat.message || "Generation terminee.");
+      showSuccess(
+        `${resultat.message || "Generation terminee."} Mode ${formaterLibelleModeOptimisation(
+          resultat.mode_optimisation_utilise || modeOptimisationGeneration
+        )}.`
+      );
       await rechargerContexteActif();
       emettreSynchronisationPlanning({
         type: "horaire_genere",
@@ -1466,7 +1915,188 @@ export function AffectationsPage({ utilisateur, onLogout }) {
     } finally {
       setGenerationEnCours(false);
     }
-  }, [rechargerContexteActif, sessionActive, showError, showSuccess]);
+  }, [
+    modeOptimisationGeneration,
+    rechargerContexteActif,
+    sessionActive,
+    showError,
+    showSuccess,
+  ]);
+
+  /**
+   * Lance le what-if obligatoire de replanification intelligente.
+   *
+   * Toute demande d'application doit reposer sur un rapport de simulation
+   * calcule sur l'etat courant du formulaire. Si le formulaire change ensuite,
+   * la cle de simulation devient differente et le rapport passe en obsolete.
+   */
+  const handleSimulerModificationIntelligente = useCallback(async () => {
+    const issuesBloquantes = issuesLocalesModificationIntelligente.filter(
+      (issue) => issue.level === "error"
+    );
+
+    if (!idAffectationEdition || !requeteModificationIntelligente) {
+      showError("Selectionnez d'abord une affectation existante a modifier.");
+      return;
+    }
+
+    if (issuesBloquantes.length > 0) {
+      showError(issuesBloquantes[0].message);
+      return;
+    }
+
+    setSimulationModificationEnCours(true);
+
+    try {
+      const rapport = await simulerModificationAffectation({
+        ...requeteModificationIntelligente,
+        id_session: sessionActive?.id_session || null,
+      });
+
+      setSimulationModification(rapport);
+      setCleSimulationModification(cleRequeteModificationIntelligente);
+    } catch (error) {
+      const payload = error.payload || null;
+      const simulationErreur = payload?.simulation
+        ? {
+            ...payload.simulation,
+            ...(Array.isArray(payload?.warnings) ? { warnings: payload.warnings } : {}),
+          }
+        : null;
+
+      if (simulationErreur) {
+        setSimulationModification(simulationErreur);
+        setCleSimulationModification(cleRequeteModificationIntelligente);
+      } else {
+        setSimulationModification(null);
+        setCleSimulationModification("");
+      }
+
+      showError(error.message || "Erreur lors de la simulation de modification.");
+    } finally {
+      setSimulationModificationEnCours(false);
+    }
+  }, [
+    cleRequeteModificationIntelligente,
+    idAffectationEdition,
+    issuesLocalesModificationIntelligente,
+    requeteModificationIntelligente,
+    sessionActive?.id_session,
+    showError,
+  ]);
+
+  /**
+   * Applique la modification reelle uniquement sur une simulation valide.
+   *
+   * Le backend reste l'autorite finale de validation, mais le frontend bloque
+   * tout envoi si aucune simulation a jour n'est disponible.
+   */
+  const handleAppliquerModificationIntelligente = useCallback(async () => {
+    const issuesBloquantes = issuesLocalesModificationIntelligente.filter(
+      (issue) => issue.level === "error"
+    );
+
+    if (!requeteModificationIntelligente || !idAffectationEdition) {
+      showError("Selectionnez d'abord une affectation existante a modifier.");
+      return;
+    }
+
+    if (issuesBloquantes.length > 0) {
+      showError(issuesBloquantes[0].message);
+      return;
+    }
+
+    if (!simulationModification) {
+      showError("Lancez d'abord une simulation what-if avant l'application reelle.");
+      return;
+    }
+
+    if (!simulationModificationCourante) {
+      showError(
+        "La simulation n'est plus a jour. Relancez-la avant d'appliquer la modification."
+      );
+      return;
+    }
+
+    if (!simulationModification.faisable) {
+      showError("La simulation actuelle bloque cette modification.");
+      return;
+    }
+
+    const messageConfirmation = construireMessageConfirmationModification(
+      simulationModification
+    );
+    let degradationConfirmee = false;
+
+    if (messageConfirmation) {
+      const confirmation = await confirm({
+        title: "Confirmer la modification",
+        message: `${messageConfirmation} Voulez-vous appliquer cette replanification ?`,
+        confirmLabel: "Appliquer",
+        cancelLabel: "Revenir",
+        tone: "warning",
+      });
+
+      if (!confirmation) {
+        return;
+      }
+
+      degradationConfirmee = true;
+    }
+
+    setApplicationModificationIntelligenteEnCours(true);
+
+    try {
+      const resultat = await modifierAffectationIntelligemment({
+        ...requeteModificationIntelligente,
+        id_session: sessionActive?.id_session || null,
+        confirmerDegradationScore: degradationConfirmee,
+      });
+      const messageSucces = construireResumeSuccesModification(resultat);
+
+      setResumeModificationIntelligente(resultat.result || null);
+      await rechargerContexteActif();
+      reinitialiserPlanification();
+      emettreSynchronisationPlanning({
+        type: "affectation_modifiee",
+        ...(resultat.result || {}),
+        simulation: resultat.simulation || null,
+      });
+      showSuccess(messageSucces);
+    } catch (error) {
+      const payload = error.payload || null;
+      const simulationErreur = payload?.simulation
+        ? {
+            ...payload.simulation,
+            ...(Array.isArray(payload?.warnings) ? { warnings: payload.warnings } : {}),
+          }
+        : null;
+
+      if (simulationErreur) {
+        setSimulationModification(simulationErreur);
+        setCleSimulationModification(cleRequeteModificationIntelligente);
+      }
+
+      showError(
+        error.message || "Erreur lors de l'application de la modification intelligente."
+      );
+    } finally {
+      setApplicationModificationIntelligenteEnCours(false);
+    }
+  }, [
+    cleRequeteModificationIntelligente,
+    confirm,
+    idAffectationEdition,
+    issuesLocalesModificationIntelligente,
+    rechargerContexteActif,
+    reinitialiserPlanification,
+    requeteModificationIntelligente,
+    sessionActive?.id_session,
+    showError,
+    showSuccess,
+    simulationModification,
+    simulationModificationCourante,
+  ]);
 
   const handleEnregistrerPlanification = useCallback(async () => {
     if (
@@ -1515,23 +2145,16 @@ export function AffectationsPage({ utilisateur, onLogout }) {
       };
 
       let resultat = null;
-      if (idAffectationEdition) {
-        resultat = await modifierAffectation(idAffectationEdition, payload);
-      } else {
-        resultat = await creerAffectation(payload);
-      }
+      resultat = await creerAffectation(payload);
 
       await rechargerContexteActif();
       reinitialiserPlanification();
       emettreSynchronisationPlanning({
-        type: idAffectationEdition ? "affectation_modifiee" : "affectation_creee",
+        type: "affectation_creee",
         ...resultat,
       });
       showSuccess(
-        resultat?.message ||
-          (idAffectationEdition
-            ? "Affectation mise a jour."
-            : "Cours planifie avec succes.")
+        resultat?.message || "Cours planifie avec succes."
       );
     } catch (error) {
       showError(error.message || "Erreur lors de la planification manuelle.");
@@ -1539,7 +2162,6 @@ export function AffectationsPage({ utilisateur, onLogout }) {
       setPlanificationEnCours(false);
     }
   }, [
-    idAffectationEdition,
     planificationManuelle,
     rechargerContexteActif,
     reinitialiserPlanification,
@@ -1678,6 +2300,10 @@ export function AffectationsPage({ utilisateur, onLogout }) {
 
   const handleModifier = useCallback((affectation) => {
     setIdAffectationEdition(Number(affectation.id_affectation_cours));
+    setModeOptimisationModification("legacy");
+    setSimulationModification(null);
+    setCleSimulationModification("");
+    setResumeModificationIntelligente(null);
     setPlanificationManuelle({
       id_groupes_etudiants: String(affectation.id_groupes_etudiants || ""),
       id_cours: String(affectation.id_cours || ""),
@@ -1821,6 +2447,42 @@ export function AffectationsPage({ utilisateur, onLogout }) {
                   ))}
                 </div>
 
+                <div className="affectations-page__scope-card">
+                  <div className="affectations-page__scope-header">
+                    <strong>Mode d'optimisation de la generation</strong>
+                    <span>
+                      Le scoring_v1 influence aussi la generation globale. Le
+                      moteur applique ce choix des le lancement puis conserve
+                      `legacy` comme fallback sur si un client ancien n'envoie
+                      rien.
+                    </span>
+                  </div>
+
+                  <div className="affectations-page__row">
+                    <label className="crud-page__field">
+                      <span>Mode</span>
+                      <select
+                        name="mode_optimisation_generation"
+                        value={modeOptimisationGeneration}
+                        onChange={handleChangerModeOptimisationGeneration}
+                        disabled={generationEnCours || loading}
+                      >
+                        {OPTIMIZATION_MODE_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <div className="affectations-page__scope-note">
+                      <span>
+                        {optionModeOptimisationGenerationSelectionnee.description}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="affectations-page__actions">
                   <button
                     className="crud-page__primary-button"
@@ -1875,22 +2537,36 @@ export function AffectationsPage({ utilisateur, onLogout }) {
             </div>
 
             {resumeGeneration ? (
-              <div className="affectations-page__generation-summary">
-                <div className="affectations-page__selection-stat">
-                  <strong>{resumeGeneration.session?.nom || sessionActive?.nom || "-"}</strong>
-                  <span>Session generee</span>
+              <div className="affectations-page__generation-report">
+                <div className="affectations-page__generation-summary">
+                  <div className="affectations-page__selection-stat">
+                    <strong>{resumeGeneration.session?.nom || sessionActive?.nom || "-"}</strong>
+                    <span>Session generee</span>
+                  </div>
+                  <div className="affectations-page__selection-stat">
+                    <strong>{resumeGeneration.score_qualite ?? "-"}</strong>
+                    <span>Score qualite</span>
+                  </div>
+                  <div className="affectations-page__selection-stat">
+                    <strong>{resumeGeneration.nb_cours_planifies ?? 0}</strong>
+                    <span>Seances planifiees</span>
+                  </div>
+                  <div className="affectations-page__selection-stat">
+                    <strong>{resumeGeneration.nb_cours_non_planifies ?? 0}</strong>
+                    <span>Seances non planifiees</span>
+                  </div>
                 </div>
-                <div className="affectations-page__selection-stat">
-                  <strong>{resumeGeneration.score_qualite ?? "-"}</strong>
-                  <span>Score qualite</span>
-                </div>
-                <div className="affectations-page__selection-stat">
-                  <strong>{resumeGeneration.nb_cours_planifies ?? 0}</strong>
-                  <span>Seances planifiees</span>
-                </div>
-                <div className="affectations-page__selection-stat">
-                  <strong>{resumeGeneration.nb_cours_non_planifies ?? 0}</strong>
-                  <span>Seances non planifiees</span>
+                <div className="affectations-page__simulation-block affectations-page__simulation-block--info">
+                  <strong>
+                    Generation executee en mode{" "}
+                    {formaterLibelleModeOptimisation(
+                      resumeGeneration?.details?.modeOptimisationUtilise || "legacy"
+                    )}
+                  </strong>
+                  <span>
+                    Le moteur a applique ce profil lors de la selection des
+                    placements puis dans l'optimisation locale read-only.
+                  </span>
                 </div>
               </div>
             ) : null}
@@ -2141,15 +2817,20 @@ export function AffectationsPage({ utilisateur, onLogout }) {
         <section className="affectations-page__panel">
           <div className="affectations-page__panel-header">
             <div>
-              <h2>Planifier un cours manuellement</h2>
+              <h2>
+                {idAffectationEdition
+                  ? "Replanifier une affectation existante"
+                  : "Planifier un cours manuellement"}
+              </h2>
               <p>
-                Utilisez ce formulaire pour ajouter ou corriger une seance precise
-                pour un groupe deja cree.
+                {idAffectationEdition
+                  ? "Le groupe et le cours restent verrouilles. Seuls le professeur, la salle, l'horaire et la portee sont replanifies via une simulation what-if obligatoire."
+                  : "Utilisez ce formulaire pour ajouter ou corriger une seance precise pour un groupe deja cree."}
               </p>
             </div>
             {idAffectationEdition ? (
               <span className="affectations-page__count">
-                Edition #{idAffectationEdition}
+                Edition intelligente #{idAffectationEdition}
               </span>
             ) : null}
           </div>
@@ -2168,6 +2849,7 @@ export function AffectationsPage({ utilisateur, onLogout }) {
                     name="id_groupes_etudiants"
                     value={planificationManuelle.id_groupes_etudiants}
                     onChange={handleChangerPlanification}
+                    disabled={Boolean(idAffectationEdition)}
                   >
                     <option value="">Choisir un groupe</option>
                     {groupesPlanificationManuelle.map((groupe) => (
@@ -2187,7 +2869,7 @@ export function AffectationsPage({ utilisateur, onLogout }) {
                     name="id_cours"
                     value={planificationManuelle.id_cours}
                     onChange={handleChangerPlanification}
-                    disabled={!groupePlanificationActif}
+                    disabled={Boolean(idAffectationEdition) || !groupePlanificationActif}
                   >
                     <option value="">Choisir un cours</option>
                     {coursPlanificationManuelle.map((element) => (
@@ -2198,6 +2880,17 @@ export function AffectationsPage({ utilisateur, onLogout }) {
                   </select>
                 </label>
               </div>
+
+              {idAffectationEdition ? (
+                <div className="affectations-page__simulation-block affectations-page__simulation-block--info">
+                  <strong>Modification et creation sont distinguees</strong>
+                  <span>
+                    En edition intelligente, le groupe et le cours ne changent pas.
+                    Si vous devez modifier ces elements, creez une nouvelle affectation
+                    ou utilisez le flux manuel adapte.
+                  </span>
+                </div>
+              ) : null}
 
               <div className="affectations-page__row">
                 <label className="crud-page__field">
@@ -2312,8 +3005,10 @@ export function AffectationsPage({ utilisateur, onLogout }) {
                         {planificationManuelle.portee_mode === "single"
                           ? "Une seule occurrence sera creee ou modifiee."
                           : planificationManuelle.portee_mode === "until_session_end"
-                            ? "La recurrence sera appliquee chaque semaine jusqu'a la fin de la session active."
-                            : "Le backend generera ou replanifiera toutes les occurrences hebdomadaires comprises dans la periode choisie."}
+                            ? "La replanification s'appliquera a cette occurrence puis aux suivantes."
+                            : planificationManuelle.portee_mode === "all_occurrences"
+                              ? "Toute la serie existante sera remplacee proprement, sans doublon."
+                              : "Le backend replanifiera uniquement les occurrences situees dans la plage choisie."}
                       </span>
                     ) : (
                       <span>
@@ -2349,27 +3044,75 @@ export function AffectationsPage({ utilisateur, onLogout }) {
                 ) : null}
               </div>
 
+              {idAffectationEdition ? (
+                <div className="affectations-page__scope-card">
+                  <div className="affectations-page__scope-header">
+                    <strong>Mode d'optimisation du scoring</strong>
+                    <span>
+                      Ce choix influence la comparaison avant/apres dans la simulation.
+                      Les validations dures restent identiques quel que soit le mode.
+                    </span>
+                  </div>
+
+                  <div className="affectations-page__row">
+                    <label className="crud-page__field">
+                      <span>Mode</span>
+                      <select
+                        name="mode_optimisation_modification"
+                        value={modeOptimisationModification}
+                        onChange={handleChangerModeOptimisationModification}
+                      >
+                        {OPTIMIZATION_MODE_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <div className="affectations-page__scope-note">
+                      <span>{optionModeOptimisationSelectionnee.description}</span>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
               <div className="affectations-page__manual-summary">
                 <strong>
-                  {groupePlanificationActif?.nom_groupe || "Aucun groupe sélectionné"}
+                  {idAffectationEdition
+                    ? affectationEnEdition?.cours_code
+                      ? `${affectationEnEdition.cours_code} - ${groupePlanificationActif?.nom_groupe || "Groupe"}`
+                      : `Affectation #${idAffectationEdition}`
+                    : groupePlanificationActif?.nom_groupe || "Aucun groupe selectionne"}
                 </strong>
                 <span>
-                  Effectif : {groupePlanificationActif?.effectif || 0} étudiants
-                  {" — "}
+                  Effectif : {groupePlanificationActif?.effectif || 0} etudiants
+                  {" - "}
                   {coursPlanificationActif
-                    ? `Type de salle requis : ${coursPlanificationActif.type_salle || "standard"}`
-                    : "Sélectionner un cours"}
+                    ? `Type de salle requis : ${coursPlanificationActif.type_salle || "standard"}`
+                    : "Selectionner un cours"}
                 </span>
                 <span>
-                  La validation finale recontrole aussi les etudiants en reprise hors groupe
-                  et l'effectif reel de la seance avant insertion.
+                  {idAffectationEdition
+                    ? "Le backend recalculera les conflits groupe, professeur, salle et etudiants en reprise avant toute application."
+                    : "La validation finale recontrole aussi les etudiants en reprise hors groupe et l'effectif reel de la seance avant insertion."}
                 </span>
+                {idAffectationEdition ? (
+                  <span>
+                    Professeur cible :{" "}
+                    {professeursPlanificationManuelle.find(
+                      (professeur) =>
+                        String(professeur.id_professeur) ===
+                        String(planificationManuelle.id_professeur)
+                    )?.nomComplet || "A confirmer"}
+                  </span>
+                ) : null}
                 <div className="affectations-page__room-status-legend">
                   <span className="affectations-page__room-legend-item affectations-page__room-legend-item--available">
                     <span className="affectations-page__room-legend-dot" /> {resumeDisponibiliteSalles.disponibles} disponible(s)
                   </span>
                   <span className="affectations-page__room-legend-item affectations-page__room-legend-item--occupied">
-                    <span className="affectations-page__room-legend-dot" /> {resumeDisponibiliteSalles.occupees} occupée(s)
+                    <span className="affectations-page__room-legend-dot" /> {resumeDisponibiliteSalles.occupees} occupee(s)
                   </span>
                   <span className="affectations-page__room-legend-item affectations-page__room-legend-item--incompatible">
                     <span className="affectations-page__room-legend-dot" /> {resumeDisponibiliteSalles.incompatibles} incompatible(s)
@@ -2382,12 +3125,20 @@ export function AffectationsPage({ utilisateur, onLogout }) {
                   <span className={`affectations-page__room-selected-info affectations-page__room-selected-info--${
                     sallePlanificationSelectionnee.statut === "AVAILABLE" ? "ok" : "error"
                   }`}>
-                    {sallePlanificationSelectionnee.statut === "AVAILABLE" ? "✅" : "⚠️"}{" "}
-                    {sallePlanificationSelectionnee.code} — {sallePlanificationSelectionnee.raison}
+                    {sallePlanificationSelectionnee.statut === "AVAILABLE" ? "OK" : "A verifier"}{" "}
+                    {sallePlanificationSelectionnee.code} - {sallePlanificationSelectionnee.raison}
                   </span>
                 ) : null}
               </div>
 
+              <AssignmentModificationSimulationPanel
+                active={Boolean(idAffectationEdition)}
+                loading={simulationModificationEnCours}
+                report={simulationModification}
+                isCurrent={simulationModificationCourante}
+                localIssues={issuesLocalesModificationIntelligente}
+                lastAppliedResult={resumeModificationIntelligente}
+              />
 
               {sallesPlanificationManuelleAvecStatut.length > 0 ? (
                 <div className="affectations-page__rooms-panel">
@@ -2447,28 +3198,65 @@ export function AffectationsPage({ utilisateur, onLogout }) {
 
 
               <div className="affectations-page__actions">
-                <button
-                  className="crud-page__primary-button"
-                  type="button"
-                  onClick={handleEnregistrerPlanification}
-                  disabled={
-                    planificationEnCours ||
-                    loading ||
-                    !sallePlanificationSelectionnee?.disponible
-                  }
-                >
-                  {planificationEnCours
-                    ? "Enregistrement..."
-                    : idAffectationEdition
-                      ? "Mettre a jour"
-                      : "Planifier le cours"}
-                </button>
+                {idAffectationEdition ? (
+                  <>
+                    <button
+                      className="crud-page__secondary-button"
+                      type="button"
+                      onClick={handleSimulerModificationIntelligente}
+                      disabled={
+                        simulationModificationEnCours ||
+                        applicationModificationIntelligenteEnCours ||
+                        loading ||
+                        modificationIntelligenteBloqueeLocalement
+                      }
+                    >
+                      {simulationModificationEnCours
+                        ? "Simulation..."
+                        : simulationModification
+                          ? "Relancer la simulation"
+                          : "Simuler l'impact"}
+                    </button>
+                    <button
+                      className="crud-page__primary-button"
+                      type="button"
+                      onClick={handleAppliquerModificationIntelligente}
+                      disabled={
+                        applicationModificationIntelligenteEnCours ||
+                        simulationModificationEnCours ||
+                        modificationIntelligenteBloqueeLocalement ||
+                        !simulationModification ||
+                        !simulationModificationCourante ||
+                        !simulationModification.faisable
+                      }
+                    >
+                      {applicationModificationIntelligenteEnCours
+                        ? "Application..."
+                        : "Appliquer la modification"}
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    className="crud-page__primary-button"
+                    type="button"
+                    onClick={handleEnregistrerPlanification}
+                    disabled={
+                      planificationEnCours ||
+                      loading ||
+                      !sallePlanificationSelectionnee?.disponible
+                    }
+                  >
+                    {planificationEnCours ? "Enregistrement..." : "Planifier le cours"}
+                  </button>
+                )}
                 {idAffectationEdition ? (
                   <button
                     className="crud-page__secondary-button"
                     type="button"
                     onClick={reinitialiserPlanification}
-                    disabled={planificationEnCours}
+                    disabled={
+                      planificationEnCours || applicationModificationIntelligenteEnCours
+                    }
                   >
                     Annuler l'edition
                   </button>

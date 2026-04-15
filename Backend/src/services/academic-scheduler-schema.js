@@ -1,3 +1,11 @@
+/**
+ * Service d'evolution de schema au runtime pour les modules avances.
+ *
+ * Le projet repose encore sur un melange de dump SQL historiques et
+ * d'evolutions incrustees dans le backend. Ce fichier sert donc de garde-fou :
+ * il assure, avant l'execution des flux critiques, que les tables, colonnes,
+ * index et contraintes indispensables au scheduler academique sont bien presentes.
+ */
 import pool from "../../db.js";
 
 let schemaReadyPromise = null;
@@ -136,6 +144,15 @@ async function assurerIndexGroupesParSession(executor) {
   );
 }
 
+/**
+ * Cree la table des affectations individuelles si elle n'existe pas encore.
+ *
+ * Cette table supporte a la fois les reprises et les exceptions individuelles
+ * appliquees a un etudiant sur un cours donne.
+ *
+ * @param {Object} executor Connexion SQL active.
+ * @returns {Promise<void>}
+ */
 async function assurerTableAffectationEtudiants(executor) {
   await executor.query(
     `CREATE TABLE IF NOT EXISTS affectation_etudiants (
@@ -178,6 +195,13 @@ async function assurerTableAffectationEtudiants(executor) {
   );
 }
 
+/**
+ * Cree le journal metier des echanges de cours et rattache les overrides
+ * individuels a ce journal.
+ *
+ * @param {Object} executor Connexion SQL active.
+ * @returns {Promise<void>}
+ */
 async function assurerEchangesCoursEtudiants(executor) {
   await executor.query(
     `CREATE TABLE IF NOT EXISTS echanges_cours_etudiants (
@@ -251,6 +275,12 @@ async function assurerEchangesCoursEtudiants(executor) {
   );
 }
 
+/**
+ * Fait evoluer `cours_echoues` pour tracer le groupe reel retenu en reprise.
+ *
+ * @param {Object} executor Connexion SQL active.
+ * @returns {Promise<void>}
+ */
 async function assurerCoursEchouesEvolution(executor) {
   await ajouterColonneSiAbsente(
     executor,
@@ -279,6 +309,12 @@ async function assurerCoursEchouesEvolution(executor) {
   );
 }
 
+/**
+ * Cree les series de planification utilisees par la recurrence manuelle.
+ *
+ * @param {Object} executor Connexion SQL active.
+ * @returns {Promise<void>}
+ */
 async function assurerPlanificationSeries(executor) {
   await executor.query(
     `CREATE TABLE IF NOT EXISTS planification_series (
@@ -325,14 +361,61 @@ async function assurerPlanificationSeries(executor) {
   );
 }
 
+/**
+ * Cree le journal metier des replanifications intelligentes d'affectations.
+ *
+ * @param {Object} executor Connexion SQL active.
+ * @returns {Promise<void>}
+ */
+async function assurerJournalModificationsAffectationsScheduler(executor) {
+  await executor.query(
+    `CREATE TABLE IF NOT EXISTS journal_modifications_affectations_scheduler (
+      id_journal_modification_affectation INT NOT NULL AUTO_INCREMENT,
+      id_session INT NOT NULL,
+      id_utilisateur INT NULL,
+      id_affectation_reference INT NOT NULL,
+      id_planification_serie_reference INT NULL,
+      portee VARCHAR(32) NOT NULL,
+      mode_optimisation VARCHAR(32) NOT NULL,
+      nb_occurrences_ciblees INT NOT NULL DEFAULT 1,
+      statut VARCHAR(32) NOT NULL DEFAULT 'APPLIQUEE',
+      anciennes_valeurs_json LONGTEXT NULL,
+      nouvelles_valeurs_json LONGTEXT NULL,
+      simulation_json LONGTEXT NULL,
+      details_json LONGTEXT NULL,
+      cree_le DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (id_journal_modification_affectation),
+      KEY idx_modifications_affectations_session (id_session, cree_le),
+      KEY idx_modifications_affectations_reference (id_affectation_reference, cree_le),
+      CONSTRAINT fk_modifications_affectations_session
+        FOREIGN KEY (id_session) REFERENCES sessions (id_session)
+        ON DELETE CASCADE,
+      CONSTRAINT fk_modifications_affectations_utilisateur
+        FOREIGN KEY (id_utilisateur) REFERENCES utilisateurs (id_utilisateur)
+        ON DELETE SET NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
+  );
+}
+
 async function assurerSchema(executor) {
   await assurerTableAffectationEtudiants(executor);
   await assurerEchangesCoursEtudiants(executor);
   await assurerCoursEchouesEvolution(executor);
   await assurerPlanificationSeries(executor);
+  await assurerJournalModificationsAffectationsScheduler(executor);
   await assurerIndexGroupesParSession(executor);
 }
 
+/**
+ * Assure le schema minimal requis par les modules de scheduler academique.
+ *
+ * En environnement applicatif, le resultat est memorise pour eviter de
+ * rejouer les memes verifications a chaque requete. En test, l'appel est
+ * neutralise afin de laisser les fixtures maitriser entierement le schema.
+ *
+ * @param {Object} [executor=pool] Pool MySQL ou connexion transactionnelle.
+ * @returns {Promise<void>}
+ */
 export async function assurerSchemaSchedulerAcademique(executor = pool) {
   if (process.env.NODE_ENV === "test") {
     return;

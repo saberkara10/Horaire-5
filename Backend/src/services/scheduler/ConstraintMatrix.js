@@ -433,4 +433,56 @@ export class ConstraintMatrix {
       .filter((cle) => cle.startsWith(date))
       .map((cle) => cle.split("|")[1]);
   }
+
+  /**
+   * Clone la matrice de contraintes courante.
+   *
+   * Cette copie profonde permet de tester des mouvements locaux en memoire
+   * sans perturber l'etat du moteur principal ni les reservations deja faites
+   * pour les reprises et les autres groupes.
+   *
+   * @returns {ConstraintMatrix} Copie complete de la matrice.
+   */
+  clone() {
+    const clonedMatrix = new ConstraintMatrix();
+    clonedMatrix.salles = ConstraintMatrix._cloneMapOfSets(this.salles);
+    clonedMatrix.professeurs = ConstraintMatrix._cloneMapOfSets(this.professeurs);
+    clonedMatrix.groupes = ConstraintMatrix._cloneMapOfSets(this.groupes);
+    clonedMatrix.etudiants = ConstraintMatrix._cloneMapOfSets(this.etudiants);
+    clonedMatrix.coursParProf = ConstraintMatrix._cloneMapOfMaps(this.coursParProf);
+    clonedMatrix.groupesParProf = ConstraintMatrix._cloneMapOfMaps(this.groupesParProf);
+    clonedMatrix.seancesHebdomadairesParGroupe =
+      ConstraintMatrix._cloneMapOfMaps(this.seancesHebdomadairesParGroupe);
+    clonedMatrix.seancesHebdomadairesParProfesseur =
+      ConstraintMatrix._cloneMapOfMaps(this.seancesHebdomadairesParProfesseur);
+    return clonedMatrix;
+  }
+
+  /**
+   * Copie profonde d'une Map<string, Set>.
+   *
+   * @param {Map<string, Set<string>>} sourceMap - index source.
+   * @returns {Map<string, Set<string>>} Copie profonde.
+   */
+  static _cloneMapOfSets(sourceMap) {
+    const clonedMap = new Map();
+    for (const [key, value] of sourceMap?.entries?.() || []) {
+      clonedMap.set(key, new Set(value || []));
+    }
+    return clonedMap;
+  }
+
+  /**
+   * Copie profonde d'une Map<string, Map>.
+   *
+   * @param {Map<string, Map<string|number, number>>} sourceMap - index source.
+   * @returns {Map<string, Map<string|number, number>>} Copie profonde.
+   */
+  static _cloneMapOfMaps(sourceMap) {
+    const clonedMap = new Map();
+    for (const [key, nestedMap] of sourceMap?.entries?.() || []) {
+      clonedMap.set(key, new Map(nestedMap || []));
+    }
+    return clonedMap;
+  }
 }

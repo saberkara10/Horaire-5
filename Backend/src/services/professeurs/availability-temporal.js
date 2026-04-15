@@ -1,3 +1,11 @@
+/**
+ * Utilitaires temporels partages par la gestion des disponibilites professeurs.
+ *
+ * Ce module isole les calculs de dates et de fenetres d'effet utilises par :
+ * - la saisie des disponibilites ;
+ * - la projection sur une session academique ;
+ * - la replanification locale des seances impactees.
+ */
 export const DATE_DEBUT_DISPONIBILITE_DEFAUT = "2000-01-01";
 export const DATE_FIN_DISPONIBILITE_DEFAUT = "2099-12-31";
 
@@ -9,6 +17,12 @@ export const MODE_APPLICATION_DISPONIBILITES = Object.freeze({
   PERMANENTE: "permanente",
 });
 
+/**
+ * Normalise une date vers le format ISO `YYYY-MM-DD`.
+ *
+ * @param {string|Date} date Valeur brute recue depuis l'API ou la base.
+ * @returns {string} Date ISO ou chaine vide si la valeur est invalide.
+ */
 export function normaliserDateIso(date) {
   const valeur = String(date || "").trim();
 
@@ -45,6 +59,12 @@ export function normaliserDateIso(date) {
   return formatDateLocale(dateLocale);
 }
 
+/**
+ * Convertit une date ISO en objet `Date` local sans decalage horaire.
+ *
+ * @param {string} dateString Date ISO attendue.
+ * @returns {Date} Instance `Date`, possiblement invalide.
+ */
 export function parseDateLocale(dateString) {
   const texte = normaliserDateIso(dateString);
 
@@ -56,6 +76,12 @@ export function parseDateLocale(dateString) {
   return new Date(Number(annee), Number(mois) - 1, Number(jour));
 }
 
+/**
+ * Formate une date locale au format ISO court.
+ *
+ * @param {Date} date Date a formatter.
+ * @returns {string} Date `YYYY-MM-DD`.
+ */
 export function formatDateLocale(date) {
   const annee = date.getFullYear();
   const mois = String(date.getMonth() + 1).padStart(2, "0");
@@ -63,24 +89,62 @@ export function formatDateLocale(date) {
   return `${annee}-${mois}-${jour}`;
 }
 
+/**
+ * Ajoute un nombre de jours a une date ISO.
+ *
+ * @param {string} dateString Date de depart.
+ * @param {number} nombreJours Nombre de jours a ajouter.
+ * @returns {string} Nouvelle date ISO.
+ */
 export function ajouterJours(dateString, nombreJours) {
   const date = parseDateLocale(dateString);
   date.setDate(date.getDate() + Number(nombreJours || 0));
   return formatDateLocale(date);
 }
 
+/**
+ * Retourne la date ISO la plus recente entre deux valeurs.
+ *
+ * @param {string} dateA Premiere date.
+ * @param {string} dateB Deuxieme date.
+ * @returns {string} Date maximale.
+ */
 export function maxDateIso(dateA, dateB) {
   return String(dateA).localeCompare(String(dateB), "fr") >= 0 ? dateA : dateB;
 }
 
+/**
+ * Retourne la date ISO la plus ancienne entre deux valeurs.
+ *
+ * @param {string} dateA Premiere date.
+ * @param {string} dateB Deuxieme date.
+ * @returns {string} Date minimale.
+ */
 export function minDateIso(dateA, dateB) {
   return String(dateA).localeCompare(String(dateB), "fr") <= 0 ? dateA : dateB;
 }
 
+/**
+ * Force une date a rester dans une plage minimale / maximale.
+ *
+ * @param {string} date Date a contraindre.
+ * @param {string} dateMin Borne basse.
+ * @param {string} dateMax Borne haute.
+ * @returns {string} Date ISO tronquee aux bornes fournies.
+ */
 export function clipDateIso(date, dateMin, dateMax) {
   return minDateIso(maxDateIso(date, dateMin), dateMax);
 }
 
+/**
+ * Indique si deux intervalles de dates se chevauchent.
+ *
+ * @param {string} dateDebutA Debut de l'intervalle A.
+ * @param {string} dateFinA Fin de l'intervalle A.
+ * @param {string} dateDebutB Debut de l'intervalle B.
+ * @param {string} dateFinB Fin de l'intervalle B.
+ * @returns {boolean} `true` si les intervalles se recouvrent.
+ */
 export function datesSeChevauchent(
   dateDebutA,
   dateFinA,
@@ -95,6 +159,13 @@ export function datesSeChevauchent(
   return debutA <= finB && finA >= debutB;
 }
 
+/**
+ * Verifie si une disponibilite couvre une date de seance donnee.
+ *
+ * @param {Object} disponibilite Disponibilite ou plage d'effet.
+ * @param {string} date Date a verifier.
+ * @returns {boolean} `true` si la date est couverte.
+ */
 export function disponibiliteCouvreDate(disponibilite, date) {
   const dateReference = normaliserDateIso(date);
   const dateDebut =
@@ -107,6 +178,12 @@ export function disponibiliteCouvreDate(disponibilite, date) {
   return Boolean(dateReference) && dateReference >= dateDebut && dateReference <= dateFin;
 }
 
+/**
+ * Calcule le nombre de semaines couvertes par une session.
+ *
+ * @param {Object} session Session avec `date_debut` et `date_fin`.
+ * @returns {number} Nombre minimal de semaines, jamais inferieur a 1.
+ */
 export function calculerNombreSemainesSession(session) {
   const dateDebut = normaliserDateIso(session?.date_debut);
   const dateFin = normaliserDateIso(session?.date_fin);
@@ -125,6 +202,13 @@ export function calculerNombreSemainesSession(session) {
   return Math.max(1, Math.ceil((difference + 24 * 60 * 60 * 1000) / (7 * 24 * 60 * 60 * 1000)));
 }
 
+/**
+ * Retourne le numero de semaine d'une date dans la session.
+ *
+ * @param {string} dateString Date cible.
+ * @param {Object} session Session de reference.
+ * @returns {number} Numero de semaine base 1.
+ */
 export function calculerNumeroSemaineSession(dateString, session) {
   const date = normaliserDateIso(dateString);
   const dateDebut = normaliserDateIso(session?.date_debut);
@@ -143,6 +227,14 @@ export function calculerNumeroSemaineSession(dateString, session) {
   return Math.floor(difference / (7 * 24 * 60 * 60 * 1000)) + 1;
 }
 
+/**
+ * Determine la semaine de reference a utiliser pour une operation.
+ *
+ * @param {Object} session Session de reference.
+ * @param {number} semaineCible Numero de semaine demande par le client.
+ * @param {string} [dateReference=formatDateLocale(new Date())] Date fallback.
+ * @returns {number} Numero de semaine valide dans la session.
+ */
 export function determinerSemaineReferenceSession(
   session,
   semaineCible,
@@ -173,6 +265,13 @@ export function determinerSemaineReferenceSession(
   );
 }
 
+/**
+ * Calcule les bornes exactes de la semaine cible dans la session.
+ *
+ * @param {Object} session Session de reference.
+ * @param {number} semaineCible Numero de semaine souhaite.
+ * @returns {Object} Numero, bornes et nombre total de semaines.
+ */
 export function calculerFenetreSemaineSession(session, semaineCible) {
   const numeroSemaine = determinerSemaineReferenceSession(session, semaineCible);
   const dateDebutSession = normaliserDateIso(session?.date_debut);
@@ -188,6 +287,12 @@ export function calculerFenetreSemaineSession(session, semaineCible) {
   };
 }
 
+/**
+ * Normalise le mode d'application d'une disponibilite.
+ *
+ * @param {string} mode Valeur brute recue depuis l'API.
+ * @returns {string} Mode supporte par le backend.
+ */
 export function normaliserModeApplicationDisponibilites(mode) {
   const valeur = String(mode || "").trim().toLowerCase();
 
@@ -208,6 +313,14 @@ export function normaliserModeApplicationDisponibilites(mode) {
   }
 }
 
+/**
+ * Calcule la fenetre temporelle d'effet d'une disponibilite sur une session.
+ *
+ * @param {Object} session Session cible.
+ * @param {Object} [options={}] Options d'application recues depuis l'API.
+ * @param {string} [legacyModeApplication] Ancien mode encore accepte.
+ * @returns {Object} Fenetre de semaine et bornes d'impact.
+ */
 export function calculerFenetreApplicationDisponibilites(
   session,
   options = {},
@@ -303,6 +416,13 @@ export function calculerFenetreApplicationDisponibilites(
   };
 }
 
+/**
+ * Trie deux disponibilites selon leur ordre d'application temporel.
+ *
+ * @param {Object} disponibiliteA Premiere disponibilite.
+ * @param {Object} disponibiliteB Deuxieme disponibilite.
+ * @returns {number} Valeur compatible avec `Array.prototype.sort`.
+ */
 export function comparerDisponibilitesTemporelles(disponibiliteA, disponibiliteB) {
   const debutA =
     normaliserDateIso(disponibiliteA?.date_debut_effet) ||
@@ -343,6 +463,13 @@ export function comparerDisponibilitesTemporelles(disponibiliteA, disponibiliteB
   );
 }
 
+/**
+ * Tronque une disponibilite aux bornes reelles de la session.
+ *
+ * @param {Object} disponibilite Disponibilite brute.
+ * @param {Object} session Session de reference.
+ * @returns {Object} Disponibilite enrichie et bornee a la session.
+ */
 export function enrichirDisponibilitePourSession(disponibilite, session) {
   const sessionDebut = normaliserDateIso(session?.date_debut);
   const sessionFin = normaliserDateIso(session?.date_fin);

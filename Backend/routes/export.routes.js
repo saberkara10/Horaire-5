@@ -162,7 +162,7 @@ export default function exportRoutes(app) {
         return res.status(404).json({ message: "Groupe introuvable." });
       }
 
-      const buffer = genererExcelGroupe(data);
+      const buffer = await genererExcelGroupe(data);
       const filename = nomFichier(
         "groupe",
         data.groupe.nom_groupe,
@@ -220,7 +220,7 @@ export default function exportRoutes(app) {
         return res.status(404).json({ message: "Professeur introuvable." });
       }
 
-      const buffer = genererExcelProfesseur(data);
+      const buffer = await genererExcelProfesseur(data);
       const identifiant = `${data.professeur.prenom || ""}-${data.professeur.nom || ""}`.trim();
       const filename = nomFichier(
         "professeur",
@@ -279,7 +279,7 @@ export default function exportRoutes(app) {
         return res.status(404).json({ message: "Etudiant introuvable." });
       }
 
-      const buffer = genererExcelEtudiant(data);
+      const buffer = await genererExcelEtudiant(data);
       const identifiant = `${data.etudiant.prenom || ""}-${data.etudiant.nom || ""}`.trim();
       const filename = nomFichier(
         "etudiant",

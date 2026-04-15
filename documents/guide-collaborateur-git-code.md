@@ -218,22 +218,22 @@ SCHEDULER_MAX_WEEKLY_SESSIONS_PER_PROFESSOR=16
 
 ### Base de donnees
 
-Source principale:
+Source officielle des evolutions schema:
 
-- `Backend/Database/GDH5.sql`
+- `Backend/Database/migration_v1.sql` a `Backend/Database/migration_v11.sql`
+- `Backend/Database/run-migrations.js`
+- la table SQL `migrations`
 
-Autres scripts observes:
+Commande standard:
 
-- `Backend/Database/migration_v2.sql`
-- `Backend/Database/migration_v3.sql`
-- `Backend/Database/migration_v8.sql`
-- `Backend/Database/run_migration.js`
-- `Backend/Database/run-migration-v3.js` a `run-migration-v9.js`
+```bash
+npm run migrate
+```
 
-Note importante:
+Notes importantes:
 
-- le projet combine dump SQL, scripts de migration et ajustements de schema au runtime
-- le service `Backend/src/services/academic-scheduler-schema.js` cree ou complete une partie du schema scheduler automatiquement hors environnement de test
+- `Backend/Database/GDH5.sql` reste un snapshot historique, mais ce n'est plus la voie normale d'installation
+- les anciens scripts `run_migration.js` et `run-migration-vX.js` sont deprecies et rediriges vers le moteur central
 
 ### Ports et proxy
 
@@ -539,10 +539,10 @@ Elements a connaitre:
 
 - `Backend/db.js` cree un pool de connexions
 - la base attendue dans la doc actuelle est `gdh5`
-- une partie du schema est dans `GDH5.sql`
-- une autre partie est amenee par migrations et bootstrap runtime
+- le schema canonique est pilote par la chaine de migrations versionnees
+- `GDH5.sql` reste un snapshot historique de reference
 
-Le fichier `Backend/src/services/academic-scheduler-schema.js` garantit notamment:
+Les migrations couvrent notamment:
 
 - la table `affectation_etudiants`
 - des indexes sur `groupes_etudiants`
@@ -550,7 +550,7 @@ Le fichier `Backend/src/services/academic-scheduler-schema.js` garantit notammen
 
 Implication pratique:
 
-- si un bug touche les affectations individuelles ou les reprises, il faut verifier a la fois le SQL de base et ce service d'evolution de schema
+- si un bug touche les affectations individuelles ou les reprises, il faut verifier la version de schema en base via la table `migrations` et la migration concernee dans `Backend/Database/`
 
 ## 14. Tests
 
@@ -609,7 +609,7 @@ Ce qu'un nouveau collaborateur doit savoir tout de suite:
 1. obtenir l'acces GitHub au depot prive
 2. cloner le repo et installer les dependances
 3. creer `Backend/.env`
-4. importer `Backend/Database/GDH5.sql`
+4. lancer `npm run migrate`
 5. lancer `npm run dev` depuis la racine
 6. verifier `http://localhost:5173` et `http://localhost:3000/api/health`
 7. tester la connexion via `admin@ecole.ca` ou `responsable@ecole.ca`
