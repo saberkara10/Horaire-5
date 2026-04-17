@@ -1,3 +1,14 @@
+/**
+ * Logique de nettoyage de donnees de la migration v4.
+ *
+ * Role:
+ * - fusionne les professeurs en doublon avant d'imposer une unicite
+ *
+ * Impact sur le projet:
+ * - evite que des doublons de professeurs polluent les affectations et
+ *   disponibilites
+ * - ajoute une cle unique sur `(nom, prenom)` dans `professeurs`
+ */
 function normaliserTexteIdentite(valeur) {
   return String(valeur || "")
     .trim()

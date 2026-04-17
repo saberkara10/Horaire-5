@@ -14,6 +14,19 @@ const poolMock = {
 
 const recupererDisponibilitesProfesseursMock = jest.fn();
 const recupererIndexCoursProfesseursMock = jest.fn();
+const detecterViolationsPauseSeanceMock = jest.fn();
+const recupererParticipantsSeanceMock = jest.fn();
+
+const manualPlanningServiceMock = {
+  listerEtudiantsPourPlanificationReprise: jest.fn(),
+  listerCoursEchouesEtudiant: jest.fn(),
+  listerGroupesCompatiblesPourCoursEchoue: jest.fn(),
+  detecterViolationsPauseSeance: detecterViolationsPauseSeanceMock,
+  planifierCoursEchouePourEtudiant: jest.fn(),
+  planifierCoursGroupeManuellement: jest.fn(),
+  recupererParticipantsSeance: recupererParticipantsSeanceMock,
+  replanifierCoursGroupeManuellement: jest.fn(),
+};
 
 await jest.unstable_mockModule("../db.js", () => ({
   default: poolMock,
@@ -23,6 +36,10 @@ await jest.unstable_mockModule("../src/model/professeurs.model.js", () => ({
   recupererDisponibilitesProfesseurs: recupererDisponibilitesProfesseursMock,
   recupererIndexCoursProfesseurs: recupererIndexCoursProfesseursMock,
 }));
+
+await jest.unstable_mockModule("../src/services/planning/manual-planning.service.js", () =>
+  manualPlanningServiceMock
+);
 
 const {
   creerAffectationValidee,
@@ -49,7 +66,23 @@ describe("Tests modele Horaire", () => {
     connectionMock.commit.mockResolvedValue(undefined);
     connectionMock.rollback.mockResolvedValue(undefined);
     connectionMock.release.mockResolvedValue(undefined);
+    recupererParticipantsSeanceMock.mockResolvedValue({
+      etudiantsReguliers: [],
+      etudiantsReprises: [],
+      participants: [],
+      idsParticipants: [],
+      effectifReel: 0,
+    });
+    detecterViolationsPauseSeanceMock.mockResolvedValue([]);
   });
+
+  function mockSessionActiveQuery(sql) {
+    if (sql.includes("FROM sessions") && sql.includes("active = TRUE")) {
+      return [[{ id_session: 1 }]];
+    }
+
+    return null;
+  }
 
   test("professeurEstCompatibleAvecCours retourne true quand le cours est assigne", () => {
     const map = new Map([[1, new Set([10])]]);
@@ -193,6 +226,11 @@ describe("Tests modele Horaire", () => {
 
   test("creerAffectationValidee rejette un professeur non compatible", async () => {
     connectionMock.query.mockImplementation(async (sql) => {
+      const sessionResult = mockSessionActiveQuery(sql);
+      if (sessionResult) {
+        return sessionResult;
+      }
+
       if (sql.includes("FROM cours")) {
         return [[
           {
@@ -251,6 +289,11 @@ describe("Tests modele Horaire", () => {
 
   test("creerAffectationValidee cree une affectation et lie le groupe quand le contexte est valide", async () => {
     connectionMock.query.mockImplementation(async (sql) => {
+      const sessionResult = mockSessionActiveQuery(sql);
+      if (sessionResult) {
+        return sessionResult;
+      }
+
       if (sql.includes("FROM cours")) {
         return [[
           {
@@ -356,6 +399,11 @@ describe("Tests modele Horaire", () => {
 
   test("creerAffectationValidee rejette un groupe deja occupe sur le meme creneau", async () => {
     connectionMock.query.mockImplementation(async (sql) => {
+      const sessionResult = mockSessionActiveQuery(sql);
+      if (sessionResult) {
+        return sessionResult;
+      }
+
       if (sql.includes("FROM cours")) {
         return [[
           {
@@ -442,11 +490,143 @@ describe("Tests modele Horaire", () => {
     });
   });
 
+  test("creerAffectationValidee rejette une pause insuffisante apres deux cours consecutifs", async () => {
+    recupererParticipantsSeanceMock.mockResolvedValue({
+      etudiantsReguliers: [{ id_etudiant: 99 }],
+      etudiantsReprises: [],
+      participants: [{ id_etudiant: 99 }],
+      idsParticipants: [99],
+      effectifReel: 1,
+    });
+    detecterViolationsPauseSeanceMock.mockResolvedValue([
+      {
+        code: "BREAK_AFTER_TWO_CONSECUTIVE_REQUIRED",
+        message:
+          "Apres 2 cours consecutifs, une pause d'au moins 1h est obligatoire avant un 3e cours.",
+        resourceType: "etudiant",
+        resourceId: 99,
+        date: "2026-03-23",
+        details: {
+          gap_minutes: 30,
+        },
+      },
+    ]);
+
+    connectionMock.query.mockImplementation(async (sql) => {
+      const sessionResult = mockSessionActiveQuery(sql);
+      if (sessionResult) {
+        return sessionResult;
+      }
+
+      if (sql.includes("FROM cours")) {
+        return [[
+          {
+            id_cours: 1,
+            code: "INF101",
+            nom: "Programmation",
+            programme: "Programmation informatique",
+            etape_etude: "1",
+            type_salle: "Laboratoire",
+            id_salle_reference: 3,
+          },
+        ]];
+      }
+
+      if (sql.includes("FROM professeurs")) {
+        return [[
+          {
+            id_professeur: 2,
+            matricule: "MAT002",
+            nom: "Martin",
+            prenom: "Lea",
+            specialite: "Programmation informatique",
+          },
+        ]];
+      }
+
+      if (sql.includes("FROM salles")) {
+        return [[
+          {
+            id_salle: 3,
+            code: "LAB-01",
+            type: "Laboratoire",
+            capacite: 24,
+          },
+        ]];
+      }
+
+      if (sql.includes("FROM groupes_etudiants ge")) {
+        return [[
+          {
+            id_groupes_etudiants: 4,
+            nom_groupe: "Programmation informatique - E1 - Automne - G1",
+            programme: "Programmation informatique",
+            etape: "1",
+            session: "Automne",
+            effectif: 24,
+          },
+        ]];
+      }
+
+      if (sql.includes("FROM affectation_groupes ag")) {
+        return [[{ conflits: 0 }]];
+      }
+
+      if (sql.includes("WHERE ac.id_salle = ?")) {
+        return [[{ conflits: 0 }]];
+      }
+
+      if (sql.includes("WHERE ac.id_professeur = ?")) {
+        return [[{ conflits: 0 }]];
+      }
+
+      return [[]];
+    });
+
+    recupererIndexCoursProfesseursMock.mockResolvedValue(
+      new Map([[2, new Set([1])]])
+    );
+    recupererDisponibilitesProfesseursMock.mockResolvedValue(new Map());
+
+    await expect(
+      creerAffectationValidee({
+        idCours: 1,
+        idProfesseur: 2,
+        idSalle: 3,
+        idGroupeEtudiants: 4,
+        date: "2026-03-23",
+        heureDebut: "14:30",
+        heureFin: "17:30",
+      })
+    ).rejects.toMatchObject({
+      message:
+        "Apres 2 cours consecutifs, une pause d'au moins 1h est obligatoire avant un 3e cours.",
+      statusCode: 409,
+      code: "BREAK_AFTER_TWO_CONSECUTIVE_REQUIRED",
+    });
+
+    expect(detecterViolationsPauseSeanceMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        participantIds: [99],
+        idSession: 1,
+        date: "2026-03-23",
+        heureDebut: "14:30",
+        heureFin: "17:30",
+      }),
+      expect.any(Object)
+    );
+  });
+
   test("updateAffectationValidee remplace le groupe et met a jour l'affectation", async () => {
     let groupeActuel = 4;
     let libelleGroupeActuel = "Programmation informatique - E1 - Automne - G1";
 
     connectionMock.query.mockImplementation(async (sql, params = []) => {
+      const sessionResult = mockSessionActiveQuery(sql);
+      if (sessionResult) {
+        return sessionResult;
+      }
+
       if (
         sql.includes("WHERE ac.id_affectation_cours = ?") &&
         sql.includes("GROUP_CONCAT")
@@ -582,6 +762,11 @@ describe("Tests modele Horaire", () => {
 
   test("updateAffectationValidee rejette un groupe deja occupe sur le meme creneau", async () => {
     connectionMock.query.mockImplementation(async (sql, params = []) => {
+      const sessionResult = mockSessionActiveQuery(sql);
+      if (sessionResult) {
+        return sessionResult;
+      }
+
       if (
         sql.includes("WHERE ac.id_affectation_cours = ?") &&
         sql.includes("GROUP_CONCAT")
@@ -686,6 +871,149 @@ describe("Tests modele Horaire", () => {
       message: "Groupe deja occupe sur ce creneau.",
       statusCode: 409,
     });
+  });
+
+  test("updateAffectationValidee rejette une pause insuffisante meme sans groupe explicite", async () => {
+    connectionMock.query.mockImplementation(async (sql, params = []) => {
+      const sessionResult = mockSessionActiveQuery(sql);
+      if (sessionResult) {
+        return sessionResult;
+      }
+
+      if (
+        sql.includes("WHERE ac.id_affectation_cours = ?") &&
+        sql.includes("GROUP_CONCAT")
+      ) {
+        return [[
+          {
+            id_affectation_cours: 9,
+            id_cours: 1,
+            id_professeur: 2,
+            id_salle: 3,
+            id_plage_horaires: 11,
+            date: "2026-03-23",
+            heure_debut: "08:00:00",
+            heure_fin: "10:00:00",
+            id_groupes_etudiants: 4,
+            groupes: "Programmation informatique - E1 - Automne - G1",
+          },
+        ]];
+      }
+
+      if (sql.includes("FROM cours")) {
+        return [[
+          {
+            id_cours: 1,
+            code: "INF101",
+            nom: "Programmation",
+            programme: "Programmation informatique",
+            etape_etude: "1",
+            type_salle: "Laboratoire",
+            id_salle_reference: 3,
+          },
+        ]];
+      }
+
+      if (sql.includes("FROM professeurs")) {
+        return [[
+          {
+            id_professeur: 2,
+            matricule: "MAT002",
+            nom: "Martin",
+            prenom: "Lea",
+            specialite: "Programmation informatique",
+          },
+        ]];
+      }
+
+      if (sql.includes("FROM salles")) {
+        return [[
+          {
+            id_salle: 3,
+            code: "LAB-01",
+            type: "Laboratoire",
+            capacite: 30,
+          },
+        ]];
+      }
+
+      if (sql.includes("WHERE ac.id_salle = ?")) {
+        return [[{ conflits: 0 }]];
+      }
+
+      if (sql.includes("WHERE ac.id_professeur = ?")) {
+        return [[{ conflits: 0 }]];
+      }
+
+      if (sql.includes("FROM affectation_groupes ag")) {
+        return [[{ conflits: 0 }]];
+      }
+
+      if (
+        sql.includes("SELECT id_groupes_etudiants") &&
+        sql.includes("FROM affectation_groupes")
+      ) {
+        return [[{ id_groupes_etudiants: 4 }]];
+      }
+
+      if (sql.includes("UPDATE plages_horaires")) {
+        return [{ affectedRows: 1 }];
+      }
+
+      if (sql.includes("UPDATE affectation_cours")) {
+        return [{ affectedRows: 1 }];
+      }
+
+      throw new Error(`SQL non simule: ${sql} / ${JSON.stringify(params)}`);
+    });
+
+    recupererIndexCoursProfesseursMock.mockResolvedValue(
+      new Map([[2, new Set([1])]])
+    );
+    recupererDisponibilitesProfesseursMock.mockResolvedValue(new Map());
+    recupererParticipantsSeanceMock.mockResolvedValue({
+      etudiantsReguliers: [],
+      etudiantsReprises: [{ id_etudiant: 77 }],
+      participants: [{ id_etudiant: 77 }],
+      idsParticipants: [77],
+      effectifReel: 1,
+    });
+    detecterViolationsPauseSeanceMock.mockResolvedValue([
+      {
+        code: "BREAK_AFTER_TWO_CONSECUTIVE_REQUIRED",
+        message:
+          "Apres 2 cours consecutifs, une pause d'au moins 1h est obligatoire avant un 3e cours.",
+        resourceType: "etudiant",
+        resourceId: 77,
+        date: "2026-03-23",
+      },
+    ]);
+
+    await expect(
+      updateAffectationValidee(9, {
+        idCours: 1,
+        idProfesseur: 2,
+        idSalle: 3,
+        date: "2026-03-23",
+        heureDebut: "14:30",
+        heureFin: "17:30",
+      })
+    ).rejects.toMatchObject({
+      message:
+        "Apres 2 cours consecutifs, une pause d'au moins 1h est obligatoire avant un 3e cours.",
+      statusCode: 409,
+      code: "BREAK_AFTER_TWO_CONSECUTIVE_REQUIRED",
+    });
+
+    expect(detecterViolationsPauseSeanceMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        groupeIds: [4],
+        participantIds: [77],
+        idSession: 1,
+        idsAffectationsExclues: [9],
+      }),
+      expect.any(Object)
+    );
   });
 
   test("genererHoraireAutomatiquement cree un horaire groupe par groupe", async () => {

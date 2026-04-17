@@ -1,3 +1,11 @@
+-- ============================================================================
+-- ROLE DU FICHIER
+-- Definition SQL pour la version de schema v12.
+--
+-- IMPACT SUR LE PROJET
+-- - cree `journal_modifications_affectations_scheduler`
+-- - enregistre les changements manuels ou simules d'affectation du scheduler
+-- ============================================================================
 CREATE TABLE IF NOT EXISTS journal_modifications_affectations_scheduler (
   id_journal_modification_affectation INT NOT NULL AUTO_INCREMENT,
   id_session INT NOT NULL,

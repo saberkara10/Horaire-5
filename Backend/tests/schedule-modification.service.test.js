@@ -149,10 +149,57 @@ function buildSuccessfulSimulation() {
   return {
     faisable: true,
     conflitsCrees: 0,
+    modeScoringAvant: "equilibre",
+    modeScoringApres: "equilibre",
+    scoreAvant: {
+      mode: "equilibre",
+      scoreGlobal: 72,
+      scoreEtudiant: 74,
+      scoreProfesseur: 68,
+      scoreGroupe: 70,
+      metrics: {
+        pausesEtudiantsRespectees: 1,
+        pausesEtudiantsManquees: 0,
+        pausesProfesseursRespectees: 1,
+        pausesProfesseursManquees: 0,
+        pausesGroupesRespectees: 1,
+        pausesGroupesManquees: 0,
+        nbCoursNonPlanifies: 0,
+        nbConflitsEvites: 0,
+      },
+    },
+    scoreApres: {
+      mode: "equilibre",
+      scoreGlobal: 76,
+      scoreEtudiant: 79,
+      scoreProfesseur: 70,
+      scoreGroupe: 74,
+      metrics: {
+        pausesEtudiantsRespectees: 1,
+        pausesEtudiantsManquees: 0,
+        pausesProfesseursRespectees: 1,
+        pausesProfesseursManquees: 0,
+        pausesGroupesRespectees: 1,
+        pausesGroupesManquees: 0,
+        nbCoursNonPlanifies: 0,
+        nbConflitsEvites: 1,
+      },
+    },
     difference: {
       scoreGlobal: 4,
       scoreEtudiant: 5,
       scoreProfesseur: 2,
+      scoreGroupe: 4,
+      metrics: {
+        pausesEtudiantsRespectees: 0,
+        pausesEtudiantsManquees: 0,
+        pausesProfesseursRespectees: 0,
+        pausesProfesseursManquees: 0,
+        pausesGroupesRespectees: 0,
+        pausesGroupesManquees: 0,
+        nbCoursNonPlanifies: 0,
+        nbConflitsEvites: 1,
+      },
     },
     impact: {
       etudiants: {
@@ -316,6 +363,14 @@ describe("ScheduleModificationService", () => {
     expect(
       connection.query.mock.calls.some(([sql]) => sql.includes("INSERT INTO planification_series"))
     ).toBe(true);
+
+    const journalInsertCall = connection.query.mock.calls.find(([sql]) =>
+      sql.includes("INSERT INTO journal_modifications_affectations_scheduler")
+    );
+    const detailsJson = JSON.parse(journalInsertCall[1][10]);
+
+    expect(detailsJson.scoring_v1.score_avant.scoreGroupe).toBe(70);
+    expect(detailsJson.scoring_v1.difference.scoreGroupe).toBe(4);
   });
 
   test("previsualise une modification intelligente sans aucune ecriture SQL", async () => {

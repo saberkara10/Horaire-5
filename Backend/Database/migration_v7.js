@@ -1,3 +1,14 @@
+/**
+ * Logique de disponibilite temporelle de la migration v7.
+ *
+ * Role:
+ * - etend les lignes de disponibilites professeurs avec une plage d'effet
+ * - repare les index et contraintes associes si necessaire
+ *
+ * Impact sur le projet:
+ * - ajoute `date_debut_effet` et `date_fin_effet`
+ * - permet au projet de modeliser les changements de disponibilite dans le temps
+ */
 const UNIQUE_INDEX_COLUMNS = [
   "id_professeur",
   "jour_semaine",

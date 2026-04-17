@@ -1,3 +1,10 @@
+import {
+  ACADEMIC_DAY_END_TIME,
+  ACADEMIC_DAY_START_TIME,
+  ACADEMIC_SLOT_DURATION_MINUTES,
+} from "./time/TimeSlotUtils.js";
+import { generateAcademicWeekdayTimeSlots } from "./time/TimeSlotGenerator.js";
+
 export const SESSION_DURATION_MONTHS = 4;
 export const TARGET_GROUPS_PER_PROGRAM = 4;
 export const TARGET_GROUP_SIZE = 28;
@@ -17,12 +24,8 @@ export const MIN_ACTIVE_DAYS_PER_GROUP = 3;
 export const MAX_GROUP_SESSIONS_PER_DAY = 3;
 export const MAX_PROFESSOR_SESSIONS_PER_DAY = 4;
 export const ACADEMIC_WEEKDAY_ORDER = [1, 2, 3, 4, 5];
-export const ACADEMIC_WEEKDAY_TIME_SLOTS = [
-  { debut: "08:00:00", fin: "11:00:00" },
-  { debut: "11:00:00", fin: "14:00:00" },
-  { debut: "14:00:00", fin: "17:00:00" },
-  { debut: "17:00:00", fin: "20:00:00" },
-];
+export { ACADEMIC_DAY_START_TIME, ACADEMIC_DAY_END_TIME, ACADEMIC_SLOT_DURATION_MINUTES };
+export const ACADEMIC_WEEKDAY_TIME_SLOTS = generateAcademicWeekdayTimeSlots();
 
 export const ACADEMIC_ROOM_CATALOG = [
   { code: "CLS101", type: "Salle de cours", capacite: 40 },
@@ -950,9 +953,82 @@ function buildProfessorCoursePlans(options = {}) {
   ).filter((plan) => plan.assignedCourseCodes.length > 0);
 }
 
+function buildReserveProfessorCoursePlans(options = {}) {
+  const reserveCourseDemands = Array.isArray(options.reserveCourseDemands)
+    ? options.reserveCourseDemands
+    : [];
+  const normalizedDemands = reserveCourseDemands
+    .map((item) => ({
+      code: String(item?.code || "").trim().toUpperCase(),
+      programme: String(item?.programme || "").trim(),
+      load: Math.max(1, Number(item?.load) || 0),
+    }))
+    .filter((item) => item.code && item.programme && item.load > 0)
+    .sort((itemA, itemB) => {
+      if (itemB.load !== itemA.load) {
+        return itemB.load - itemA.load;
+      }
+
+      const programmeCompare = itemA.programme.localeCompare(itemB.programme, "fr");
+      if (programmeCompare !== 0) {
+        return programmeCompare;
+      }
+
+      return itemA.code.localeCompare(itemB.code, "fr");
+    });
+
+  const slots = [];
+
+  for (const item of normalizedDemands) {
+    const slotCible = slots
+      .filter((slot) => {
+        const programmes = new Set([...slot.programmes, item.programme]);
+        return (
+          slot.load + item.load <= MAX_WEEKLY_SESSIONS_PER_PROFESSOR &&
+          slot.codes.length < MAX_COURSES_PER_PROFESSOR &&
+          programmes.size <= MAX_PROGRAMS_PER_PROFESSOR
+        );
+      })
+      .sort((slotA, slotB) => slotB.load - slotA.load)[0];
+
+    if (slotCible) {
+      if (!slotCible.codes.includes(item.code)) {
+        slotCible.codes.push(item.code);
+      }
+      slotCible.programmes.add(item.programme);
+      slotCible.load += item.load;
+      continue;
+    }
+
+    slots.push({
+      codes: [item.code],
+      programmes: new Set([item.programme]),
+      load: item.load,
+    });
+  }
+
+  return slots.map((slot) => ({
+    assignedCourseCodes: slot.codes,
+    estimatedWeeklyLoad: slot.load,
+    planType: "reserve",
+  }));
+}
+
 export function buildAcademicProfessors(options = {}) {
   const { existingProfessors = [] } = options;
-  const coursePlans = buildProfessorCoursePlans(options);
+  const basePlans = buildProfessorCoursePlans(options).map((plan, index) => ({
+    ...plan,
+    planType: "base",
+    planIndex: index + 1,
+  }));
+  const reservePlans = buildReserveProfessorCoursePlans(options).map(
+    (plan, index) => ({
+      ...plan,
+      planType: "reserve",
+      planIndex: index + 1,
+    })
+  );
+  const coursePlans = [...basePlans, ...reservePlans];
   const professorIdentities = buildProfessorIdentities(coursePlans.length);
   const existingProfessorPool = buildExistingProfessorReusePool(existingProfessors);
   const existingProfesseursUtilises = new Set();
@@ -971,6 +1047,7 @@ export function buildAcademicProfessors(options = {}) {
     )];
     const professeurExistant = existingProfessorPool.find(
       (professeur) =>
+        plan.planType === "base" &&
         !existingProfesseursUtilises.has(professeur.cleIdentite) &&
         professeurExistantCompatibleAvecPlan(professeur, plan)
     );
@@ -983,7 +1060,9 @@ export function buildAcademicProfessors(options = {}) {
     return {
       matricule:
         professeurExistant?.matricule ||
-        `AUTO-PROF-${String(index + 1).padStart(2, "0")}`,
+        (plan.planType === "reserve"
+          ? `AUTO-RESERVE-PROF-${String(plan.planIndex).padStart(2, "0")}`
+          : `AUTO-PROF-${String(plan.planIndex).padStart(2, "0")}`),
       nom: identity.nom,
       prenom: identity.prenom,
       specialite:
@@ -1009,10 +1088,10 @@ export function getAcademicBootstrapTargets() {
 }
 
 export function createProfessorAvailabilityRows(idProfesseur) {
-  return [1, 2, 3, 4, 5].map((jour) => ({
+  return ACADEMIC_WEEKDAY_ORDER.map((jour) => ({
     id_professeur: idProfesseur,
     jour_semaine: jour,
-    heure_debut: "08:00:00",
-    heure_fin: "20:00:00",
+    heure_debut: ACADEMIC_DAY_START_TIME,
+    heure_fin: ACADEMIC_DAY_END_TIME,
   }));
 }

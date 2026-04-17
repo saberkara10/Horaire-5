@@ -11,7 +11,6 @@
 
 import { userAuth, userAdmin, userAdminOrResponsable } from "../middlewares/auth.js";
 import { SchedulerEngine } from "../src/services/scheduler/SchedulerEngine.js";
-import { SchedulerDataBootstrap } from "../src/services/scheduler/SchedulerDataBootstrap.js";
 import { FailedCourseDebugService } from "../src/services/scheduler/FailedCourseDebugService.js";
 import { SchedulerReportService } from "../src/services/scheduler/SchedulerReportService.js";
 import { ScheduleModificationController } from "../src/controllers/scheduler/ScheduleModificationController.js";
@@ -40,15 +39,13 @@ function readOptimizationMode(source = {}) {
 }
 
 export default function schedulerRoutes(app) {
-  // Bootstrap technique du schema et des donnees minimales du scheduler.
+  // Le bootstrap automatique est desactive. Le moteur travaille uniquement
+  // avec les donnees presentes en base.
   app.post("/api/scheduler/bootstrap", userAuth, userAdmin, async (request, response) => {
-    try {
-      const report = await SchedulerDataBootstrap.ensureOperationalDataset();
-      return response.json({ message: "Bootstrap termine.", report });
-    } catch (error) {
-      console.error("ERREUR Bootstrap:", error);
-      return response.status(500).json({ message: error.message || "Erreur serveur." });
-    }
+    return response.status(410).json({
+      message:
+        "Le bootstrap du scheduler est desactive. Le moteur utilise uniquement les donnees deja presentes en base.",
+    });
   });
 
   // Generation complete avec suivi de progression SSE.

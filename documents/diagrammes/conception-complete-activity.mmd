@@ -1,0 +1,25 @@
+flowchart TB
+  D([Debut]) --> A[Assurer schema et dataset operationnel]
+  A --> B[Charger le contexte de session]
+  B --> C{Session et ressources valides ?}
+  C -- Non --> X[Arreter avec erreur metier]
+  C -- Oui --> E[Former les groupes]
+  E --> F[Construire la matrice de contraintes]
+  F --> G[Generer les jours et les creneaux possibles]
+  G --> H[Trier les cours du plus contraint au moins contraint]
+  H --> I[Rechercher une serie hebdomadaire stable]
+  I --> J{Serie stable trouvee ?}
+  J -- Oui --> K[Reserver le placement]
+  J -- Non --> L[Passer en mode assoupli]
+  L --> M{Placement assoupli trouve ?}
+  M -- Oui --> K
+  M -- Non --> N[Enregistrer un diagnostic non planifie]
+  K --> O{Tous les cours/groupes traites ?}
+  N --> O
+  O -- Non --> I
+  O -- Oui --> P[Passe de garantie 7 cours par groupe]
+  P --> Q[Traiter les cours echoues]
+  Q --> R[Calculer scoring et optimiser localement]
+  R --> S[Persister les affectations]
+  S --> T[Persister les reprises et le rapport]
+  T --> U([Fin])

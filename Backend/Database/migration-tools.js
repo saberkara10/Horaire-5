@@ -1,3 +1,16 @@
+/**
+ * Boite a outils partagee pour les migrations JS.
+ *
+ * Role:
+ * - inspecte les tables, colonnes, index et contraintes
+ * - ajoute ou retire des elements de schema de facon conditionnelle
+ * - encapsule les etapes sensibles dans des transactions
+ * - normalise la detection des erreurs SQL de doublon ou d'absence
+ *
+ * Impact sur le projet:
+ * - ce fichier n'ajoute aucun changement de schema a lui seul
+ * - il rend les migrations plus sures et plus idempotentes
+ */
 import fs from "node:fs/promises";
 
 const IDENTIFIER_PATTERN = /^[A-Za-z0-9_]+$/;

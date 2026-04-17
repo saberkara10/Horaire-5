@@ -1,7 +1,27 @@
 import { describe, expect, test } from "@jest/globals";
 import { ScheduleScorer } from "../src/services/scheduler/scoring/ScheduleScorer.js";
 
+function getIsoWeekday(dateValue) {
+  const date = new Date(`${dateValue}T00:00:00Z`);
+  const weekday = date.getUTCDay();
+  return weekday === 0 ? 7 : weekday;
+}
+
+function buildSlotMetadata(debut, fin) {
+  const [startHours, startMinutes] = debut.split(":").map(Number);
+  const [endHours, endMinutes] = fin.split(":").map(Number);
+  const startTotal = startHours * 60 + startMinutes;
+  const endTotal = endHours * 60 + endMinutes;
+
+  return {
+    dureeHeures: (endTotal - startTotal) / 60,
+    slotStartIndex: (startTotal - 8 * 60) / 60,
+    slotEndIndex: (endTotal - 8 * 60) / 60,
+  };
+}
+
 function placement({
+  idAffectationCours,
   idCours,
   idProfesseur,
   idGroupe,
@@ -14,6 +34,7 @@ function placement({
     id_cours: idCours,
     code_cours: `C${idCours}`,
     nom_cours: `Cours ${idCours}`,
+    id_affectation_cours: idAffectationCours || idCours,
     id_professeur: idProfesseur,
     nom_professeur: `Prof ${idProfesseur}`,
     id_groupe: idGroupe,
@@ -21,6 +42,8 @@ function placement({
     date,
     heure_debut: debut,
     heure_fin: fin,
+    jourSemaine: getIsoWeekday(date),
+    ...buildSlotMetadata(debut, fin),
     id_salle: idCours,
     code_salle: `S${idCours}`,
     est_en_ligne: false,
@@ -139,12 +162,17 @@ describe("ScheduleScorer", () => {
   });
 
   test("supporte les trois modes avec une ponderation differente", () => {
+    const studentPlacements = compactStudentPayload().placements.map((row) => ({
+      ...row,
+      id_groupe: 11,
+      nom_groupe: "GSTUDENT",
+    }));
     const payload = {
       placements: [
-        ...compactStudentPayload().placements,
+        ...studentPlacements,
         ...fragmentedTeacherPayload().placements,
       ],
-      affectationsEtudiantGroupe: new Map([[1, ["G1"]]]),
+      affectationsEtudiantGroupe: new Map([[1, ["GSTUDENT"]]]),
       affectationsReprises: [],
     };
 
@@ -168,7 +196,142 @@ describe("ScheduleScorer", () => {
         },
       },
     });
+    expect(bundle.modes.equilibre.scoreGroupe).toBeDefined();
     expect(bundle.details.etudiant).toBeDefined();
     expect(bundle.details.professeur).toBeDefined();
+    expect(bundle.details.groupe).toBeDefined();
+  });
+
+  test("produit les quatre scores et les compteurs de pause", () => {
+    const payload = {
+      placements: [
+        placement({
+          idAffectationCours: 1,
+          idCours: 601,
+          idProfesseur: 30,
+          idGroupe: 7,
+          nomGroupe: "G7",
+          date: "2026-09-07",
+          debut: "08:00:00",
+          fin: "10:00:00",
+        }),
+        placement({
+          idAffectationCours: 2,
+          idCours: 602,
+          idProfesseur: 30,
+          idGroupe: 7,
+          nomGroupe: "G7",
+          date: "2026-09-07",
+          debut: "10:00:00",
+          fin: "12:00:00",
+        }),
+        placement({
+          idAffectationCours: 3,
+          idCours: 603,
+          idProfesseur: 30,
+          idGroupe: 7,
+          nomGroupe: "G7",
+          date: "2026-09-07",
+          debut: "13:00:00",
+          fin: "15:00:00",
+        }),
+      ],
+      affectationsEtudiantGroupe: new Map([[1, ["G7"]]]),
+      affectationsReprises: [],
+      participantsParAffectation: new Map([
+        [1, [1]],
+        [2, [1]],
+        [3, [1]],
+      ]),
+    };
+
+    const score = ScheduleScorer.scoreSchedule(payload, "equilibre");
+
+    expect(score).toEqual(
+      expect.objectContaining({
+        scoreGlobal: expect.any(Number),
+        scoreEtudiant: expect.any(Number),
+        scoreProfesseur: expect.any(Number),
+        scoreGroupe: expect.any(Number),
+      })
+    );
+    expect(score.metrics.pausesEtudiantsRespectees).toBe(1);
+    expect(score.metrics.pausesProfesseursRespectees).toBe(1);
+    expect(score.metrics.pausesGroupesRespectees).toBe(1);
+    expect(score.metrics.pausesEtudiantsManquees).toBe(0);
+    expect(score.details.etudiant.totals.pauseRespectedCount).toBe(1);
+    expect(score.details.professeur.totals.pauseRespectedCount).toBe(1);
+    expect(score.details.groupe.totals.pauseRespectedCount).toBe(1);
+  });
+
+  test("penalise progressivement les slots tardifs apres 18h", () => {
+    const payloadEarly = {
+      placements: [
+        placement({
+          idCours: 701,
+          idProfesseur: 40,
+          idGroupe: 8,
+          nomGroupe: "G8",
+          date: "2026-09-08",
+          debut: "15:00:00",
+          fin: "18:00:00",
+        }),
+      ],
+      affectationsEtudiantGroupe: new Map([[1, ["G8"]]]),
+      affectationsReprises: [],
+    };
+    const payloadLate = {
+      placements: [
+        placement({
+          idCours: 702,
+          idProfesseur: 40,
+          idGroupe: 8,
+          nomGroupe: "G8",
+          date: "2026-09-08",
+          debut: "18:00:00",
+          fin: "22:00:00",
+        }),
+      ],
+      affectationsEtudiantGroupe: new Map([[1, ["G8"]]]),
+      affectationsReprises: [],
+    };
+
+    const early = ScheduleScorer.scoreSchedule(payloadEarly, "equilibre");
+    const late = ScheduleScorer.scoreSchedule(payloadLate, "equilibre");
+
+    expect(early.details.etudiant.totals.lateCoursePenalty).toBe(0);
+    expect(late.details.etudiant.totals.lateCoursePenalty).toBe(10);
+    expect(late.details.professeur.totals.lateCoursePenalty).toBe(10);
+    expect(late.details.groupe.totals.lateCoursePenalty).toBe(10);
+    expect(late.scoreGlobal).toBeLessThan(early.scoreGlobal);
+  });
+
+  test("utilise les participants reels et pas seulement le groupe principal", () => {
+    const payload = {
+      placements: [
+        placement({
+          idAffectationCours: 801,
+          idCours: 801,
+          idProfesseur: 50,
+          idGroupe: 9,
+          nomGroupe: "G9",
+          date: "2026-09-09",
+          debut: "18:00:00",
+          fin: "21:00:00",
+        }),
+      ],
+      affectationsEtudiantGroupe: new Map([
+        [1, ["G9"]],
+        [2, ["G10"]],
+      ]),
+      affectationsReprises: [],
+      participantsParAffectation: new Map([[801, [1, 2]]]),
+    };
+
+    const score = ScheduleScorer.scoreSchedule(payload, "equilibre");
+
+    expect(score.details.etudiant.studentsAnalyzed).toBe(2);
+    expect(score.details.etudiant.coverage.realParticipantsIncluded).toBe(true);
+    expect(score.details.etudiant.totals.lateCoursePenalty).toBe(12);
   });
 });

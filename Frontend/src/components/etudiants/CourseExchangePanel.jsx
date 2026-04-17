@@ -6,23 +6,20 @@ import {
 } from "../../services/etudiants.api.js";
 import { emettreSynchronisationPlanning } from "../../utils/planningSync.js";
 import { FeedbackBanner } from "../ui/FeedbackBanner.jsx";
+import { EchangeEtudiantSearchField } from "./EchangeEtudiantSearchField.jsx";
+
+/* ─── Helpers d'affichage ─── */
 
 function construireLibelleEtudiant(etudiant) {
-  if (!etudiant) {
-    return "";
-  }
-
+  if (!etudiant) return "";
   const nom = `${etudiant.prenom || ""} ${etudiant.nom || ""}`.trim();
   const matricule = etudiant.matricule ? ` - ${etudiant.matricule}` : "";
   const groupe = etudiant.groupe || etudiant.groupe_principal;
-
   return groupe ? `${nom}${matricule} (${groupe})` : `${nom}${matricule}`;
 }
 
 function formaterOccurrence(occurrence) {
-  if (!occurrence?.date) {
-    return "Occurrence non planifiee";
-  }
+  if (!occurrence?.date) return "Occurrence non planifiee";
 
   const date = new Date(`${occurrence.date}T00:00:00`);
   const dateTexte = Number.isNaN(date.getTime())
@@ -42,14 +39,13 @@ function formaterSource(affectation) {
   if (String(affectation?.source_horaire || "") === "individuelle") {
     return "Exception individuelle";
   }
-
   return "Groupe principal";
 }
 
+/* ─── Sous-composant : carte d'affectation ─── */
+
 function CarteAffectation({ titre, affectation, conflits = [] }) {
-  if (!affectation) {
-    return null;
-  }
+  if (!affectation) return null;
 
   return (
     <article className="course-exchange__card">
@@ -57,7 +53,8 @@ function CarteAffectation({ titre, affectation, conflits = [] }) {
         <div>
           <h3>{titre}</h3>
           <p>
-            {affectation.groupe_source || "Groupe non renseigne"} - {formaterSource(affectation)}
+            {affectation.groupe_source || "Groupe non renseigne"} -{" "}
+            {formaterSource(affectation)}
           </p>
         </div>
         <span
@@ -71,7 +68,9 @@ function CarteAffectation({ titre, affectation, conflits = [] }) {
 
       <div className="course-exchange__occurrences">
         {(affectation.occurrences || []).map((occurrence) => (
-          <span key={`${affectation.id_cours}-${occurrence.id_affectation_cours}-${occurrence.date}`}>
+          <span
+            key={`${affectation.id_cours}-${occurrence.id_affectation_cours}-${occurrence.date}`}
+          >
             {formaterOccurrence(occurrence)}
           </span>
         ))}
@@ -83,8 +82,9 @@ function CarteAffectation({ titre, affectation, conflits = [] }) {
             <li
               key={`${conflit.date}-${conflit.heure_debut}-${conflit.code_cours_conflit}-${index}`}
             >
-              {formaterOccurrence(conflit)} bloque par {conflit.code_cours_conflit || "un cours"}{" "}
-              ({conflit.groupe_conflit || "groupe non renseigne"})
+              {formaterOccurrence(conflit)} bloque par{" "}
+              {conflit.code_cours_conflit || "un cours"} (
+              {conflit.groupe_conflit || "groupe non renseigne"})
             </li>
           ))}
         </ul>
@@ -92,6 +92,8 @@ function CarteAffectation({ titre, affectation, conflits = [] }) {
     </article>
   );
 }
+
+/* ─── Composant principal ─── */
 
 export function CourseExchangePanel({
   etudiants = [],
@@ -107,27 +109,18 @@ export function CourseExchangePanel({
   const [detailsErreur, setDetailsErreur] = useState([]);
   const [messageSucces, setMessageSucces] = useState("");
 
+  /* ─── Pré-sélectionner l'étudiant A depuis le contexte parent ─── */
   useEffect(() => {
-    if (!etudiantSelectionneId || idEtudiantA) {
-      return;
-    }
-
+    if (!etudiantSelectionneId || idEtudiantA) return;
     setIdEtudiantA(String(etudiantSelectionneId));
   }, [etudiantSelectionneId, idEtudiantA]);
-
-  const etudiantsTries = useMemo(
-    () =>
-      [...(Array.isArray(etudiants) ? etudiants : [])].sort((a, b) =>
-        construireLibelleEtudiant(a).localeCompare(construireLibelleEtudiant(b), "fr")
-      ),
-    [etudiants]
-  );
 
   const coursDisponibles = useMemo(
     () => optionsEchange?.cours_communs || [],
     [optionsEchange]
   );
 
+  /* ─── Charger les cours communs dès que A et B sont sélectionnés ─── */
   useEffect(() => {
     let actif = true;
 
@@ -143,7 +136,9 @@ export function CourseExchangePanel({
         setOptionsEchange(null);
         setIdCours("");
         setPreviewEchange(null);
-        setMessageErreur("Deux etudiants differents sont requis pour un echange cible.");
+        setMessageErreur(
+          "Deux etudiants differents sont requis pour un echange cible."
+        );
         setDetailsErreur([]);
         return;
       }
@@ -155,38 +150,32 @@ export function CourseExchangePanel({
       setPreviewEchange(null);
 
       try {
-        const resultat = await recupererCoursCommunsEchangeables(idEtudiantA, idEtudiantB);
-
-        if (!actif) {
-          return;
-        }
-
+        const resultat = await recupererCoursCommunsEchangeables(
+          idEtudiantA,
+          idEtudiantB
+        );
+        if (!actif) return;
         setOptionsEchange(resultat);
         setIdCours("");
       } catch (error) {
-        if (!actif) {
-          return;
-        }
-
+        if (!actif) return;
         setOptionsEchange(null);
         setIdCours("");
         setPreviewEchange(null);
-        setMessageErreur(error.message || "Erreur lors du chargement des cours communs.");
+        setMessageErreur(
+          error.message || "Erreur lors du chargement des cours communs."
+        );
         setDetailsErreur(error.details || []);
       } finally {
-        if (actif) {
-          setEtatAction("idle");
-        }
+        if (actif) setEtatAction("idle");
       }
     }
 
     void chargerOptions();
-
-    return () => {
-      actif = false;
-    };
+    return () => { actif = false; };
   }, [idEtudiantA, idEtudiantB]);
 
+  /* ─── Charger le preview dès que A, B et le cours sont connus ─── */
   useEffect(() => {
     let actif = true;
 
@@ -202,39 +191,32 @@ export function CourseExchangePanel({
       setMessageSucces("");
 
       try {
-        const resultat = await previsualiserEchangeCours(idEtudiantA, idEtudiantB, idCours);
-
-        if (!actif) {
-          return;
-        }
-
+        const resultat = await previsualiserEchangeCours(
+          idEtudiantA,
+          idEtudiantB,
+          idCours
+        );
+        if (!actif) return;
         setPreviewEchange(resultat);
       } catch (error) {
-        if (!actif) {
-          return;
-        }
-
+        if (!actif) return;
         setPreviewEchange(null);
-        setMessageErreur(error.message || "Erreur lors de la verification de l'echange.");
+        setMessageErreur(
+          error.message || "Erreur lors de la verification de l'echange."
+        );
         setDetailsErreur(error.details || []);
       } finally {
-        if (actif) {
-          setEtatAction("idle");
-        }
+        if (actif) setEtatAction("idle");
       }
     }
 
     void chargerPreview();
-
-    return () => {
-      actif = false;
-    };
+    return () => { actif = false; };
   }, [idEtudiantA, idEtudiantB, idCours]);
 
+  /* ─── Exécuter l'échange ─── */
   async function soumettreEchange() {
-    if (!previewEchange?.echange_possible) {
-      return;
-    }
+    if (!previewEchange?.echange_possible) return;
 
     setEtatAction("soumission");
     setMessageErreur("");
@@ -261,14 +243,15 @@ export function CourseExchangePanel({
           recupererCoursCommunsEchangeables(idEtudiantA, idEtudiantB),
           previsualiserEchangeCours(idEtudiantA, idEtudiantB, idCours),
         ]);
-
         setOptionsEchange(optionsFraiches);
         setPreviewEchange(previewFraiche);
       } catch {
         setPreviewEchange(null);
       }
     } catch (error) {
-      setMessageErreur(error.message || "Erreur lors de l'echange cible du cours.");
+      setMessageErreur(
+        error.message || "Erreur lors de l'echange cible du cours."
+      );
       setDetailsErreur(error.details || []);
     } finally {
       setEtatAction("idle");
@@ -276,7 +259,8 @@ export function CourseExchangePanel({
   }
 
   const blocages = previewEchange?.blocages || [];
-  const chargement = etatAction === "chargement-options" || etatAction === "chargement-preview";
+  const chargement =
+    etatAction === "chargement-options" || etatAction === "chargement-preview";
   const soumission = etatAction === "soumission";
 
   return (
@@ -285,8 +269,8 @@ export function CourseExchangePanel({
         <div>
           <h2>Echange cible d&apos;un cours</h2>
           <p>
-            Cette operation echange un seul cours entre deux etudiants sans modifier leur
-            groupe principal.
+            Cette operation echange un seul cours entre deux etudiants sans
+            modifier leur groupe principal.
           </p>
         </div>
       </div>
@@ -300,39 +284,45 @@ export function CourseExchangePanel({
       />
 
       <div className="course-exchange__form">
-        <label className="field">
-          <span>Etudiant A</span>
-          <select value={idEtudiantA} onChange={(event) => setIdEtudiantA(event.target.value)}>
-            <option value="">Selectionner</option>
-            {etudiantsTries.map((etudiant) => (
-              <option key={`exchange-a-${etudiant.id_etudiant}`} value={etudiant.id_etudiant}>
-                {construireLibelleEtudiant(etudiant)}
-              </option>
-            ))}
-          </select>
-        </label>
+        {/* ─── Étudiant A ─── */}
+        <EchangeEtudiantSearchField
+          etudiants={etudiants}
+          selectedId={idEtudiantA}
+          onSelect={setIdEtudiantA}
+          excludeId={idEtudiantB}
+          label="Étudiant A"
+          placeholder="Nom, prénom, matricule, groupe ou programme…"
+        />
 
-        <label className="field">
-          <span>Etudiant B</span>
-          <select value={idEtudiantB} onChange={(event) => setIdEtudiantB(event.target.value)}>
-            <option value="">Selectionner</option>
-            {etudiantsTries.map((etudiant) => (
-              <option key={`exchange-b-${etudiant.id_etudiant}`} value={etudiant.id_etudiant}>
-                {construireLibelleEtudiant(etudiant)}
-              </option>
-            ))}
-          </select>
-        </label>
+        {/* ─── Étudiant B ─── */}
+        <EchangeEtudiantSearchField
+          etudiants={etudiants}
+          selectedId={idEtudiantB}
+          onSelect={setIdEtudiantB}
+          excludeId={idEtudiantA}
+          label="Étudiant B"
+          placeholder="Nom, prénom, matricule, groupe ou programme…"
+        />
 
+        {/* ─── Cours commun (select dynamique) ─── */}
         <label className="field">
           <span>Cours commun</span>
           <select
             value={idCours}
             onChange={(event) => setIdCours(event.target.value)}
-            disabled={!idEtudiantA || !idEtudiantB || coursDisponibles.length === 0 || chargement}
+            disabled={
+              !idEtudiantA ||
+              !idEtudiantB ||
+              coursDisponibles.length === 0 ||
+              chargement
+            }
           >
             <option value="">
-              {coursDisponibles.length > 0 ? "Selectionner un cours" : "Aucun cours disponible"}
+              {chargement
+                ? "Chargement en cours…"
+                : coursDisponibles.length > 0
+                  ? "Selectionner un cours"
+                  : "Aucun cours disponible"}
             </option>
             {coursDisponibles.map((cours) => (
               <option
@@ -354,16 +344,16 @@ export function CourseExchangePanel({
             Session active : {optionsEchange.session.nom}
           </span>
           <span className="course-exchange__summary">
-            {coursDisponibles.filter((cours) => cours.echange_utile).length} cours reellement
-            echangeables detectes.
+            {coursDisponibles.filter((cours) => cours.echange_utile).length}{" "}
+            cours reellement echangeables detectes.
           </span>
         </div>
       ) : null}
 
       {idEtudiantA && idEtudiantB && !chargement && coursDisponibles.length === 0 ? (
         <div className="detail-card__callout">
-          Aucun cours commun exploitable n&apos;a ete trouve pour cette paire d&apos;etudiants
-          dans la session active.
+          Aucun cours commun exploitable n&apos;a ete trouve pour cette paire
+          d&apos;etudiants dans la session active.
         </div>
       ) : null}
 
@@ -372,13 +362,19 @@ export function CourseExchangePanel({
           <div className="course-exchange__preview-header">
             <div>
               <h3>
-                {previewEchange.cours?.code_cours} - {previewEchange.cours?.nom_cours}
+                {previewEchange.cours?.code_cours} -{" "}
+                {previewEchange.cours?.nom_cours}
               </h3>
-              <p>Comparaison des sections actuelles et cibles, avec verification des conflits.</p>
+              <p>
+                Comparaison des sections actuelles et cibles, avec verification
+                des conflits.
+              </p>
             </div>
             <span
               className={`status-pill ${
-                previewEchange.echange_possible ? "status-pill--success" : "status-pill--warning"
+                previewEchange.echange_possible
+                  ? "status-pill--success"
+                  : "status-pill--warning"
               }`}
             >
               {previewEchange.echange_possible ? "Echange possible" : "Bloque"}

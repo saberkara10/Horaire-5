@@ -1,3 +1,11 @@
+-- ============================================================================
+-- ROLE DU FICHIER
+-- Definition SQL pour la version de schema v10.
+--
+-- IMPACT SUR LE PROJET
+-- - cree `planification_series`
+-- - relie `affectation_cours` a des series de planification manuelle recurrents
+-- ============================================================================
 -- migration_v10.sql
 -- Evolution du module de planification manuelle :
 -- 1. persistance des series de planification

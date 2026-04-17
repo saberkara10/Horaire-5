@@ -1,0 +1,44 @@
+sequenceDiagram
+  actor A as Responsable administratif
+  participant UI as Frontend React
+  participant Route as scheduler.routes
+  participant Engine as SchedulerEngine
+  participant Bootstrap as SchedulerDataBootstrap
+  participant Loader as ContextLoader
+  participant Grouper as GroupFormer
+  participant Matrix as ConstraintMatrix
+  participant Reprises as FailedCourseEngine
+  participant Optim as LocalSearchOptimizer
+  participant DB as MySQL
+
+  A->>UI: Demande de generation
+  UI->>Route: POST /api/scheduler/generer
+  Route->>Engine: generer(options)
+  Engine->>Bootstrap: assurer schema + dataset
+  Bootstrap->>DB: verifier / completer schema et donnees
+  Engine->>Loader: charger(idSession)
+  Loader->>DB: lire session, cours, profs, salles, etudiants, reprises
+  Loader-->>Engine: contexte complet
+  Engine->>Grouper: formerGroupes(etudiants, cours, reprises)
+  Grouper-->>Engine: groupes formes
+  Engine->>Matrix: initialiser la matrice de contraintes
+  loop pour chaque cours trie
+    Engine->>Engine: chercher une serie hebdomadaire stable
+    Engine->>Matrix: verifier salle/prof/groupe/etudiants
+    Matrix-->>Engine: placement valide ou rejet
+  end
+  Engine->>Engine: passe assouplie + passe de garantie
+  Engine->>Reprises: rattacherCoursEchoues()
+  Reprises->>Matrix: verifier conflits et capacites
+  Reprises-->>Engine: reprises retenues + conflits expliques
+  Engine->>Optim: optimize(solution)
+  Optim-->>Engine: solution optimisee + scoring
+  Engine->>DB: persister plages_horaires
+  Engine->>DB: persister affectation_cours
+  Engine->>DB: persister affectation_groupes
+  Engine->>DB: persister affectation_etudiants
+  Engine->>DB: persister rapports_generation
+  DB-->>Engine: commit
+  Engine-->>Route: rapport final
+  Route-->>UI: reponse JSON
+  UI-->>A: rapport de generation

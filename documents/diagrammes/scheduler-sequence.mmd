@@ -1,5 +1,5 @@
 sequenceDiagram
-    actor Admin
+    actor ResponsableAdministratif as Responsable administratif
     participant Frontend as SchedulerPage
     participant Route as GET /api/scheduler/generer-stream
     participant Engine as SchedulerEngine
@@ -10,7 +10,7 @@ sequenceDiagram
     participant Retakes as FailedCourseEngine
     participant DB as MySQL
 
-    Admin->>Frontend: Lance la generation de session
+    ResponsableAdministratif->>Frontend: Lance la generation de session
     Frontend->>Route: GET /api/scheduler/generer-stream?id_session=...
     Route->>Engine: generer({idSession, idUtilisateur, onProgress})
     Engine->>Schema: assurerSchemaSchedulerAcademique()
@@ -31,4 +31,4 @@ sequenceDiagram
     DB-->>Engine: Commit
     Engine-->>Route: progress DONE + rapport
     Route-->>Frontend: event done
-    Frontend-->>Admin: Affiche score, blocages et historique
+    Frontend-->>ResponsableAdministratif: Affiche score, blocages et historique

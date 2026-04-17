@@ -4,7 +4,7 @@
 
 Le module Admins gere les comptes d'administration delegues.
 
-Il permet a un responsable de :
+Il permet au **Responsable administratif** de :
 
 - lister les sous-admins ;
 - creer un sous-admin ;
@@ -27,6 +27,12 @@ Il s'appuie sur :
 
 Sa responsabilite est la gouvernance des comptes `ADMIN` delegues.
 
+Dans la conception cible :
+
+- le `Responsable administratif` est l'autorite fonctionnelle superieure ;
+- il peut creer, modifier et supprimer les comptes `Administrateur` ;
+- l'`Administrateur` ne peut pas administrer le compte du `Responsable administratif`.
+
 ## 3. Contrainte d'acces
 
 Toutes les routes exigent :
@@ -36,6 +42,10 @@ Toutes les routes exigent :
 
 La conception impose donc un controle par role au niveau du routeur,
 pas uniquement au niveau du frontend.
+
+Cette contrainte traduit directement la regle metier suivante :
+
+- la creation et la suppression des administrateurs relevent du `Responsable administratif` uniquement.
 
 ## 4. Compatibilite de schema
 

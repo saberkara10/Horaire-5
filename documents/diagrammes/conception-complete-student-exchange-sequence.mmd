@@ -1,0 +1,32 @@
+sequenceDiagram
+  actor A as Administrateur
+  participant UI as Frontend React
+  participant Route as etudiants.routes
+  participant Service as student-course-exchange.service
+  participant DB as MySQL
+
+  A->>UI: Traite une demande d'echange de cours
+  UI->>Route: GET /api/etudiants/echange-cours/preview
+  Route->>Service: previsualiserEchangeCoursEtudiants(payload)
+  Service->>DB: charger session, etudiants, affectations effectives
+  Service->>DB: projeter la section cible et verifier les conflits
+  DB-->>Service: preview valide ou blocage
+  Service-->>Route: rapport de previsualisation
+  Route-->>UI: preview
+
+  A->>UI: Confirme l'echange administratif
+  UI->>Route: POST /api/etudiants/echange-cours
+  Route->>Service: executerEchangeCoursEtudiants(payload)
+  Service->>DB: revalider dans une transaction
+  alt echange faisable
+    Service->>DB: inserer echanges_cours_etudiants
+    Service->>DB: supprimer anciens overrides individuels
+    Service->>DB: inserer nouvelles affectation_etudiants
+    DB-->>Service: commit
+    Service-->>Route: echange execute
+    Route-->>UI: succes
+  else conflit detecte
+    DB-->>Service: rollback
+    Service-->>Route: erreur metier
+    Route-->>UI: echec explicable
+  end

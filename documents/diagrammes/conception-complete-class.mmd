@@ -1,0 +1,136 @@
+classDiagram
+  class Professeur {
+    +id_professeur: int
+    +matricule: string
+    +nom: string
+    +prenom: string
+    +specialite: string
+  }
+
+  class Disponibilite {
+    +id_disponibilite_professeur: int
+    +jour_semaine: int
+    +heure_debut: time
+    +heure_fin: time
+    +date_debut_effet: date
+    +date_fin_effet: date
+  }
+
+  class Cours {
+    +id_cours: int
+    +code: string
+    +nom: string
+    +duree: int
+    +programme: string
+    +etape_etude: string
+    +type_salle: string
+    +est_en_ligne: bool
+    +sessions_par_semaine: int
+  }
+
+  class Salle {
+    +id_salle: int
+    +code: string
+    +type: string
+    +capacite: int
+  }
+
+  class Groupe {
+    +id_groupes_etudiants: int
+    +nom_groupe: string
+    +programme: string
+    +etape: string
+    +taille_max: int
+    +est_groupe_special: bool
+  }
+
+  class Etudiant {
+    +id_etudiant: int
+    +matricule: string
+    +nom: string
+    +prenom: string
+    +programme: string
+    +etape: string
+    +session: string
+  }
+
+  class Horaire {
+    +id_affectation_cours: int
+    +date: date
+    +heure_debut: time
+    +heure_fin: time
+  }
+
+  class SessionAcademique {
+    +id_session: int
+    +nom: string
+    +date_debut: date
+    +date_fin: date
+    +active: bool
+  }
+
+  class CoursEchoue {
+    +id: int
+    +statut: string
+    +note_echec: decimal
+    +id_groupe_reprise: int
+  }
+
+  class AffectationEtudiant {
+    +id_affectation_etudiant: int
+    +source_type: string
+    +id_session: int
+  }
+
+  class RapportGeneration {
+    +id: int
+    +score_qualite: number
+    +date_generation: datetime
+  }
+
+  class Moteur {
+    +generer()
+    +simulerScenario()
+    +modifierAffectation()
+  }
+
+  class ConstraintMatrix {
+    +salleLibre()
+    +profLibre()
+    +groupeLibre()
+    +etudiantsLibres()
+    +reserver()
+  }
+
+  class ScheduleScorer {
+    +scoreSchedule()
+  }
+
+  class FailedCourseEngine {
+    +rattacherCoursEchoues()
+  }
+
+  class LocalSearchOptimizer {
+    +optimize()
+  }
+
+  Professeur "1" --> "0..*" Disponibilite : dispose de
+  Professeur "0..*" -- "0..*" Cours : peut enseigner
+  SessionAcademique "1" --> "0..*" Groupe : contient
+  Groupe "1" --> "0..*" Etudiant : regroupe
+  Horaire "*" --> "1" Cours : planifie
+  Horaire "*" --> "1" Professeur : enseigne
+  Horaire "*" --> "0..1" Salle : occupe
+  Horaire "*" --> "0..1" Groupe : cible
+  CoursEchoue "*" --> "1" Etudiant : concerne
+  CoursEchoue "*" --> "1" Cours : reference
+  CoursEchoue "*" --> "0..1" Groupe : groupe_reprise
+  AffectationEtudiant "*" --> "1" Etudiant : surcharge
+  AffectationEtudiant "*" --> "1" Groupe : rattache a
+  AffectationEtudiant "*" --> "1" Cours : pour
+  RapportGeneration "*" --> "1" SessionAcademique : documente
+  Moteur ..> ConstraintMatrix : utilise
+  Moteur ..> ScheduleScorer : evalue
+  Moteur ..> FailedCourseEngine : traite reprises
+  Moteur ..> LocalSearchOptimizer : optimise
+  Moteur ..> Horaire : persiste

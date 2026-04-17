@@ -1,3 +1,12 @@
+-- ============================================================================
+-- ROLE DU FICHIER
+-- Definition SQL pour la version de schema v8.
+--
+-- IMPACT SUR LE PROJET
+-- - cree `affectation_etudiants`
+-- - memorise le groupe de reprise choisi dans `cours_echoues`
+-- - impose l'unicite du nom de groupe par session
+-- ============================================================================
 -- migration_v8.sql
 -- Evolution enterprise pour :
 -- 1. l'unicite des groupes par session

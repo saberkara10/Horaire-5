@@ -1,3 +1,14 @@
+/**
+ * Logique d'initialisation de la migration v1.
+ *
+ * Role:
+ * - verifie que le schema canonique de base existe
+ * - execute `migration_v1.sql` quand le projet part d'une base vide
+ *
+ * Impact sur le projet:
+ * - cree le premier schema fonctionnel de GDH5
+ * - installe les tables coeur requises par l'application
+ */
 const REQUIRED_TABLES = [
   "utilisateurs",
   "salles",

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "@jest/globals";
 import {
   discoverMigrations,
+  isRecordedChecksumAccepted,
   parseMigrationVersion,
 } from "../Database/migration-engine.js";
 
@@ -22,5 +23,25 @@ describe("migration engine", () => {
     expect(migrations.every((migration) => migration.checksum.length === 64)).toBe(
       true
     );
+  });
+
+  test("isRecordedChecksumAccepted accepte les anciens checksums documentaires connus", async () => {
+    const migrations = await discoverMigrations();
+    const migrationV1 = migrations.find((migration) => migration.version === 1);
+    const migrationV12 = migrations.find((migration) => migration.version === 12);
+
+    expect(
+      isRecordedChecksumAccepted(
+        migrationV1,
+        "01dafc82ffc5f1663a182fd2c8bbad010d5ee5328050702cb1abe53b3593029a"
+      )
+    ).toBe(true);
+    expect(
+      isRecordedChecksumAccepted(
+        migrationV12,
+        "55873037be9631f4444820245736c730ed26cdb0796e1e6181f1de71dc6fde27"
+      )
+    ).toBe(true);
+    expect(isRecordedChecksumAccepted(migrationV1, "invalide")).toBe(false);
   });
 });

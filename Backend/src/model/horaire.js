@@ -26,8 +26,10 @@ import {
   listerEtudiantsPourPlanificationReprise,
   listerCoursEchouesEtudiant,
   listerGroupesCompatiblesPourCoursEchoue,
+  detecterViolationsPauseSeance,
   planifierCoursEchouePourEtudiant,
   planifierCoursGroupeManuellement,
+  recupererParticipantsSeance,
   replanifierCoursGroupeManuellement,
 } from "../services/planning/manual-planning.service.js";
 
@@ -281,9 +283,15 @@ function professeurEstDisponible(
   });
 }
 
-function creerErreurHoraire(message, statusCode = 400) {
+function creerErreurHoraire(message, statusCode = 400, code = null, details = null) {
   const erreur = new Error(message);
   erreur.statusCode = statusCode;
+  if (code) {
+    erreur.code = code;
+  }
+  if (details && typeof details === "object") {
+    erreur.details = details;
+  }
   return erreur;
 }
 
@@ -1438,6 +1446,48 @@ export async function creerAffectationValidee(affectation, executor = pool) {
           );
         }
       }
+
+      const sessionActive = await recupererSessionActive(transactionExecutor);
+      if (!sessionActive?.id_session) {
+        throw creerErreurHoraire(
+          "Aucune session active n'est disponible pour valider les pauses.",
+          409
+        );
+      }
+
+      const participantsSeance = await recupererParticipantsSeance(
+        idGroupeNumerique,
+        idCours,
+        Number(sessionActive.id_session),
+        transactionExecutor
+      );
+      const violationsPause = await detecterViolationsPauseSeance(
+        {
+          professeurId: idProfesseur,
+          groupeIds: [idGroupeNumerique],
+          participantIds: participantsSeance.idsParticipants,
+          date,
+          heureDebut,
+          heureFin,
+          idSession: Number(sessionActive.id_session),
+        },
+        transactionExecutor
+      );
+
+      if (violationsPause.length > 0) {
+        const violation = violationsPause[0];
+        throw creerErreurHoraire(
+          violation.message,
+          409,
+          violation.code || "BREAK_AFTER_TWO_CONSECUTIVE_REQUIRED",
+          {
+            resource_type: violation.resourceType || null,
+            resource_id: violation.resourceId || null,
+            date: violation.date || date,
+            violations: violationsPause,
+          }
+        );
+      }
     }
 
     const conflitSalle = await verifierConflitSalle(
@@ -1675,6 +1725,75 @@ export async function updateAffectationValidee(
             409
           );
         }
+      }
+    }
+
+    const groupesCiblesPourPause = groupe
+      ? [idGroupeNumerique]
+      : (
+          await transactionExecutor.query(
+            `SELECT id_groupes_etudiants
+             FROM affectation_groupes
+             WHERE id_affectation_cours = ?`,
+            [idAffectationNumerique]
+          )
+        )[0]
+          .map((row) => Number(row.id_groupes_etudiants))
+          .filter((idGroupe) => Number.isInteger(idGroupe) && idGroupe > 0);
+
+    if (groupesCiblesPourPause.length > 0) {
+      const sessionActive = await recupererSessionActive(transactionExecutor);
+      if (!sessionActive?.id_session) {
+        throw creerErreurHoraire(
+          "Aucune session active n'est disponible pour valider les pauses.",
+          409
+        );
+      }
+
+      const participantsSeance = await Promise.all(
+        groupesCiblesPourPause.map((idGroupeCible) =>
+          recupererParticipantsSeance(
+            idGroupeCible,
+            idCours,
+            Number(sessionActive.id_session),
+            transactionExecutor
+          )
+        )
+      );
+      const participantIds = [...new Set(
+        participantsSeance.flatMap((participants) =>
+          Array.isArray(participants?.idsParticipants)
+            ? participants.idsParticipants
+            : []
+        )
+      )];
+      const violationsPause = await detecterViolationsPauseSeance(
+        {
+          professeurId: idProfesseur,
+          groupeIds: groupesCiblesPourPause,
+          participantIds,
+          date,
+          heureDebut,
+          heureFin,
+          idSession: Number(sessionActive.id_session),
+          idsAffectationsExclues: [idAffectationNumerique],
+        },
+        transactionExecutor
+      );
+
+      if (violationsPause.length > 0) {
+        const violation = violationsPause[0];
+        throw creerErreurHoraire(
+          violation.message,
+          409,
+          violation.code || "BREAK_AFTER_TWO_CONSECUTIVE_REQUIRED",
+          {
+            resource_type: violation.resourceType || null,
+            resource_id: violation.resourceId || null,
+            date: violation.date || date,
+            violations: violationsPause,
+          }
+        );
       }
     }
 

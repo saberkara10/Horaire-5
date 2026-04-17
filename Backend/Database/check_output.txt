@@ -1,7 +1,0 @@
-﻿[dotenv@17.3.1] injecting env (0) from ..\.env -- tip: ­ƒøí´©Å auth for agents: https://vestauth.com
-Sessions de test supprim├®es
-Utilisateurs: [{"id_utilisateur":1,"email":"admin@ecole.ca","role":"ADMIN","actif":1},{"id_utilisateur":2,"email":"responsable@ecole.ca","role":"ADMIN_RESPONSABLE","actif":1}]
-Sessions: [{"id_session":1,"nom":"Automne 2026","date_debut":"2026-08-25T04:00:00.000Z","date_fin":"2026-12-20T05:00:00.000Z","active":1,"created_at":"2026-04-01T18:32:10.000Z"}]
-Rapports: [{"n":0}]
-
-Base de donn├®es OK !

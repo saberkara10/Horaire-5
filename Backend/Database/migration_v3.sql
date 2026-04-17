@@ -1,3 +1,11 @@
+-- ============================================================================
+-- ROLE DU FICHIER
+-- Definition SQL pour la version de schema v3.
+--
+-- IMPACT SUR LE PROJET
+-- - ajoute `idx_plages_horaires_date_heure`
+-- - accelere les recherches du scheduler sur les creneaux date/heure
+-- ============================================================================
 -- ============================================================
 -- GDH5 - Migration v3 : Optimisations scheduler
 -- A executer apres migration_v2.sql

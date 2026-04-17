@@ -1,3 +1,11 @@
+-- ============================================================================
+-- ROLE DU FICHIER
+-- Definition SQL pour la version de schema v11.
+--
+-- IMPACT SUR LE PROJET
+-- - cree `echanges_cours_etudiants`
+-- - relie les affectations etudiantes a un enregistrement d'echange optionnel
+-- ============================================================================
 -- migration_v11.sql
 -- Evolution du module etudiant :
 -- 1. tracabilite des echanges cibles de cours entre etudiants

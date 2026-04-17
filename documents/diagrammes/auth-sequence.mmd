@@ -1,5 +1,5 @@
 sequenceDiagram
-    actor Utilisateur
+    actor UtilisateurAdministratif as Administrateur / Responsable administratif
     participant Frontend
     participant RouteAuth as Route /auth/login
     participant RouteLogic as auth.routes.js
@@ -7,7 +7,7 @@ sequenceDiagram
     participant Session
     participant MySQL
 
-    Utilisateur->>Frontend: Saisit email et mot de passe
+    UtilisateurAdministratif->>Frontend: Saisit email et mot de passe
     Frontend->>RouteAuth: POST /auth/login
     RouteAuth->>RouteLogic: Normaliser l'email
     RouteLogic->>MySQL: SELECT id_utilisateur, email, motdepasse, nom, prenom, role FROM utilisateurs WHERE email = ?

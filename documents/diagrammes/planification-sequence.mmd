@@ -1,11 +1,11 @@
 sequenceDiagram
-    actor Responsable
+    actor ResponsableAdministratif as Responsable administratif
     participant Frontend
     participant ModulePlanif as Module planification
     participant Validation
     participant MySQL
 
-    Responsable->>Frontend: Choisit cours, professeur, salle, date, heure, groupes
+    ResponsableAdministratif->>Frontend: Choisit cours, professeur, salle, date, heure, groupes
     Frontend->>ModulePlanif: Creer une affectation
     ModulePlanif->>Validation: Verifier identifiants et contraintes
     Validation->>MySQL: Lire cours, professeur, salle, groupes

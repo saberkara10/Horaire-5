@@ -272,3 +272,313 @@
     overflow-x: auto;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════
+   Composant ProfesseurSearchField (réutilisable)
+═══════════════════════════════════════════════════════════ */
+
+.prof-search {
+  display: grid;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.prof-search__label {
+  font-weight: 700;
+  color: #355574;
+  font-size: 0.94rem;
+}
+
+.prof-search__root {
+  display: grid;
+  gap: 0.45rem;
+  position: relative;
+}
+
+.prof-search__control {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.3rem;
+  border: 1px solid rgba(178, 197, 217, 0.72);
+  border-radius: 16px;
+  background: rgba(248, 251, 255, 0.98);
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.prof-search__root--open .prof-search__control {
+  border-color: rgba(14, 165, 233, 0.55);
+  box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.1);
+}
+
+.prof-search__control input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  padding: 0.55rem 0.7rem;
+  min-height: 42px;
+}
+
+.prof-search__control input::placeholder {
+  color: #8fa2b4;
+}
+
+.prof-search__clear {
+  flex-shrink: 0;
+  border: none;
+  border-radius: 12px;
+  background: rgba(14, 165, 233, 0.1);
+  color: #0284c7;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 0.45rem 0.75rem;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+
+.prof-search__clear:hover {
+  background: rgba(14, 165, 233, 0.18);
+}
+
+.prof-search__clear:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.prof-search__hint {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.prof-search__hint span {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.prof-search__dropdown {
+  display: grid;
+  gap: 0.7rem;
+  padding: 0.9rem;
+  border: 1px solid rgba(178, 197, 217, 0.5);
+  border-radius: 18px;
+  background: rgba(248, 251, 255, 0.98);
+  box-shadow: 0 16px 40px rgba(114, 141, 171, 0.18);
+  z-index: 100;
+}
+
+.prof-search__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.prof-search__summary strong {
+  color: var(--text);
+  font-size: 0.88rem;
+}
+
+.prof-search__summary span,
+.prof-search__hint span {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.prof-search__empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.prof-search__results {
+  display: grid;
+  gap: 0.5rem;
+  max-height: 320px;
+  overflow: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.prof-search__option {
+  width: 100%;
+  display: grid;
+  gap: 0.12rem;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  padding: 0.75rem 0.9rem;
+  border-radius: 14px;
+  border: 1px solid rgba(178, 197, 217, 0.4);
+  background: #fff;
+  transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+}
+
+.prof-search__option:hover,
+.prof-search__option--active {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+  border-color: rgba(14, 165, 233, 0.35);
+}
+
+.prof-search__option--selected {
+  border-width: 2px;
+  border-color: #0ea5e9;
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.12);
+  background: rgba(240, 249, 255, 0.98);
+}
+
+.prof-search__option strong {
+  color: var(--text);
+  font-size: 0.92rem;
+}
+
+.prof-search__option span {
+  color: #486782;
+  font-size: 0.82rem;
+}
+
+.prof-search__option small {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Filtres de groupe (HorairesGroupesPage)
+═══════════════════════════════════════════════════════════ */
+
+.groupe-filtres {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.85rem;
+  flex-wrap: wrap;
+  padding: 0.85rem 1rem;
+  border: 1px solid rgba(178, 197, 217, 0.5);
+  border-radius: 18px;
+  background: rgba(248, 251, 255, 0.95);
+  margin-bottom: 1.1rem;
+}
+
+.groupe-filtres__champ {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 180px;
+  flex: 1;
+}
+
+.groupe-filtres__champ span {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #486782;
+}
+
+.groupe-filtres__champ select {
+  min-height: 46px;
+  padding: 0 1rem;
+  border: 1px solid rgba(178, 197, 217, 0.72);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.98);
+  color: var(--text);
+  outline: none;
+  appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, rgba(72, 103, 130, 0.8) 50%),
+    linear-gradient(135deg, rgba(72, 103, 130, 0.8) 50%, transparent 50%);
+  background-position:
+    calc(100% - 18px) calc(50% - 2px),
+    calc(100% - 12px) calc(50% - 2px);
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+  padding-right: 2.5rem;
+}
+
+.groupe-filtres__champ select:focus {
+  border-color: rgba(14, 165, 233, 0.55);
+  box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.1);
+}
+
+.groupe-filtres__reset {
+  flex-shrink: 0;
+  min-height: 46px;
+  padding: 0 1rem;
+  border: 1px solid rgba(178, 197, 217, 0.6);
+  border-radius: 14px;
+  background: rgba(248, 251, 255, 0.98);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.87rem;
+  cursor: pointer;
+  transition: background 120ms ease;
+  align-self: flex-end;
+}
+
+.groupe-filtres__reset:hover {
+  background: rgba(236, 245, 255, 0.96);
+}
+
+.groupe-filtres__compteur {
+  align-self: flex-end;
+  font-size: 0.82rem;
+  color: var(--muted);
+  padding-bottom: 0.65rem;
+  white-space: nowrap;
+}
+
+
+
+/* ═══════════════════════════════════════════════════════════
+   Sélecteur hybride de type de salle
+═══════════════════════════════════════════════════════════ */
+
+/**
+ * Message affiché pendant le chargement des types.
+ */
+.salle-type-chargement {
+  display: flex;
+  align-items: center;
+  min-height: 54px;
+  padding: 0 1rem;
+  border: 1px dashed rgba(178, 197, 217, 0.72);
+  border-radius: 16px;
+  background: rgba(248, 251, 255, 0.6);
+  color: #8fa2b4;
+  font-style: italic;
+  font-size: 0.93rem;
+}
+
+/**
+ * Bouton bascule "Ajouter un nouveau type" / "Choisir un type existant".
+ * Affiché comme un lien discret sous le champ.
+ */
+.salle-type-toggle {
+  align-self: flex-start;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #0ea5e9;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color 0.15s ease, opacity 0.15s ease;
+}
+
+.salle-type-toggle:hover {
+  color: #0284c7;
+  opacity: 0.85;
+}
+
+.salle-type-toggle:disabled {
+  color: #8fa2b4;
+  cursor: not-allowed;
+  text-decoration: none;
+}
+

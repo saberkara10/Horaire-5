@@ -7,10 +7,21 @@
  * - le parent gere l'obsolescence de la simulation et l'application reelle ;
  * - le panneau rend lisibles les scores, impacts, warnings et blocages.
  */
+import {
+  normalizeSchedulerScoreDifference,
+  normalizeSchedulerScoreSnapshot,
+} from "../../utils/schedulerScoring.js";
 
 function formaterNombre(value) {
   const numericValue = Number(value);
-  return Number.isFinite(numericValue) ? numericValue.toFixed(2) : "-";
+
+  if (!Number.isFinite(numericValue)) {
+    return "-";
+  }
+
+  return Number.isInteger(numericValue)
+    ? String(numericValue)
+    : numericValue.toFixed(2);
 }
 
 function formaterDelta(value) {
@@ -20,21 +31,28 @@ function formaterDelta(value) {
     return "-";
   }
 
+  const formattedValue = Number.isInteger(numericValue)
+    ? String(Math.abs(numericValue))
+    : Math.abs(numericValue).toFixed(2);
+
   if (numericValue > 0) {
-    return `+${numericValue.toFixed(2)}`;
+    return `+${formattedValue}`;
   }
 
-  return numericValue.toFixed(2);
+  return numericValue < 0 ? `-${formattedValue}` : formattedValue;
 }
 
-function determinerClasseDelta(value) {
+function determinerClasseDelta(value, direction = "higher_is_better") {
   const numericValue = Number(value);
 
   if (!Number.isFinite(numericValue) || numericValue === 0) {
     return "neutral";
   }
 
-  return numericValue > 0 ? "positive" : "negative";
+  const adjustedValue =
+    direction === "lower_is_better" ? numericValue * -1 : numericValue;
+
+  return adjustedValue > 0 ? "positive" : "negative";
 }
 
 function construireImpacts(report) {
@@ -57,7 +75,17 @@ function construireImpacts(report) {
       ids: report?.impact?.salles?.idsImpactees || [],
       resume: report?.impact?.salles?.resume || "Aucun impact calcule.",
     },
+    {
+      id: "groupes",
+      label: "Groupes",
+      ids: report?.impact?.groupes?.idsImpactes || [],
+      resume: report?.impact?.groupes?.resume || "Aucun impact calcule.",
+    },
   ];
+}
+
+function aAuMoinsUneValeur(...values) {
+  return values.some((value) => Number.isFinite(Number(value)));
 }
 
 /**
@@ -89,11 +117,119 @@ export function AssignmentModificationSimulationPanel({
   const blocages = Array.isArray(report?.validation?.raisonsBlocage)
     ? report.validation.raisonsBlocage
     : [];
+  const blocagesParAffectation = Array.isArray(report?.validation?.detailsParAffectation)
+    ? report.validation.detailsParAffectation.filter(
+        (item) => Array.isArray(item?.reasons) && item.reasons.length > 0
+      )
+    : [];
   const impacts = construireImpacts(report);
   const hasReport = Boolean(report);
   const localIssuesTone = localIssues.some((issue) => issue.level === "error")
     ? "error"
     : "warning";
+  const scoreAvant = normalizeSchedulerScoreSnapshot(report?.scoreAvant);
+  const scoreApres = normalizeSchedulerScoreSnapshot(report?.scoreApres);
+  const difference = normalizeSchedulerScoreDifference(report?.difference);
+  const scoreMetrics = [
+    {
+      id: "global",
+      label: "Score global",
+      before: scoreAvant?.scoreGlobal,
+      after: scoreApres?.scoreGlobal,
+      delta: difference?.scoreGlobal,
+      direction: "higher_is_better",
+    },
+    {
+      id: "etudiant",
+      label: "Score etudiant",
+      before: scoreAvant?.scoreEtudiant,
+      after: scoreApres?.scoreEtudiant,
+      delta: difference?.scoreEtudiant,
+      direction: "higher_is_better",
+    },
+    {
+      id: "professeur",
+      label: "Score professeur",
+      before: scoreAvant?.scoreProfesseur,
+      after: scoreApres?.scoreProfesseur,
+      delta: difference?.scoreProfesseur,
+      direction: "higher_is_better",
+    },
+    {
+      id: "groupe",
+      label: "Score groupe",
+      before: scoreAvant?.scoreGroupe,
+      after: scoreApres?.scoreGroupe,
+      delta: difference?.scoreGroupe,
+      direction: "higher_is_better",
+    },
+  ].filter((metric) => aAuMoinsUneValeur(metric.before, metric.after, metric.delta));
+  const scoringMetrics = [
+    {
+      id: "student-breaks-ok",
+      label: "Pauses etudiants respectees",
+      before: scoreAvant?.metrics?.pausesEtudiantsRespectees,
+      after: scoreApres?.metrics?.pausesEtudiantsRespectees,
+      delta: difference?.metrics?.pausesEtudiantsRespectees,
+      direction: "higher_is_better",
+    },
+    {
+      id: "student-breaks-missed",
+      label: "Pauses etudiants manquees",
+      before: scoreAvant?.metrics?.pausesEtudiantsManquees,
+      after: scoreApres?.metrics?.pausesEtudiantsManquees,
+      delta: difference?.metrics?.pausesEtudiantsManquees,
+      direction: "lower_is_better",
+    },
+    {
+      id: "teacher-breaks-ok",
+      label: "Pauses professeurs respectees",
+      before: scoreAvant?.metrics?.pausesProfesseursRespectees,
+      after: scoreApres?.metrics?.pausesProfesseursRespectees,
+      delta: difference?.metrics?.pausesProfesseursRespectees,
+      direction: "higher_is_better",
+    },
+    {
+      id: "teacher-breaks-missed",
+      label: "Pauses professeurs manquees",
+      before: scoreAvant?.metrics?.pausesProfesseursManquees,
+      after: scoreApres?.metrics?.pausesProfesseursManquees,
+      delta: difference?.metrics?.pausesProfesseursManquees,
+      direction: "lower_is_better",
+    },
+    {
+      id: "group-breaks-ok",
+      label: "Pauses groupes respectees",
+      before: scoreAvant?.metrics?.pausesGroupesRespectees,
+      after: scoreApres?.metrics?.pausesGroupesRespectees,
+      delta: difference?.metrics?.pausesGroupesRespectees,
+      direction: "higher_is_better",
+    },
+    {
+      id: "group-breaks-missed",
+      label: "Pauses groupes manquees",
+      before: scoreAvant?.metrics?.pausesGroupesManquees,
+      after: scoreApres?.metrics?.pausesGroupesManquees,
+      delta: difference?.metrics?.pausesGroupesManquees,
+      direction: "lower_is_better",
+    },
+    {
+      id: "not-planned",
+      label: "Cours non planifies",
+      before: scoreAvant?.metrics?.nbCoursNonPlanifies,
+      after: scoreApres?.metrics?.nbCoursNonPlanifies,
+      delta: difference?.metrics?.nbCoursNonPlanifies,
+      direction: "lower_is_better",
+    },
+    {
+      id: "avoided-conflicts",
+      label: "Conflits evites",
+      before: scoreAvant?.metrics?.nbConflitsEvites,
+      after: scoreApres?.metrics?.nbConflitsEvites,
+      delta: difference?.metrics?.nbConflitsEvites,
+      direction: "higher_is_better",
+    },
+  ].filter((metric) => aAuMoinsUneValeur(metric.before, metric.after, metric.delta));
 
   return (
     <section className="affectations-page__simulation-card">
@@ -163,56 +299,65 @@ export function AssignmentModificationSimulationPanel({
             </div>
           ) : null}
 
-          <div className="affectations-page__simulation-summary">
-            <p>{report.resume || "Aucun resume analytique disponible."}</p>
-            <div className="affectations-page__simulation-meta">
-              <span>Portee : {report.validation?.scope || report.portee || "-"}</span>
-              <span>
-                Occurrences ciblees : {Number(report.meta?.occurrences_ciblees || 0) || 1}
-              </span>
-              <span>Conflits crees : {Number(report.conflitsCrees || 0)}</span>
-              <span>Conflits resolus : {Number(report.conflitsResolus || 0)}</span>
+            <div className="affectations-page__simulation-summary">
+              <p>{report.resume || "Aucun resume analytique disponible."}</p>
+              <div className="affectations-page__simulation-meta">
+                <span>Portee : {report.validation?.scope || report.portee || "-"}</span>
+                <span>
+                  Occurrences ciblees : {Number(report.meta?.occurrences_ciblees || 0) || 1}
+                </span>
+                {Array.isArray(report.affectationsCiblees) &&
+                report.affectationsCiblees.length > 0 ? (
+                  <span>Affectations ciblees : {report.affectationsCiblees.length}</span>
+                ) : null}
+                <span>Conflits crees : {Number(report.conflitsCrees || 0)}</span>
+                <span>Conflits resolus : {Number(report.conflitsResolus || 0)}</span>
+              </div>
             </div>
-          </div>
 
-          <div className="affectations-page__simulation-metrics">
-            {[
-              {
-                id: "global",
-                label: "Score global",
-                before: report.scoreAvant?.scoreGlobal,
-                after: report.scoreApres?.scoreGlobal,
-                delta: report.difference?.scoreGlobal,
-              },
-              {
-                id: "etudiant",
-                label: "Score etudiant",
-                before: report.scoreAvant?.scoreEtudiant,
-                after: report.scoreApres?.scoreEtudiant,
-                delta: report.difference?.scoreEtudiant,
-              },
-              {
-                id: "professeur",
-                label: "Score professeur",
-                before: report.scoreAvant?.scoreProfesseur,
-                after: report.scoreApres?.scoreProfesseur,
-                delta: report.difference?.scoreProfesseur,
-              },
-            ].map((metric) => (
-              <article key={metric.id} className="affectations-page__simulation-metric">
-                <span>{metric.label}</span>
-                <strong>
-                  {formaterNombre(metric.before)}{" "}
-                  <small>&rarr; {formaterNombre(metric.after)}</small>
-                </strong>
-                <em
-                  className={`affectations-page__simulation-delta affectations-page__simulation-delta--${determinerClasseDelta(metric.delta)}`}
-                >
-                  {formaterDelta(metric.delta)}
-                </em>
-              </article>
-            ))}
-          </div>
+          {scoreMetrics.length > 0 ? (
+            <div className="affectations-page__simulation-metrics">
+              {scoreMetrics.map((metric) => (
+                <article key={metric.id} className="affectations-page__simulation-metric">
+                  <span>{metric.label}</span>
+                  <strong>
+                    {formaterNombre(metric.before)}{" "}
+                    <small>&rarr; {formaterNombre(metric.after)}</small>
+                  </strong>
+                  <em
+                    className={`affectations-page__simulation-delta affectations-page__simulation-delta--${determinerClasseDelta(
+                      metric.delta,
+                      metric.direction
+                    )}`}
+                  >
+                    {formaterDelta(metric.delta)}
+                  </em>
+                </article>
+              ))}
+            </div>
+          ) : null}
+
+          {scoringMetrics.length > 0 ? (
+            <div className="affectations-page__simulation-metrics">
+              {scoringMetrics.map((metric) => (
+                <article key={metric.id} className="affectations-page__simulation-metric">
+                  <span>{metric.label}</span>
+                  <strong>
+                    {formaterNombre(metric.before)}{" "}
+                    <small>&rarr; {formaterNombre(metric.after)}</small>
+                  </strong>
+                  <em
+                    className={`affectations-page__simulation-delta affectations-page__simulation-delta--${determinerClasseDelta(
+                      metric.delta,
+                      metric.direction
+                    )}`}
+                  >
+                    {formaterDelta(metric.delta)}
+                  </em>
+                </article>
+              ))}
+            </div>
+          ) : null}
 
           <div className="affectations-page__simulation-impact-grid">
             {impacts.map((impact) => (
@@ -238,6 +383,31 @@ export function AssignmentModificationSimulationPanel({
                 {warnings.map((warning) => (
                   <li key={warning.code}>
                     <span>{warning.message}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          {blocagesParAffectation.length > 0 ? (
+            <div className="affectations-page__simulation-block affectations-page__simulation-block--error">
+              <strong>Blocages par occurrence</strong>
+              <ul className="affectations-page__simulation-list">
+                {blocagesParAffectation.map((detail) => (
+                  <li key={`assignment-${detail.id_affectation_cours}`}>
+                    <span>
+                      Occurrence #{detail.id_affectation_cours} :{" "}
+                      {(detail.reasons || [])
+                        .map((reason) => reason?.message)
+                        .filter(Boolean)
+                        .join(" ; ") || "Blocage non detaille."}
+                    </span>
+                    <small>
+                      {(detail.reasons || [])
+                        .map((reason) => reason?.code)
+                        .filter(Boolean)
+                        .join(", ") || (detail.feasible ? "OK" : "BLOQUEE")}
+                    </small>
                   </li>
                 ))}
               </ul>

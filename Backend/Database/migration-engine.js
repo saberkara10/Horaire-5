@@ -1,3 +1,17 @@
+/**
+ * Moteur central de migration de la base du projet.
+ *
+ * Role:
+ * - decouvre les fichiers de migration
+ * - valide l'ordre des versions et les checksums
+ * - cree la base si besoin
+ * - adopte un schema legacy deja present
+ * - applique uniquement les migrations manquantes avec verrou et tracabilite
+ *
+ * Impact sur le projet:
+ * - ce fichier ne cree pas directement les tables metier
+ * - il garantit une evolution de schema deterministe et sure
+ */
 import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -13,6 +27,20 @@ const ENV_PATH = path.join(__dirname, "../.env");
 const MIGRATION_FILE_PATTERN = /^migration_v(\d+)\.sql$/i;
 const LOCK_NAME = "gdh5_schema_migrations_lock";
 const moduleCache = new Map();
+const LEGACY_SQL_CHECKSUMS_BY_VERSION = new Map([
+  [1, ["01dafc82ffc5f1663a182fd2c8bbad010d5ee5328050702cb1abe53b3593029a"]],
+  [2, ["24fffa0390ef1e838ce6aefc90f6f26dae76c05115126fa7fe46ae5b5aa8054f"]],
+  [3, ["c0eccafb4b885bf90c3ef7888745cae3c984fe5f8588f56961cad5f8220180fa"]],
+  [4, ["5c456521654775caf2d264683925b57a20beee9581083c9df7134d0b35b7500a"]],
+  [5, ["1d27fac8b98965fd7341c4483f7021a8926c0f0f178a5dec13049656b3bbcbb0"]],
+  [6, ["7e03a4dee827812adb86284f706a546d0993acd234ec784721eb39b7a4d48320"]],
+  [7, ["6ef3ced159ce4f33ad3a3581e4b68e1d8593c88489746626553d22f8cfdee1e4"]],
+  [8, ["912f592bfd3f9875d73a1811a2e37129d579c60de8246b99a00096ef35957855"]],
+  [9, ["b452c4f1dbda4278404b03dc95b6db87871a2566cd5548491fc5f73ff5925f78"]],
+  [10, ["77546edab46d15e48bbc6844f1f7d19cb34a478394a613b3beedde5ffb3e3699"]],
+  [11, ["9e6f23942cd2213677832345cded38a975b16d4af43e141b166f8a686bd00c7b"]],
+  [12, ["55873037be9631f4444820245736c730ed26cdb0796e1e6181f1de71dc6fde27"]],
+]);
 
 dotenv.config({
   path: ENV_PATH,
@@ -35,6 +63,29 @@ function logInfo(message) {
 
 function logWarn(message) {
   console.warn(`[migrate] ${message}`);
+}
+
+/**
+ * Accepte le checksum courant du fichier ainsi qu'une liste explicite
+ * d'anciens checksums historiques.
+ *
+ * Pourquoi:
+ * - les commentaires documentaires ajoutes dans les anciens fichiers SQL
+ *   changent le checksum du fichier
+ * - les bases deja migrees gardent cependant l'ancien checksum en base
+ *
+ * Cette compatibilite reste volontairement explicite par version.
+ */
+export function isRecordedChecksumAccepted(migration, recordedChecksum) {
+  const acceptedChecksums = new Set([migration.checksum]);
+  const legacyChecksums =
+    LEGACY_SQL_CHECKSUMS_BY_VERSION.get(migration.version) || [];
+
+  for (const checksum of legacyChecksums) {
+    acceptedChecksums.add(checksum);
+  }
+
+  return acceptedChecksums.has(recordedChecksum);
 }
 
 export function parseMigrationVersion(fileName) {
@@ -210,7 +261,12 @@ function validateRecordedMigrations(migrations, recordedMigrations) {
       );
     }
 
-    if (recordedMigration.checksum !== sourceMigration.checksum) {
+    if (
+      !isRecordedChecksumAccepted(
+        sourceMigration,
+        recordedMigration.checksum
+      )
+    ) {
       throw new Error(
         `Migration v${recordedMigration.version} checksum mismatch. The SQL file was modified after execution.`
       );
@@ -353,7 +409,7 @@ export async function runMigrations(options = {}) {
 
     if (options.deprecationSource) {
       logWarn(
-        `${options.deprecationSource} is deprecated. Use "npm run migrate" instead.`
+        `${options.deprecationSource} est obsolete. Utilisez "npm run migrate" a la place.`
       );
     }
 

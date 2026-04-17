@@ -1,3 +1,12 @@
+-- ============================================================================
+-- ROLE DU FICHIER
+-- Bootstrap SQL canonique pour la version de schema v1.
+-- Ce fichier cree la premiere structure de base exploitable du projet.
+--
+-- IMPACT SUR LE PROJET
+-- - installe les tables coeur de GDH5
+-- - insere les donnees de reference initiales utilisees par l'application
+-- ============================================================================
 -- migration_v1.sql
 -- Base canonique du projet avant les evolutions v2+.
 
@@ -228,4 +237,3 @@ VALUES
   (8, 4),
   (9, 5),
   (3, 6);
-

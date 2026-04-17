@@ -1,3 +1,13 @@
+/**
+ * Logique de planification manuelle de la migration v10.
+ *
+ * Role:
+ * - ajoute la persistance des series de planification et de la recurrence
+ *
+ * Impact sur le projet:
+ * - cree `planification_series`
+ * - relie `affectation_cours` a une serie de planification optionnelle
+ */
 async function assurerTablePlanificationSeries(connection) {
   await connection.query(
     `CREATE TABLE IF NOT EXISTS planification_series (

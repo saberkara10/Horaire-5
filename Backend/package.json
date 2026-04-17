@@ -7,8 +7,9 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node scripts/free-dev-port.mjs && nodemon src/server.js",
+    "sync:capacity": "node scripts/synchroniser-capacite-academique.mjs",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
-    "migrate": "node Database/run-migrations.js"
+    "migrate": "node Database/apply-schema-migrations.js"
   },
   "keywords": [],
   "author": "",

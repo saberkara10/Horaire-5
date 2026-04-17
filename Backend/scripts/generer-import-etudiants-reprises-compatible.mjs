@@ -10,12 +10,8 @@ const __dirname = path.dirname(__filename);
 const racineProjet = path.resolve(__dirname, "..", "..");
 const dossierSortie = path.join(racineProjet, "documents");
 
-const EFFECTIF_PAR_ETAPE = new Map([
-  ["1", 42],
-  ["2", 36],
-  ["3", 30],
-  ["4", 24],
-]);
+const EFFECTIF_PAR_COHORTE = 50;
+const GROUPES_ATTENDUS_PAR_COHORTE = 2;
 
 const NOMS = [
   "Tremblay",
@@ -140,7 +136,7 @@ function construireEtudiantsPourCohorte({
   coursNormaux,
   tagExecution,
 }) {
-  const effectif = EFFECTIF_PAR_ETAPE.get(String(etape)) || 24;
+  const effectif = EFFECTIF_PAR_COHORTE;
   const codesCoursNormaux = coursNormaux.map((cours) => cours.code);
   const libellesCoursNormaux = coursNormaux.map((cours) => `${cours.code} - ${cours.nom}`);
 
@@ -319,8 +315,62 @@ function definirLargeursColonnes(feuille, largeurs) {
   feuille["!cols"] = largeurs.map((wch) => ({ wch }));
 }
 
+function calculerCapaciteParTypeSalle(salles) {
+  return salles.reduce((map, salle) => {
+    const type = String(salle.type || "").trim();
+    const capacite = Number(salle.capacite);
+
+    if (!type || !Number.isFinite(capacite) || capacite <= 0) {
+      return map;
+    }
+
+    const maximumActuel = map.get(type) || 0;
+
+    if (capacite > maximumActuel) {
+      map.set(type, capacite);
+    }
+
+    return map;
+  }, new Map());
+}
+
+function determinerCapaciteCohorte(coursNormaux, capaciteParTypeSalle) {
+  const capacitesCompatibles = coursNormaux
+    .map((cours) => capaciteParTypeSalle.get(String(cours.type_salle || "").trim()) || 0)
+    .filter((capacite) => capacite > 0);
+
+  if (capacitesCompatibles.length === 0) {
+    return 30;
+  }
+
+  return Math.min(...capacitesCompatibles, 30);
+}
+
+function verifierDimensionnementCohortes(cohortes, coursParProgrammeEtEtape, salles) {
+  const capaciteParTypeSalle = calculerCapaciteParTypeSalle(salles);
+
+  for (const cohorte of cohortes) {
+    const coursNormaux =
+      coursParProgrammeEtEtape.get(`${cohorte.programme}|${cohorte.etape}`) || [];
+    const capaciteCohorte = determinerCapaciteCohorte(coursNormaux, capaciteParTypeSalle);
+    const groupesTheoriques = Math.ceil(EFFECTIF_PAR_COHORTE / Math.max(1, capaciteCohorte));
+
+    if (groupesTheoriques !== GROUPES_ATTENDUS_PAR_COHORTE) {
+      throw new Error(
+        [
+          `Le dimensionnement ne garantit plus ${GROUPES_ATTENDUS_PAR_COHORTE} groupes `,
+          `pour ${cohorte.programme} E${cohorte.etape}.`,
+          ` Effectif configure: ${EFFECTIF_PAR_COHORTE}.`,
+          ` Capacite cohorte calculee: ${capaciteCohorte}.`,
+          ` Groupes theoriques: ${groupesTheoriques}.`,
+        ].join("")
+      );
+    }
+  }
+}
+
 async function chargerContexte() {
-  const [[sessionActive], [cours]] = await Promise.all([
+  const [[sessionActive], [cours], [salles]] = await Promise.all([
     pool.query(
       `SELECT id_session, nom, date_debut, date_fin, active
        FROM sessions
@@ -334,6 +384,11 @@ async function chargerContexte() {
        WHERE archive = 0
        ORDER BY programme ASC, CAST(etape_etude AS UNSIGNED) ASC, code ASC`
     ),
+    pool.query(
+      `SELECT type, capacite
+       FROM salles
+       ORDER BY type ASC, capacite ASC`
+    ),
   ]);
 
   if (!sessionActive[0]) {
@@ -343,11 +398,12 @@ async function chargerContexte() {
   return {
     sessionActive: sessionActive[0],
     cours,
+    salles,
   };
 }
 
 async function genererFichier() {
-  const { sessionActive, cours } = await chargerContexte();
+  const { sessionActive, cours, salles } = await chargerContexte();
   const tagExecution = creerTagExecution();
   const sessionCourante =
     normaliserNomSession(sessionActive.nom) ||
@@ -373,6 +429,7 @@ async function genererFichier() {
 
       return Number(cohorteA.etape) - Number(cohorteB.etape);
     });
+  verifierDimensionnementCohortes(cohortes, coursParProgrammeEtEtape, salles);
   const etudiants = [];
   const reprises = [];
   const chargeAcademique = [];
@@ -434,6 +491,7 @@ async function genererFichier() {
       etudiants_avec_reprise: etudiantsCohorte.filter(
         (etudiant) => Number(etudiant.nb_reprises || 0) > 0
       ).length,
+      groupes_attendus: GROUPES_ATTENDUS_PAR_COHORTE,
       etudiants_a_8_cours: etudiantsCohorte.filter(
         (etudiant) => Number(etudiant.nb_cours_total || 0) === 8
       ).length,
@@ -521,6 +579,7 @@ async function genererFichier() {
       "effectif",
       "nb_reprises",
       "etudiants_avec_reprise",
+      "groupes_attendus",
       "nb_cours_normaux_par_etudiant",
       "etudiants_a_8_cours",
       "etudiants_a_9_cours",
@@ -528,7 +587,7 @@ async function genererFichier() {
       "charge_maximale",
     ],
   });
-  definirLargeursColonnes(feuilleResume, [55, 8, 12, 12, 14, 20, 28, 18, 18, 24, 18]);
+  definirLargeursColonnes(feuilleResume, [55, 8, 12, 12, 14, 20, 28, 18, 18, 18, 24, 18]);
 
   XLSX.utils.book_append_sheet(workbook, feuilleEtudiants, "Etudiants");
   XLSX.utils.book_append_sheet(workbook, feuilleCoursEchoues, "CoursEchoues");
@@ -539,7 +598,7 @@ async function genererFichier() {
 
   const fichierSortie = path.join(
     dossierSortie,
-    `import-etudiants-reprises-compatible-${sessionCourante.toLowerCase()}-${tagExecution}.xlsx`
+    `import-etudiants-reprises-compatible-1600-${sessionCourante.toLowerCase()}-${tagExecution}.xlsx`
   );
 
   XLSX.writeFile(workbook, fichierSortie);
@@ -550,6 +609,8 @@ async function genererFichier() {
   console.log(`Etudiants generes: ${etudiants.length}`);
   console.log(`Cours echoues generes: ${reprises.length}`);
   console.log(`Cohortes couvertes: ${resumeCohortes.length}`);
+  console.log(`Effectif par cohorte: ${EFFECTIF_PAR_COHORTE}`);
+  console.log(`Groupes attendus par cohorte: ${GROUPES_ATTENDUS_PAR_COHORTE}`);
 }
 
 try {

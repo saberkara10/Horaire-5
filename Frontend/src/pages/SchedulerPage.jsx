@@ -6,6 +6,10 @@ import {
   formaterLibelleModeOptimisation,
   resoudreOptionModeOptimisation,
 } from "../utils/optimizationModes.js";
+import {
+  readSchedulerScoringSummary,
+  selectSchedulerScoringMode,
+} from "../utils/schedulerScoring.js";
 import "../styles/SchedulerPage.css";
 
 const API = "/api/scheduler";
@@ -40,30 +44,139 @@ const PHASES = [
   { id: "DONE",    label: "Terminé",                   icon: "✅", pct: 100},
 ];
 
-/**
- * Mappe le mode moteur vers le mode scoring_v1 expose par les rapports.
- *
- * `legacy` reste un mode de generation, mais les rapports scoring_v1
- * s'appuient sur `equilibre` comme lecture de reference.
- *
- * @param {string} mode
- * @returns {string}
- */
-function resolveScoringMode(mode) {
-  const normalizedMode = String(mode || "legacy").trim().toLowerCase();
-  return normalizedMode === "legacy" ? "equilibre" : normalizedMode;
+const SCORING_SCORE_ITEMS = [
+  { key: "scoreGlobal", label: "Score global" },
+  { key: "scoreEtudiant", label: "Score etudiant" },
+  { key: "scoreProfesseur", label: "Score professeur" },
+  { key: "scoreGroupe", label: "Score groupe" },
+];
+
+function formaterValeurScoring(value) {
+  const numericValue = Number(value);
+
+  if (!Number.isFinite(numericValue)) {
+    return "-";
+  }
+
+  return Number.isInteger(numericValue)
+    ? String(numericValue)
+    : numericValue.toFixed(2);
 }
 
-/**
- * Lit le resume scoring_v1 du mode reellement applique.
- *
- * @param {Object|null|undefined} scoringBundle
- * @param {string} optimizationMode
- * @returns {Object|null}
- */
-function readScoringSummary(scoringBundle, optimizationMode) {
-  const scoringMode = resolveScoringMode(optimizationMode);
-  return scoringBundle?.modes?.[scoringMode] || null;
+function construireEcartsScoring(scoringMode) {
+  const scoreGlobal = Number(scoringMode?.scoreGlobal);
+
+  if (!Number.isFinite(scoreGlobal)) {
+    return [];
+  }
+
+  return [
+    {
+      key: "etudiant",
+      label: "Ecart etudiant vs global",
+      value: Number(scoringMode?.scoreEtudiant) - scoreGlobal,
+    },
+    {
+      key: "professeur",
+      label: "Ecart professeur vs global",
+      value: Number(scoringMode?.scoreProfesseur) - scoreGlobal,
+    },
+    {
+      key: "groupe",
+      label: "Ecart groupe vs global",
+      value: Number(scoringMode?.scoreGroupe) - scoreGlobal,
+    },
+  ].filter((item) => Number.isFinite(item.value) && item.value !== 0);
+}
+
+function ScoringSummaryCard({ scoringSummary, scoringMode, subtitle, className = "" }) {
+  if (!scoringSummary || !scoringMode) {
+    return null;
+  }
+
+  const metrics = scoringSummary.metrics || {};
+  const gaps = construireEcartsScoring(scoringMode);
+  const metaItems = [
+    metrics.pausesEtudiantsRespectees !== null ||
+    metrics.pausesEtudiantsManquees !== null
+      ? {
+          key: "student-breaks",
+          label: `Pauses etudiants : ${formaterValeurScoring(
+            metrics.pausesEtudiantsRespectees
+          )} respectees / ${formaterValeurScoring(
+            metrics.pausesEtudiantsManquees
+          )} manquees`,
+        }
+      : null,
+    metrics.pausesProfesseursRespectees !== null ||
+    metrics.pausesProfesseursManquees !== null
+      ? {
+          key: "teacher-breaks",
+          label: `Pauses professeurs : ${formaterValeurScoring(
+            metrics.pausesProfesseursRespectees
+          )} respectees / ${formaterValeurScoring(
+            metrics.pausesProfesseursManquees
+          )} manquees`,
+        }
+      : null,
+    metrics.pausesGroupesRespectees !== null ||
+    metrics.pausesGroupesManquees !== null
+      ? {
+          key: "group-breaks",
+          label: `Pauses groupes : ${formaterValeurScoring(
+            metrics.pausesGroupesRespectees
+          )} respectees / ${formaterValeurScoring(
+            metrics.pausesGroupesManquees
+          )} manquees`,
+        }
+      : null,
+    metrics.nbCoursNonPlanifies !== null
+      ? {
+          key: "not-planned",
+          label: `Cours non planifies : ${formaterValeurScoring(
+            metrics.nbCoursNonPlanifies
+          )}`,
+        }
+      : null,
+    metrics.nbConflitsEvites !== null
+      ? {
+          key: "avoided-conflicts",
+          label: `Conflits evites : ${formaterValeurScoring(
+            metrics.nbConflitsEvites
+          )}`,
+        }
+      : null,
+    ...gaps.map((gap) => ({
+      key: gap.key,
+      label: `${gap.label} : ${gap.value > 0 ? "+" : ""}${formaterValeurScoring(
+        gap.value
+      )}`,
+    })),
+  ].filter(Boolean);
+
+  return (
+    <div className={["scoring-summary-card", className].filter(Boolean).join(" ")}>
+      <div className="scoring-summary-header">
+        <h3>Scoring final</h3>
+        <span>{subtitle}</span>
+      </div>
+      <div className="scoring-summary-grid">
+        {SCORING_SCORE_ITEMS.map((item) => (
+          <div key={item.key} className="scoring-summary-item">
+            <strong>{formaterValeurScoring(scoringMode?.[item.key])}</strong>
+            <span>{item.label}</span>
+          </div>
+        ))}
+      </div>
+      {metaItems.length > 0 ? (
+        <div className="scoring-summary-meta">
+          {metaItems.map((item) => (
+            <span key={item.key}>{item.label}</span>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 export function SchedulerPage({ utilisateur, onLogout }) {
@@ -93,17 +206,16 @@ export function SchedulerPage({ utilisateur, onLogout }) {
 
   const sseRef = useRef(null);
   const optimizationModeOption = resoudreOptionModeOptimisation(optimizationMode);
-  const scoringCourant = readScoringSummary(
-    rapport?.details?.scoring_v1,
+  const scoringCourantSummary = readSchedulerScoringSummary(rapport);
+  const scoringCourant = selectSchedulerScoringMode(
+    scoringCourantSummary,
     rapport?.details?.modeOptimisationUtilise || optimizationMode
   );
-  const scoringCourantDetails = rapport?.details?.scoring_v1?.details || null;
-  const scoringHistorique = readScoringSummary(
-    rapportHistoriqueDetail?.details_bruts?.details?.scoring_v1,
+  const scoringHistoriqueSummary = readSchedulerScoringSummary(rapportHistoriqueDetail);
+  const scoringHistorique = selectSchedulerScoringMode(
+    scoringHistoriqueSummary,
     rapportHistoriqueDetail?.details_bruts?.details?.modeOptimisationUtilise || optimizationMode
   );
-  const scoringHistoriqueDetails =
-    rapportHistoriqueDetail?.details_bruts?.details?.scoring_v1?.details || null;
 
   useEffect(() => {
     chargerDonnees();
@@ -499,51 +611,13 @@ export function SchedulerPage({ utilisateur, onLogout }) {
                       )}
                     </div>
 
-                    {scoringCourant && (
-                      <div className="scoring-summary-card">
-                        <div className="scoring-summary-header">
-                          <h3>Scoring final</h3>
-                          <span>
-                            Lecture{" "}
-                            {formaterLibelleModeOptimisation(
-                              rapport?.details?.modeOptimisationUtilise || optimizationMode
-                            )}
-                          </span>
-                        </div>
-                        <div className="scoring-summary-grid">
-                          <div className="scoring-summary-item">
-                            <strong>{scoringCourant.scoreGlobal}</strong>
-                            <span>Score global</span>
-                          </div>
-                          <div className="scoring-summary-item">
-                            <strong>{scoringCourant.scoreEtudiant}</strong>
-                            <span>Score etudiant</span>
-                          </div>
-                          <div className="scoring-summary-item">
-                            <strong>{scoringCourant.scoreProfesseur}</strong>
-                            <span>Score professeur</span>
-                          </div>
-                        </div>
-                        <div className="scoring-summary-meta">
-                          <span>
-                            Pauses etudiants respectees :{" "}
-                            {scoringCourantDetails?.etudiant?.totals?.dynamicBreaksRespected ?? 0}
-                          </span>
-                          <span>
-                            Pauses etudiants manquees :{" "}
-                            {scoringCourantDetails?.etudiant?.totals?.dynamicBreaksMissed ?? 0}
-                          </span>
-                          <span>
-                            Pauses professeurs respectees :{" "}
-                            {scoringCourantDetails?.professeur?.totals?.pauseRespectedDays ?? 0}
-                          </span>
-                          <span>
-                            Pauses professeurs manquees :{" "}
-                            {scoringCourantDetails?.professeur?.totals?.pauseMissedDays ?? 0}
-                          </span>
-                        </div>
-                      </div>
-                    )}
+                    <ScoringSummaryCard
+                      scoringSummary={scoringCourantSummary}
+                      scoringMode={scoringCourant}
+                      subtitle={`Lecture ${formaterLibelleModeOptimisation(
+                        rapport?.details?.modeOptimisationUtilise || optimizationMode
+                      )}`}
+                    />
 
                     <div className="rapport-meta">
                       <span>🔁 Itérations SA : {rapport.iterations_sa?.toLocaleString()}</span>
@@ -810,52 +884,15 @@ export function SchedulerPage({ utilisateur, onLogout }) {
                       </div>
                     </div>
 
-                    {scoringHistorique && (
-                      <div className="scoring-summary-card scoring-summary-card--historique">
-                        <div className="scoring-summary-header">
-                          <h3>Scoring final</h3>
-                          <span>
-                            Lecture{" "}
-                            {formaterLibelleModeOptimisation(
-                              rapportHistoriqueDetail?.details_bruts?.details?.modeOptimisationUtilise ||
-                                optimizationMode
-                            )}
-                          </span>
-                        </div>
-                        <div className="scoring-summary-grid">
-                          <div className="scoring-summary-item">
-                            <strong>{scoringHistorique.scoreGlobal}</strong>
-                            <span>Score global</span>
-                          </div>
-                          <div className="scoring-summary-item">
-                            <strong>{scoringHistorique.scoreEtudiant}</strong>
-                            <span>Score etudiant</span>
-                          </div>
-                          <div className="scoring-summary-item">
-                            <strong>{scoringHistorique.scoreProfesseur}</strong>
-                            <span>Score professeur</span>
-                          </div>
-                        </div>
-                        <div className="scoring-summary-meta">
-                          <span>
-                            Pauses etudiants respectees :{" "}
-                            {scoringHistoriqueDetails?.etudiant?.totals?.dynamicBreaksRespected ?? 0}
-                          </span>
-                          <span>
-                            Pauses etudiants manquees :{" "}
-                            {scoringHistoriqueDetails?.etudiant?.totals?.dynamicBreaksMissed ?? 0}
-                          </span>
-                          <span>
-                            Pauses professeurs respectees :{" "}
-                            {scoringHistoriqueDetails?.professeur?.totals?.pauseRespectedDays ?? 0}
-                          </span>
-                          <span>
-                            Pauses professeurs manquees :{" "}
-                            {scoringHistoriqueDetails?.professeur?.totals?.pauseMissedDays ?? 0}
-                          </span>
-                        </div>
-                      </div>
-                    )}
+                    <ScoringSummaryCard
+                      scoringSummary={scoringHistoriqueSummary}
+                      scoringMode={scoringHistorique}
+                      className="scoring-summary-card--historique"
+                      subtitle={`Lecture ${formaterLibelleModeOptimisation(
+                        rapportHistoriqueDetail?.details_bruts?.details?.modeOptimisationUtilise ||
+                          optimizationMode
+                      )}`}
+                    />
 
                     <div className="historique-summary-grid">
                       <div className="historique-summary-card">

@@ -14,10 +14,14 @@ import { ConstraintMatrix } from "./ConstraintMatrix.js";
 import { AvailabilityChecker } from "./AvailabilityChecker.js";
 import { FailedCourseEngine } from "./FailedCourseEngine.js";
 import { SimulatedAnnealing } from "./SimulatedAnnealing.js";
-import { SchedulerDataBootstrap } from "./SchedulerDataBootstrap.js";
+import { BreakConstraintValidator } from "./constraints/BreakConstraintValidator.js";
+import { ResourceDayPlacementIndex } from "./constraints/ResourceDayPlacementIndex.js";
 import { LocalSearchOptimizer } from "./optimization/LocalSearchOptimizer.js";
+import { CandidatePrecomputer } from "./optimization/CandidatePrecomputer.js";
+import { CoursePrioritySorter } from "./optimization/CoursePrioritySorter.js";
 import { PlacementEvaluator } from "./optimization/PlacementEvaluator.js";
 import { ScheduleScorer } from "./scoring/ScheduleScorer.js";
+import { getCandidateMetadataForTimeRange } from "./time/StartTimeCandidates.js";
 import {
   getSchedulerMaxGroupsPerProfessor,
   getSchedulerMaxWeeklySessionsPerProfessor,
@@ -50,23 +54,6 @@ export class SchedulerEngine {
     const modeOptimisation = PlacementEvaluator.normalizeMode(optimizationMode);
 
     await assurerSchemaSchedulerAcademique();
-
-    try {
-      const sessionBootstrap = idSession
-        ? await SchedulerEngine._chargerSession(idSession, pool)
-        : null;
-      const bootstrapReport =
-        await SchedulerDataBootstrap.ensureOperationalDataset({
-          executor: pool,
-          session: sessionBootstrap,
-        });
-
-      if (bootstrapReport.details.length > 0) {
-        console.info("[Scheduler] Bootstrap:", bootstrapReport.details.join(" | "));
-      }
-    } catch (bootstrapErr) {
-      console.warn("[Scheduler] Bootstrap non bloquant:", bootstrapErr.message);
-    }
 
     const connection = await pool.getConnection();
     const rapport = {
@@ -193,6 +180,15 @@ export class SchedulerEngine {
       const datesParJourSemaine =
         SchedulerEngine._indexerDatesParJourSemaine(jours);
       const creneaux = [...ACADEMIC_WEEKDAY_TIME_SLOTS];
+      const courseTimeCandidateMap = new Map(
+        coursPlanifiables.map((course) => [
+          Number(course.id_cours),
+          SchedulerEngine._normaliserCreneauxCours(
+            course,
+            CandidatePrecomputer.buildCourseTimeCandidates(course)
+          ),
+        ])
+      );
       const preferencesStabilite = SchedulerEngine._construirePreferencesStabilite(
         affectationsExistantes
       );
@@ -202,6 +198,7 @@ export class SchedulerEngine {
       const chargeSeriesParProfJour = new Map();
       const slotsParGroupeJour = new Map();
       const slotsParProfJour = new Map();
+      const resourcePlacementIndex = new ResourceDayPlacementIndex();
 
       await SchedulerEngine._supprimerHoraireSession(session.id_session, connection);
       await SchedulerEngine._supprimerGroupesVidesSession(
@@ -213,24 +210,27 @@ export class SchedulerEngine {
       const solution = [];
       const nonPlanifies = [];
 
-      const coursTries = [...coursPlanifiables].sort((coursA, coursB) => {
-        if (coursA.est_cours_cle !== coursB.est_cours_cle) {
-          return coursB.est_cours_cle - coursA.est_cours_cle;
+      const coursTries = CoursePrioritySorter.sortCoursesMostConstrainedFirst(
+        coursPlanifiables,
+        {
+          candidateMap: courseTimeCandidateMap,
+          resolveCompatibleProfessorCount: (course) =>
+            professeurs.filter((professeur) =>
+              AvailabilityChecker.profCompatible(professeur, course)
+            ).length,
+          resolveCompatibleRoomCount: (course) =>
+            course.est_en_ligne
+              ? 1
+              : salles.filter((salle) =>
+                  AvailabilityChecker.salleCompatible(salle, course)
+                ).length,
         }
-
-        const sallesCoursA = coursA.est_en_ligne
-          ? 0
-          : salles.filter((salle) => AvailabilityChecker.salleCompatible(salle, coursA))
-              .length;
-        const sallesCoursB = coursB.est_en_ligne
-          ? 0
-          : salles.filter((salle) => AvailabilityChecker.salleCompatible(salle, coursB))
-              .length;
-
-        return sallesCoursA - sallesCoursB;
-      });
+      );
 
       for (const coursActuel of coursTries) {
+        const creneauxCours =
+          courseTimeCandidateMap.get(Number(coursActuel.id_cours)) ||
+          SchedulerEngine._normaliserCreneauxCours(coursActuel, creneaux);
         const sallesCompatiblesType = coursActuel.est_en_ligne
           ? [null]
           : salles
@@ -371,7 +371,7 @@ export class SchedulerEngine {
               profsCompatibles,
               sallesCompatibles,
               datesParJourSemaine,
-              creneaux,
+              creneaux: creneauxCours,
               matrix,
               dispParProf,
               absencesParProf,
@@ -382,6 +382,7 @@ export class SchedulerEngine {
               chargeSeriesParProfJour,
               slotsParGroupeJour,
               slotsParProfJour,
+              resourcePlacementIndex,
               numeroSeance,
               preferencesStabilite,
               optimizationMode: modeOptimisation,
@@ -434,7 +435,9 @@ export class SchedulerEngine {
           professeurs,
           salles,
           datesParJourSemaine,
-          creneaux,
+          creneaux:
+            courseTimeCandidateMap.get(Number(coursActuel.id_cours)) ||
+            SchedulerEngine._normaliserCreneauxCours(coursActuel, creneaux),
           matrix,
           dispParProf,
           absencesParProf,
@@ -445,6 +448,7 @@ export class SchedulerEngine {
           chargeSeriesParProfJour,
           slotsParGroupeJour,
           slotsParProfJour,
+          resourcePlacementIndex,
           effectifGroupe,
           optimizationMode: modeOptimisation,
         });
@@ -459,7 +463,9 @@ export class SchedulerEngine {
             professeurs,
             salles,
             datesParJourSemaine,
-            creneaux,
+            creneaux:
+              courseTimeCandidateMap.get(Number(coursActuel.id_cours)) ||
+              SchedulerEngine._normaliserCreneauxCours(coursActuel, creneaux),
             matrix,
             dispParProf,
             absencesParProf,
@@ -486,6 +492,7 @@ export class SchedulerEngine {
           salles,
           datesParJourSemaine,
           creneaux,
+          courseTimeCandidateMap,
           matrix,
           dispParProf,
           absencesParProf,
@@ -496,6 +503,7 @@ export class SchedulerEngine {
           chargeSeriesParProfJour,
           slotsParGroupeJour,
           slotsParProfJour,
+          resourcePlacementIndex,
         });
 
       solution.push(...placementsGarantie);
@@ -733,11 +741,13 @@ export class SchedulerEngine {
     chargeSeriesParProfJour,
     slotsParGroupeJour,
     slotsParProfJour,
+    resourcePlacementIndex = null,
     numeroSeance,
     preferencesStabilite,
     optimizationMode = "legacy",
   }) {
     const MIN_COVERAGE = 0.60;
+    const creneauxCours = SchedulerEngine._normaliserCreneauxCours(cours, creneaux);
 
     const preferenceSerie = SchedulerEngine._lirePreferenceStabilite(
       preferencesStabilite,
@@ -805,7 +815,7 @@ export class SchedulerEngine {
         }
 
         const creneauxOrdonnesGroupe = SchedulerEngine._ordonnerCreneauxPourGroupeJour(
-          creneaux,
+          creneauxCours,
           slotsParGroupeJour,
           idGroupe,
           jourSemaine
@@ -851,9 +861,11 @@ export class SchedulerEngine {
             );
 
           for (const [indexCreneau, creneau] of creneauxOrdonnes.entries()) {
-            const slotIndex = creneaux.findIndex(
-              (slot) => slot.debut === creneau.debut && slot.fin === creneau.fin
+            const timeWindow = SchedulerEngine._normaliserCreneauCandidate(
+              creneau,
+              indexCreneau
             );
+            const slotIndex = timeWindow.slotStartIndex;
             const etudiantsCours = SchedulerEngine._lireEtudiantsCours(
               groupe,
               cours.id_cours
@@ -865,23 +877,23 @@ export class SchedulerEngine {
                 matrix.profLibre(
                   professeur.id_professeur,
                   date,
-                  creneau.debut,
-                  creneau.fin
+                  timeWindow.debut,
+                  timeWindow.fin
                 ) &&
                 AvailabilityChecker.profDisponible(
                   professeur.id_professeur,
                   date,
-                  creneau.debut,
-                  creneau.fin,
+                  timeWindow.debut,
+                  timeWindow.fin,
                   dispParProf,
                   absencesParProf
                 ) &&
-                matrix.groupeLibre(idGroupe, date, creneau.debut, creneau.fin) &&
+                matrix.groupeLibre(idGroupe, date, timeWindow.debut, timeWindow.fin) &&
                 matrix.etudiantsLibres(
                   etudiantsCours,
                   date,
-                  creneau.debut,
-                  creneau.fin
+                  timeWindow.debut,
+                  timeWindow.fin
                 ) &&
                 matrix.groupePeutAjouterSeanceSemaine(
                   idGroupe,
@@ -892,7 +904,18 @@ export class SchedulerEngine {
                   professeur.id_professeur,
                   date,
                   getSchedulerMaxWeeklySessionsPerProfessor()
-                )
+                ) &&
+                SchedulerEngine._respectePauseRessources({
+                  resourcePlacementIndex,
+                  proposedPlacement: {
+                    date,
+                    heure_debut: timeWindow.debut,
+                    heure_fin: timeWindow.fin,
+                  },
+                  professeurId: professeur.id_professeur,
+                  groupeId: idGroupe,
+                  studentIds: etudiantsCours,
+                })
             );
 
             const seuilCouverture = Math.max(1, Math.ceil(datesToutes.length * MIN_COVERAGE));
@@ -912,8 +935,11 @@ export class SchedulerEngine {
                   professeur,
                   salle: null,
                   jourSemaine,
-                  creneau,
+                  creneau: timeWindow,
                   slotIndex,
+                  slotStartIndex: timeWindow.slotStartIndex,
+                  slotEndIndex: timeWindow.slotEndIndex,
+                  dureeHeures: timeWindow.dureeHeures,
                   matrix,
                   chargeSeriesParJour,
                   chargeSeriesParGroupeJour,
@@ -935,7 +961,7 @@ export class SchedulerEngine {
                   professeur,
                   salle: null,
                   datesSerie: datesDisponibles,
-                  creneau,
+                  creneau: timeWindow,
                   matrix,
                   chargeSeriesParProf,
                   chargeSeriesParJour,
@@ -945,6 +971,7 @@ export class SchedulerEngine {
                   slotsParProfJour,
                   jourSemaine,
                   slotIndex,
+                  resourcePlacementIndex,
                 },
               });
               continue;
@@ -956,8 +983,8 @@ export class SchedulerEngine {
                   matrix.salleLibre(
                     salle.id_salle,
                     date,
-                    creneau.debut,
-                    creneau.fin
+                    timeWindow.debut,
+                    timeWindow.fin
                   ) &&
                   AvailabilityChecker.salleDisponible(
                     salle.id_salle,
@@ -980,8 +1007,11 @@ export class SchedulerEngine {
                   professeur,
                   salle,
                   jourSemaine,
-                  creneau,
+                  creneau: timeWindow,
                   slotIndex,
+                  slotStartIndex: timeWindow.slotStartIndex,
+                  slotEndIndex: timeWindow.slotEndIndex,
+                  dureeHeures: timeWindow.dureeHeures,
                   matrix,
                   chargeSeriesParJour,
                   chargeSeriesParGroupeJour,
@@ -1004,7 +1034,7 @@ export class SchedulerEngine {
                   professeur,
                   salle,
                   datesSerie: datesAvecSalle,
-                  creneau,
+                  creneau: timeWindow,
                   matrix,
                   chargeSeriesParProf,
                   chargeSeriesParJour,
@@ -1014,6 +1044,7 @@ export class SchedulerEngine {
                   slotsParProfJour,
                   jourSemaine,
                   slotIndex,
+                  resourcePlacementIndex,
                 },
               });
             }
@@ -1046,7 +1077,10 @@ export class SchedulerEngine {
     slotsParProfJour,
     jourSemaine,
     slotIndex,
+    resourcePlacementIndex = null,
   }) {
+    const creneauMetadonnees = SchedulerEngine._normaliserCreneauCandidate(creneau);
+    const studentIds = SchedulerEngine._lireEtudiantsCours(groupe, cours.id_cours);
     const placements = datesSerie.map((date) => ({
       id_cours: cours.id_cours,
       code_cours: cours.code,
@@ -1056,8 +1090,12 @@ export class SchedulerEngine {
       id_salle: salle ? salle.id_salle : null,
       code_salle: salle ? salle.code : "EN LIGNE",
       date,
-      heure_debut: creneau.debut,
-      heure_fin: creneau.fin,
+      jourSemaine,
+      heure_debut: creneauMetadonnees.debut,
+      heure_fin: creneauMetadonnees.fin,
+      dureeHeures: creneauMetadonnees.dureeHeures,
+      slotStartIndex: creneauMetadonnees.slotStartIndex,
+      slotEndIndex: creneauMetadonnees.slotEndIndex,
       nom_groupe: groupe.nomGroupe,
       id_groupe: idGroupe,
       est_en_ligne: Boolean(cours.est_en_ligne),
@@ -1074,7 +1112,7 @@ export class SchedulerEngine {
         placement.date,
         placement.heure_debut,
         placement.heure_fin,
-        { studentIds: SchedulerEngine._lireEtudiantsCours(groupe, cours.id_cours) }
+        { studentIds }
       );
     }
 
@@ -1100,14 +1138,23 @@ export class SchedulerEngine {
       slotsParGroupeJour,
       idGroupe,
       jourSemaine,
-      slotIndex
+      creneauMetadonnees.slotStartIndex,
+      creneauMetadonnees.slotEndIndex
     );
     SchedulerEngine._memoriserSlotJour(
       slotsParProfJour,
       professeur.id_professeur,
       jourSemaine,
-      slotIndex
+      creneauMetadonnees.slotStartIndex,
+      creneauMetadonnees.slotEndIndex
     );
+    SchedulerEngine._memoriserPlacementsRessources({
+      resourcePlacementIndex,
+      placements,
+      professeurId: professeur.id_professeur,
+      groupeId: idGroupe,
+      studentIds,
+    });
 
     return {
       placements,
@@ -1218,6 +1265,175 @@ export class SchedulerEngine {
     return [...new Set([...idsReguliers, ...idsCours])];
   }
 
+  static _normaliserCreneauCandidate(creneau, fallbackIndex = 0) {
+    if (!creneau) {
+      return {
+        debut: "",
+        fin: "",
+        heure_debut: "",
+        heure_fin: "",
+        slotStartIndex: Number(fallbackIndex) || 0,
+        slotEndIndex: (Number(fallbackIndex) || 0) + 1,
+        dureeHeures: 1,
+      };
+    }
+
+    const metadata =
+      getCandidateMetadataForTimeRange(
+        creneau.heure_debut ?? creneau.debut,
+        creneau.heure_fin ?? creneau.fin
+      ) || null;
+
+    const slotStartIndex =
+      Number.isInteger(Number(creneau.slotStartIndex))
+        ? Number(creneau.slotStartIndex)
+        : metadata?.slotStartIndex ?? Number(fallbackIndex) ?? 0;
+    const slotEndIndex =
+      Number.isInteger(Number(creneau.slotEndIndex)) &&
+      Number(creneau.slotEndIndex) > slotStartIndex
+        ? Number(creneau.slotEndIndex)
+        : metadata?.slotEndIndex ?? slotStartIndex + 1;
+    const heureDebut =
+      creneau.heure_debut ?? creneau.debut ?? metadata?.heure_debut ?? "";
+    const heureFin =
+      creneau.heure_fin ?? creneau.fin ?? metadata?.heure_fin ?? "";
+
+    return {
+      ...creneau,
+      debut: heureDebut,
+      fin: heureFin,
+      heure_debut: heureDebut,
+      heure_fin: heureFin,
+      slotStartIndex,
+      slotEndIndex,
+      slotIndex: slotStartIndex,
+      dureeHeures:
+        Number(creneau.dureeHeures) ||
+        metadata?.dureeHeures ||
+        Math.max(1, slotEndIndex - slotStartIndex),
+    };
+  }
+
+  static _normaliserCreneauxCours(cours, creneaux) {
+    const creneauxNormalises = [...(Array.isArray(creneaux) ? creneaux : [])]
+      .map((creneau, index) => SchedulerEngine._normaliserCreneauCandidate(creneau, index))
+      .filter(
+        (creneau) =>
+          String(creneau.debut || "") !== "" && String(creneau.fin || "") !== ""
+      );
+
+    const dureeCours = CandidatePrecomputer.resolveCourseDurationHours(cours);
+    const doitDeriverDepuisLaGrille =
+      creneauxNormalises.length === 0 ||
+      (dureeCours > 1 &&
+        creneauxNormalises.every(
+          (creneau) => Number(creneau.slotEndIndex) - Number(creneau.slotStartIndex) === 1
+        ));
+
+    if (!doitDeriverDepuisLaGrille) {
+      return creneauxNormalises;
+    }
+
+    return CandidatePrecomputer.buildCourseTimeCandidates(cours).map((creneau, index) =>
+      SchedulerEngine._normaliserCreneauCandidate(creneau, index)
+    );
+  }
+
+  static _respectePauseRessources({
+    resourcePlacementIndex,
+    proposedPlacement,
+    professeurId = null,
+    groupeId = null,
+    studentIds = [],
+  }) {
+    if (!(resourcePlacementIndex instanceof ResourceDayPlacementIndex)) {
+      return true;
+    }
+
+    const placement = {
+      date: proposedPlacement?.date,
+      heure_debut: proposedPlacement?.heure_debut,
+      heure_fin: proposedPlacement?.heure_fin,
+    };
+
+    const resourceChecks = [
+      {
+        resourceType: "professeur",
+        resourceId: professeurId,
+      },
+      {
+        resourceType: "groupe",
+        resourceId: groupeId,
+      },
+      ...[...(Array.isArray(studentIds) ? studentIds : [])].map((studentId) => ({
+        resourceType: "etudiant",
+        resourceId: studentId,
+      })),
+    ].filter(
+      (resource) =>
+        Number.isInteger(Number(resource.resourceId)) &&
+        Number(resource.resourceId) > 0
+    );
+
+    return resourceChecks.every((resource) =>
+      BreakConstraintValidator.validateSequenceBreakConstraint({
+        placements: resourcePlacementIndex.get({
+          resourceType: resource.resourceType,
+          resourceId: resource.resourceId,
+          date: placement.date,
+        }),
+        proposedPlacement: placement,
+        resourceType: resource.resourceType,
+        resourceId: resource.resourceId,
+      }).valid
+    );
+  }
+
+  static _memoriserPlacementsRessources({
+    resourcePlacementIndex,
+    placements,
+    professeurId = null,
+    groupeId = null,
+    studentIds = [],
+  }) {
+    if (!(resourcePlacementIndex instanceof ResourceDayPlacementIndex)) {
+      return;
+    }
+
+    for (const placement of Array.isArray(placements) ? placements : []) {
+      if (Number.isInteger(Number(professeurId)) && Number(professeurId) > 0) {
+        resourcePlacementIndex.add({
+          resourceType: "professeur",
+          resourceId: professeurId,
+          date: placement.date,
+          placement,
+        });
+      }
+
+      if (Number.isInteger(Number(groupeId)) && Number(groupeId) > 0) {
+        resourcePlacementIndex.add({
+          resourceType: "groupe",
+          resourceId: groupeId,
+          date: placement.date,
+          placement,
+        });
+      }
+
+      for (const studentId of Array.isArray(studentIds) ? studentIds : []) {
+        if (!Number.isInteger(Number(studentId)) || Number(studentId) <= 0) {
+          continue;
+        }
+
+        resourcePlacementIndex.add({
+          resourceType: "etudiant",
+          resourceId: Number(studentId),
+          date: placement.date,
+          placement,
+        });
+      }
+    }
+  }
+
   static _scoreCandidatSerie({
     cours,
     groupe,
@@ -1227,6 +1443,9 @@ export class SchedulerEngine {
     jourSemaine,
     creneau,
     slotIndex,
+    slotStartIndex = slotIndex,
+    slotEndIndex = Number(slotIndex) + 1,
+    dureeHeures = 1,
     matrix,
     chargeSeriesParJour,
     chargeSeriesParGroupeJour,
@@ -1257,6 +1476,9 @@ export class SchedulerEngine {
         jourSemaine,
         creneau,
         slotIndex,
+        slotStartIndex,
+        slotEndIndex,
+        dureeHeures,
         preferenceSerie,
         indexStrategie,
         indexProfesseur,
@@ -1445,14 +1667,17 @@ export class SchedulerEngine {
     );
 
     return creneaux
-      .map((creneau, index) => ({ ...creneau, _index: index }))
+      .map((creneau, index) => ({
+        ...SchedulerEngine._normaliserCreneauCandidate(creneau, index),
+        _index: index,
+      }))
       .sort((slotA, slotB) => {
         const distanceA = SchedulerEngine._distanceSlotAuxExistants(
-          slotA._index,
+          slotA.slotStartIndex,
           slotsUtilises
         );
         const distanceB = SchedulerEngine._distanceSlotAuxExistants(
-          slotB._index,
+          slotB.slotStartIndex,
           slotsUtilises
         );
 
@@ -1460,7 +1685,11 @@ export class SchedulerEngine {
           return distanceA - distanceB;
         }
 
-        return slotA._index - slotB._index;
+        if (slotA.slotStartIndex !== slotB.slotStartIndex) {
+          return slotA.slotStartIndex - slotB.slotStartIndex;
+        }
+
+        return slotA.slotEndIndex - slotB.slotEndIndex;
       })
       .map(({ _index, ...creneau }) => creneau);
   }
@@ -1480,11 +1709,9 @@ export class SchedulerEngine {
 
     return creneauxOrdonnes
       .map((creneau) => ({
-        creneau,
-        indexReference: creneauxReference.findIndex(
-          (slot) =>
-            slot.debut === creneau.debut && slot.fin === creneau.fin
-        ),
+        creneau: SchedulerEngine._normaliserCreneauCandidate(creneau),
+        indexReference:
+          SchedulerEngine._normaliserCreneauCandidate(creneau).slotStartIndex,
       }))
       .sort((slotA, slotB) => {
         const distanceA = SchedulerEngine._distanceSlotAuxExistants(
@@ -1518,8 +1745,11 @@ export class SchedulerEngine {
   }
 
   static _trouverIndexSlotReference(heureDebut, heureFin) {
-    return ACADEMIC_WEEKDAY_TIME_SLOTS.findIndex(
-      (slot) => slot.debut === heureDebut && slot.fin === heureFin
+    return (
+      SchedulerEngine._normaliserCreneauCandidate({
+        debut: heureDebut,
+        fin: heureFin,
+      }).slotStartIndex ?? -1
     );
   }
 
@@ -1532,7 +1762,7 @@ export class SchedulerEngine {
     return new Set(parJour.get(jourSemaine) || []);
   }
 
-  static _memoriserSlotJour(index, idEntite, jourSemaine, slotIndex) {
+  static _memoriserSlotJour(index, idEntite, jourSemaine, slotStartIndex, slotEndIndex = Number(slotStartIndex) + 1) {
     const cle = String(idEntite);
     if (!index.has(cle)) {
       index.set(cle, new Map());
@@ -1543,7 +1773,15 @@ export class SchedulerEngine {
       parJour.set(jourSemaine, new Set());
     }
 
-    parJour.get(jourSemaine).add(slotIndex);
+    if (
+      Number.isInteger(Number(slotStartIndex)) &&
+      Number.isInteger(Number(slotEndIndex)) &&
+      Number(slotEndIndex) > Number(slotStartIndex)
+    ) {
+      for (let slotIndex = Number(slotStartIndex); slotIndex < Number(slotEndIndex); slotIndex += 1) {
+        parJour.get(jourSemaine).add(slotIndex);
+      }
+    }
   }
 
   static async _chargerSession(idSession, executor = pool) {
@@ -2162,6 +2400,7 @@ export class SchedulerEngine {
     chargeSeriesParProf, chargeSeriesParJour,
     chargeSeriesParGroupeJour, chargeSeriesParProfJour,
     slotsParGroupeJour, slotsParProfJour,
+    resourcePlacementIndex = null,
     effectifGroupe,
     optimizationMode = "legacy",
   }) {
@@ -2175,6 +2414,7 @@ export class SchedulerEngine {
     const joursDisponibles = ACADEMIC_WEEKDAY_ORDER.filter(
       (j) => datesParJourSemaine.has(j)
     );
+    const creneauxCours = SchedulerEngine._normaliserCreneauxCours(cours, creneaux);
 
     const profsCompat = professeurs
       .filter((p) => AvailabilityChecker.profCompatible(p, cours))
@@ -2198,32 +2438,45 @@ export class SchedulerEngine {
       const etudiantsCours = SchedulerEngine._lireEtudiantsCours(groupe, cours.id_cours);
 
       for (const [indexProfesseur, prof] of profsCompat.entries()) {
-        for (const [indexCreneau, creneau] of creneaux.entries()) {
+        for (const [indexCreneau, creneau] of creneauxCours.entries()) {
+          const timeWindow = SchedulerEngine._normaliserCreneauCandidate(
+            creneau,
+            indexCreneau
+          );
           // Filtrage par date au lieu de .every()
           const datesDisponibles = datesToutes.filter((date) =>
-            matrix.profLibre(prof.id_professeur, date, creneau.debut, creneau.fin) &&
+            matrix.profLibre(prof.id_professeur, date, timeWindow.debut, timeWindow.fin) &&
             AvailabilityChecker.profDisponible(
-              prof.id_professeur, date, creneau.debut, creneau.fin,
+              prof.id_professeur, date, timeWindow.debut, timeWindow.fin,
               dispParProf, absencesParProf
             ) &&
-            matrix.groupeLibre(idGroupe, date, creneau.debut, creneau.fin) &&
-            matrix.etudiantsLibres(etudiantsCours, date, creneau.debut, creneau.fin) &&
+            matrix.groupeLibre(idGroupe, date, timeWindow.debut, timeWindow.fin) &&
+            matrix.etudiantsLibres(etudiantsCours, date, timeWindow.debut, timeWindow.fin) &&
             matrix.groupePeutAjouterSeanceSemaine(idGroupe, date, REQUIRED_WEEKLY_SESSIONS_PER_GROUP) &&
-            matrix.profPeutAjouterSeanceSemaine(prof.id_professeur, date, PLAFOND_HEBDO)
+            matrix.profPeutAjouterSeanceSemaine(prof.id_professeur, date, PLAFOND_HEBDO) &&
+            SchedulerEngine._respectePauseRessources({
+              resourcePlacementIndex,
+              proposedPlacement: {
+                date,
+                heure_debut: timeWindow.debut,
+                heure_fin: timeWindow.fin,
+              },
+              professeurId: prof.id_professeur,
+              groupeId: idGroupe,
+              studentIds: etudiantsCours,
+            })
           );
 
           const seuil = Math.max(1, Math.ceil(datesToutes.length * MIN_COVERAGE_ASSOUPLIE));
           if (datesDisponibles.length < seuil) continue;
 
-          const slotIdx = creneaux.findIndex(
-            (s) => s.debut === creneau.debut && s.fin === creneau.fin
-          );
+          const slotIdx = timeWindow.slotStartIndex;
 
           // Tentative 1 : in-person integral (salle dispo sur toutes les dates filtrées)
           if (!cours.est_en_ligne) {
             for (const salle of sallesCompat) {
               const datesAvecSalle = datesDisponibles.filter((d) =>
-                matrix.salleLibre(salle.id_salle, d, creneau.debut, creneau.fin) &&
+                matrix.salleLibre(salle.id_salle, d, timeWindow.debut, timeWindow.fin) &&
                 AvailabilityChecker.salleDisponible(salle.id_salle, d, indispoParSalle)
               );
               if (datesAvecSalle.length >= seuil) {
@@ -2236,8 +2489,11 @@ export class SchedulerEngine {
                     professeur: prof,
                     salle,
                     jourSemaine,
-                    creneau,
+                    creneau: timeWindow,
                     slotIndex: slotIdx,
+                    slotStartIndex: timeWindow.slotStartIndex,
+                    slotEndIndex: timeWindow.slotEndIndex,
+                    dureeHeures: timeWindow.dureeHeures,
                     chargeSeriesParJour,
                     chargeSeriesParGroupeJour,
                     chargeSeriesParProfJour,
@@ -2272,6 +2528,7 @@ export class SchedulerEngine {
                     slotsParProfJour,
                     jourSemaine,
                     slotIdx,
+                    resourcePlacementIndex,
                   },
                 });
               }
@@ -2284,7 +2541,7 @@ export class SchedulerEngine {
               let sa = null;
               for (const s of sallesCompat) {
                 if (
-                  matrix.salleLibre(s.id_salle, date, creneau.debut, creneau.fin) &&
+                  matrix.salleLibre(s.id_salle, date, timeWindow.debut, timeWindow.fin) &&
                   AvailabilityChecker.salleDisponible(s.id_salle, date, indispoParSalle)
                 ) { sa = s; break; }
               }
@@ -2294,7 +2551,10 @@ export class SchedulerEngine {
                 nom_professeur: `${prof.prenom} ${prof.nom}`,
                 id_salle: sa ? sa.id_salle : null,
                 code_salle: sa ? sa.code : "EN LIGNE",
-                date, heure_debut: creneau.debut, heure_fin: creneau.fin,
+                date, heure_debut: timeWindow.debut, heure_fin: timeWindow.fin,
+                dureeHeures: timeWindow.dureeHeures,
+                slotStartIndex: timeWindow.slotStartIndex,
+                slotEndIndex: timeWindow.slotEndIndex,
                 nom_groupe: groupe.nomGroupe, id_groupe: idGroupe,
                 est_en_ligne: !sa,
                 est_cours_cle: Boolean(cours.est_cours_cle),
@@ -2310,8 +2570,11 @@ export class SchedulerEngine {
                 professeur: prof,
                 salle: null,
                 jourSemaine,
-                creneau,
+                creneau: timeWindow,
                 slotIndex: slotIdx,
+                slotStartIndex: timeWindow.slotStartIndex,
+                slotEndIndex: timeWindow.slotEndIndex,
+                dureeHeures: timeWindow.dureeHeures,
                 chargeSeriesParJour,
                 chargeSeriesParGroupeJour,
                 chargeSeriesParProfJour,
@@ -2344,6 +2607,7 @@ export class SchedulerEngine {
                 slotIdx,
                 cours,
                 groupe,
+                resourcePlacementIndex,
               },
             });
           }
@@ -2355,7 +2619,10 @@ export class SchedulerEngine {
               id_professeur: prof.id_professeur,
               nom_professeur: `${prof.prenom} ${prof.nom}`,
               id_salle: null, code_salle: "EN LIGNE",
-              date, heure_debut: creneau.debut, heure_fin: creneau.fin,
+              date, heure_debut: timeWindow.debut, heure_fin: timeWindow.fin,
+              dureeHeures: timeWindow.dureeHeures,
+              slotStartIndex: timeWindow.slotStartIndex,
+              slotEndIndex: timeWindow.slotEndIndex,
               nom_groupe: groupe.nomGroupe, id_groupe: idGroupe,
               est_en_ligne: true,
               est_cours_cle: Boolean(cours.est_cours_cle),
@@ -2370,8 +2637,11 @@ export class SchedulerEngine {
                 professeur: prof,
                 salle: null,
                 jourSemaine,
-                creneau,
+                creneau: timeWindow,
                 slotIndex: slotIdx,
+                slotStartIndex: timeWindow.slotStartIndex,
+                slotEndIndex: timeWindow.slotEndIndex,
+                dureeHeures: timeWindow.dureeHeures,
                 chargeSeriesParJour,
                 chargeSeriesParGroupeJour,
                 chargeSeriesParProfJour,
@@ -2402,6 +2672,7 @@ export class SchedulerEngine {
                 slotIdx,
                 cours,
                 groupe,
+                resourcePlacementIndex,
               },
             });
           }
@@ -2422,14 +2693,22 @@ export class SchedulerEngine {
     chargeSeriesParProf, chargeSeriesParJour,
     chargeSeriesParGroupeJour, chargeSeriesParProfJour,
     slotsParGroupeJour, slotsParProfJour, jourSemaine, slotIdx,
+    resourcePlacementIndex = null,
   }) {
+    const creneauMetadonnees = SchedulerEngine._normaliserCreneauCandidate(creneau);
+    const studentIds = SchedulerEngine._lireEtudiantsCours(groupe, cours.id_cours);
     const placements = datesSerie.map((date) => ({
       id_cours: cours.id_cours, code_cours: cours.code, nom_cours: cours.nom,
       id_professeur: prof.id_professeur,
       nom_professeur: `${prof.prenom} ${prof.nom}`,
       id_salle: estEnLigne ? null : salle.id_salle,
       code_salle: estEnLigne ? "EN LIGNE" : salle.code,
-      date, heure_debut: creneau.debut, heure_fin: creneau.fin,
+      date, jourSemaine,
+      heure_debut: creneauMetadonnees.debut,
+      heure_fin: creneauMetadonnees.fin,
+      dureeHeures: creneauMetadonnees.dureeHeures,
+      slotStartIndex: creneauMetadonnees.slotStartIndex,
+      slotEndIndex: creneauMetadonnees.slotEndIndex,
       nom_groupe: groupe.nomGroupe, id_groupe: idGroupe,
       est_en_ligne: estEnLigne,
       est_cours_cle: Boolean(cours.est_cours_cle),
@@ -2439,15 +2718,34 @@ export class SchedulerEngine {
       matrix.reserver(
         p.id_salle, p.id_professeur, p.id_groupe, p.id_cours,
         p.date, p.heure_debut, p.heure_fin,
-        { studentIds: SchedulerEngine._lireEtudiantsCours(groupe, cours.id_cours) }
+        { studentIds }
       );
     }
     chargeSeriesParProf.set(prof.id_professeur, (chargeSeriesParProf.get(prof.id_professeur) || 0) + 1);
     chargeSeriesParJour.set(jourSemaine, (chargeSeriesParJour.get(jourSemaine) || 0) + 1);
     SchedulerEngine._incrementerChargeJour(chargeSeriesParGroupeJour, idGroupe, jourSemaine);
     SchedulerEngine._incrementerChargeJour(chargeSeriesParProfJour, prof.id_professeur, jourSemaine);
-    SchedulerEngine._memoriserSlotJour(slotsParGroupeJour, idGroupe, jourSemaine, slotIdx);
-    SchedulerEngine._memoriserSlotJour(slotsParProfJour, prof.id_professeur, jourSemaine, slotIdx);
+    SchedulerEngine._memoriserSlotJour(
+      slotsParGroupeJour,
+      idGroupe,
+      jourSemaine,
+      creneauMetadonnees.slotStartIndex,
+      creneauMetadonnees.slotEndIndex
+    );
+    SchedulerEngine._memoriserSlotJour(
+      slotsParProfJour,
+      prof.id_professeur,
+      jourSemaine,
+      creneauMetadonnees.slotStartIndex,
+      creneauMetadonnees.slotEndIndex
+    );
+    SchedulerEngine._memoriserPlacementsRessources({
+      resourcePlacementIndex,
+      placements,
+      professeurId: prof.id_professeur,
+      groupeId: idGroupe,
+      studentIds,
+    });
     return { placements, professeur: prof, salle, jourSemaine };
   }
 
@@ -2471,7 +2769,9 @@ export class SchedulerEngine {
       slotIdx,
       cours,
       groupe,
+      resourcePlacementIndex = null,
     } = payload;
+    const studentIds = SchedulerEngine._lireEtudiantsCours(groupe, cours.id_cours);
 
     for (const placement of placements) {
       matrix.reserver(
@@ -2482,7 +2782,7 @@ export class SchedulerEngine {
         placement.date,
         placement.heure_debut,
         placement.heure_fin,
-        { studentIds: SchedulerEngine._lireEtudiantsCours(groupe, cours.id_cours) }
+        { studentIds }
       );
     }
 
@@ -2508,14 +2808,23 @@ export class SchedulerEngine {
       slotsParGroupeJour,
       placements[0]?.id_groupe,
       jourSemaine,
-      slotIdx
+      placements[0]?.slotStartIndex ?? slotIdx,
+      placements[0]?.slotEndIndex ?? (Number(slotIdx) + 1)
     );
     SchedulerEngine._memoriserSlotJour(
       slotsParProfJour,
       professeur.id_professeur,
       jourSemaine,
-      slotIdx
+      placements[0]?.slotStartIndex ?? slotIdx,
+      placements[0]?.slotEndIndex ?? (Number(slotIdx) + 1)
     );
+    SchedulerEngine._memoriserPlacementsRessources({
+      resourcePlacementIndex,
+      placements,
+      professeurId: professeur.id_professeur,
+      groupeId: placements[0]?.id_groupe,
+      studentIds,
+    });
 
     return {
       placements,
@@ -2624,11 +2933,12 @@ export class SchedulerEngine {
   static _passeDeGarantieGroupes({
     solution, cours, groupesFormes, idGroupeParNom,
     professeurs, salles,
-    datesParJourSemaine, creneaux, matrix,
+    datesParJourSemaine, creneaux, courseTimeCandidateMap = new Map(), matrix,
     dispParProf, absencesParProf, indispoParSalle,
     chargeSeriesParProf, chargeSeriesParJour,
     chargeSeriesParGroupeJour, chargeSeriesParProfJour,
     slotsParGroupeJour, slotsParProfJour,
+    resourcePlacementIndex = null,
   }) {
     const coursParGroupe = new Map();
     for (const placement of solution) {
@@ -2687,7 +2997,9 @@ export class SchedulerEngine {
           professeurs,
           salles,
           datesParJourSemaine,
-          creneaux,
+          creneaux:
+            courseTimeCandidateMap.get(Number(coursManquant.id_cours)) ||
+            SchedulerEngine._normaliserCreneauxCours(coursManquant, creneaux),
           matrix,
           dispParProf,
           absencesParProf,
@@ -2698,6 +3010,7 @@ export class SchedulerEngine {
           chargeSeriesParProfJour,
           slotsParGroupeJour,
           slotsParProfJour,
+          resourcePlacementIndex,
           effectifGroupe,
         });
 
@@ -2716,7 +3029,9 @@ export class SchedulerEngine {
             professeurs,
             salles,
             datesParJourSemaine,
-            creneaux,
+            creneaux:
+              courseTimeCandidateMap.get(Number(coursManquant.id_cours)) ||
+              SchedulerEngine._normaliserCreneauxCours(coursManquant, creneaux),
             matrix,
             dispParProf,
             absencesParProf,
@@ -3004,6 +3319,16 @@ export class SchedulerEngine {
       );
       const datesParJourSemaine = SchedulerEngine._indexerDatesParJourSemaine(jours);
       const creneaux = [...ACADEMIC_WEEKDAY_TIME_SLOTS];
+      const courseTimeCandidateMap = new Map(
+        coursFiltres.map((course) => [
+          Number(course.id_cours),
+          SchedulerEngine._normaliserCreneauxCours(
+            course,
+            CandidatePrecomputer.buildCourseTimeCandidates(course)
+          ),
+        ])
+      );
+      const resourcePlacementIndex = new ResourceDayPlacementIndex();
 
       // Matrices de contraintes GLOBALES (pour éviter les conflits avec les autres groupes)
       const [affectationsExistantesGlobales] = await connection.query(
@@ -3034,6 +3359,20 @@ export class SchedulerEngine {
           aff.heure_debut,
           aff.heure_fin
         );
+        resourcePlacementIndex.add({
+          resourceType: "professeur",
+          resourceId: aff.id_professeur,
+          date: aff.date,
+          placement: aff,
+        });
+        if (Number.isInteger(Number(aff.id_groupes_etudiants)) && Number(aff.id_groupes_etudiants) > 0) {
+          resourcePlacementIndex.add({
+            resourceType: "groupe",
+            resourceId: aff.id_groupes_etudiants,
+            date: aff.date,
+            placement: aff,
+          });
+        }
       }
 
       const etudiantsAContraindre = [
@@ -3113,6 +3452,12 @@ export class SchedulerEngine {
             occupation.heure_fin,
             { studentIds: [occupation.id_etudiant] }
           );
+          resourcePlacementIndex.add({
+            resourceType: "etudiant",
+            resourceId: occupation.id_etudiant,
+            date: occupation.date,
+            placement: occupation,
+          });
         }
       }
 
@@ -3128,15 +3473,28 @@ export class SchedulerEngine {
       const nonPlanifies = [];
 
       // Trier les cours par priorité (clé en premier, moins de salles en premier)
-      const coursTries = [...coursFiltres].sort((a, b) => {
-        if (a.est_cours_cle !== b.est_cours_cle) return b.est_cours_cle - a.est_cours_cle;
-        const sallesA = a.est_en_ligne ? 0 : salles.filter((s) => AvailabilityChecker.salleCompatible(s, a)).length;
-        const sallesB = b.est_en_ligne ? 0 : salles.filter((s) => AvailabilityChecker.salleCompatible(s, b)).length;
-        return sallesA - sallesB;
-      });
+      const coursTries = CoursePrioritySorter.sortCoursesMostConstrainedFirst(
+        coursFiltres,
+        {
+          candidateMap: courseTimeCandidateMap,
+          resolveCompatibleProfessorCount: (course) =>
+            professeurs.filter((professeur) =>
+              AvailabilityChecker.profCompatible(professeur, course)
+            ).length,
+          resolveCompatibleRoomCount: (course) =>
+            course.est_en_ligne
+              ? 1
+              : salles.filter((salle) =>
+                  AvailabilityChecker.salleCompatible(salle, course)
+                ).length,
+        }
+      );
 
       // Générer les séances pour le groupe
       for (const coursActuel of coursTries) {
+        const creneauxCours =
+          courseTimeCandidateMap.get(Number(coursActuel.id_cours)) ||
+          SchedulerEngine._normaliserCreneauxCours(coursActuel, creneaux);
         const sallesCompatiblesType = coursActuel.est_en_ligne
           ? [null]
           : salles
@@ -3201,7 +3559,7 @@ export class SchedulerEngine {
             profsCompatibles,
             sallesCompatibles,
             datesParJourSemaine,
-            creneaux,
+            creneaux: creneauxCours,
             matrix,
             dispParProf,
             absencesParProf,
@@ -3212,6 +3570,7 @@ export class SchedulerEngine {
             chargeSeriesParProfJour,
             slotsParGroupeJour,
             slotsParProfJour,
+            resourcePlacementIndex,
             numeroSeance: n,
             preferencesStabilite,
             optimizationMode: modeOptimisation,
@@ -3228,7 +3587,7 @@ export class SchedulerEngine {
               professeurs,
               salles,
               datesParJourSemaine,
-              creneaux,
+              creneaux: creneauxCours,
               matrix,
               dispParProf,
               absencesParProf,
@@ -3239,6 +3598,7 @@ export class SchedulerEngine {
               chargeSeriesParProfJour,
               slotsParGroupeJour,
               slotsParProfJour,
+              resourcePlacementIndex,
               effectifGroupe,
               optimizationMode: modeOptimisation,
             });

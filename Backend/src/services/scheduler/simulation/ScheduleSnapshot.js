@@ -24,6 +24,7 @@
 import pool from "../../../../db.js";
 import { ConstraintMatrix } from "../ConstraintMatrix.js";
 import { ScheduleScorer } from "../scoring/ScheduleScorer.js";
+import { buildSlotMetadataFromTimeRange } from "../time/TimeSlotUtils.js";
 
 /**
  * Normalise un entier positif ou retourne `null`.
@@ -63,6 +64,79 @@ function normalizeTime(timeValue) {
   }
 
   return value.slice(0, 8);
+}
+
+function parseDateUtc(dateValue) {
+  const [year, month, day] = String(dateValue || "")
+    .split("-")
+    .map((part) => Number(part));
+
+  if (
+    !Number.isInteger(year) ||
+    !Number.isInteger(month) ||
+    !Number.isInteger(day) ||
+    year <= 0 ||
+    month <= 0 ||
+    day <= 0
+  ) {
+    return null;
+  }
+
+  return new Date(Date.UTC(year, month - 1, day));
+}
+
+function getIsoWeekday(dateValue) {
+  const date = parseDateUtc(dateValue);
+  if (!date) {
+    return null;
+  }
+
+  const weekday = date.getUTCDay();
+  return weekday === 0 ? 7 : weekday;
+}
+
+function enrichPlacementTiming(placement) {
+  const normalizedStartTime = normalizeTime(placement?.heure_debut);
+  const normalizedEndTime = normalizeTime(placement?.heure_fin);
+  const metadata = buildSlotMetadataFromTimeRange(normalizedStartTime, normalizedEndTime);
+  const slotStartIndex = Number(placement?.slotStartIndex);
+  const slotEndIndex = Number(placement?.slotEndIndex);
+  const durationHours = Number(placement?.dureeHeures);
+  const weekday = getIsoWeekday(placement?.date);
+
+  return {
+    ...placement,
+    heure_debut: metadata?.heure_debut || normalizedStartTime,
+    heure_fin: metadata?.heure_fin || normalizedEndTime,
+    dureeHeures:
+      Number(metadata?.dureeHeures) > 0
+        ? Number(metadata.dureeHeures)
+        : durationHours > 0
+          ? durationHours
+          : Number.isInteger(slotStartIndex) && Number.isInteger(slotEndIndex) && slotEndIndex > slotStartIndex
+            ? slotEndIndex - slotStartIndex
+            : 0,
+    slotStartIndex:
+      Number.isInteger(Number(metadata?.slotStartIndex)) &&
+      Number(metadata.slotStartIndex) >= 0
+        ? Number(metadata.slotStartIndex)
+        : Number.isInteger(slotStartIndex)
+          ? slotStartIndex
+          : null,
+    slotEndIndex:
+      Number.isInteger(Number(metadata?.slotEndIndex)) &&
+      Number(metadata.slotEndIndex) > Number(metadata.slotStartIndex)
+        ? Number(metadata.slotEndIndex)
+        : Number.isInteger(slotEndIndex)
+          ? slotEndIndex
+          : null,
+    jourSemaine:
+      Number.isInteger(Number(placement?.jourSemaine)) &&
+      Number(placement?.jourSemaine) >= 1 &&
+      Number(placement?.jourSemaine) <= 7
+        ? Number(placement.jourSemaine)
+        : weekday,
+  };
 }
 
 /**
@@ -839,7 +913,9 @@ export class ScheduleSnapshot {
   constructor(data = {}) {
     this.session = Object.freeze(cloneObject(data.session));
     this.placements = freezeRows(
-      [...(Array.isArray(data.placements) ? data.placements : [])].sort(comparePlacements)
+      [...(Array.isArray(data.placements) ? data.placements : [])]
+        .map((placement) => enrichPlacementTiming(placement))
+        .sort(comparePlacements)
     );
     this.courses = freezeRows(data.courses);
     this.professors = freezeRows(data.professors);
@@ -944,9 +1020,19 @@ export class ScheduleSnapshot {
    */
   buildScoringPayload(placements = this.placements) {
     return {
-      placements: cloneRows(placements).sort(comparePlacements),
+      placements: cloneRows(placements)
+        .map((placement) => enrichPlacementTiming(placement))
+        .sort(comparePlacements),
       affectationsEtudiantGroupe: this.cloneStudentGroupAssignments(),
       affectationsReprises: this.cloneRecoveryAssignments(),
+      participantsParAffectation: new Map(
+        [...this.participantsByAssignment.entries()].map(([assignmentId, studentIds]) => [
+          Number(assignmentId),
+          [...studentIds],
+        ])
+      ),
+      nbCoursNonPlanifies: 0,
+      nbConflitsEvites: 0,
     };
   }
 

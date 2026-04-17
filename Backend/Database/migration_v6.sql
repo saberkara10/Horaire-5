@@ -1,3 +1,11 @@
+-- ============================================================================
+-- ROLE DU FICHIER
+-- Definition SQL pour la version de schema v6.
+--
+-- IMPACT SUR LE PROJET
+-- - cree `journal_replanifications_disponibilites`
+-- - donne au projet une piste d'audit pour les replanifications liees aux disponibilites
+-- ============================================================================
 -- migration_v6.sql
 -- Journal des replanifications liees aux disponibilites professeurs.
 
@@ -22,4 +30,3 @@ CREATE TABLE IF NOT EXISTS journal_replanifications_disponibilites (
     FOREIGN KEY (id_professeur) REFERENCES professeurs (id_professeur)
     ON DELETE CASCADE
 );
-

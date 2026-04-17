@@ -1,11 +1,11 @@
 sequenceDiagram
-    actor Responsable
+    actor ResponsableAdministratif as Responsable administratif
     participant Frontend
     participant ModuleSalles as Module salles
     participant Validation
     participant MySQL
 
-    Responsable->>Frontend: Demande la suppression d'une salle
+    ResponsableAdministratif->>Frontend: Demande la suppression d'une salle
     Frontend->>ModuleSalles: DELETE /api/salles/:id
     ModuleSalles->>Validation: Verifier id et existence
     Validation->>MySQL: SELECT salle par id

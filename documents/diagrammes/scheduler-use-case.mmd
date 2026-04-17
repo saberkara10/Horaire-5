@@ -1,9 +1,14 @@
 flowchart LR
-    admin[Admin]
-    responsable[Responsable]
+    responsable[Responsable administratif]
+    admin[Administrateur]
 
+    uc_login((Se connecter))
+    uc_admins((Creer et gerer les administrateurs))
+    uc_profiles((Gerer les profils utilisateurs))
     uc_bootstrap((Preparer le jeu de donnees))
     uc_sessions((Creer ou activer une session))
+    uc_catalog((Gerer cours, salles et professeurs))
+    uc_assign((Affecter cours, salles, plages et professeurs))
     uc_generate((Lancer une generation complete))
     uc_reports((Consulter les rapports et diagnostics))
     uc_failures((Gerer les cours echoues))
@@ -13,27 +18,29 @@ flowchart LR
     uc_target((Regenerer un groupe cible))
     uc_availability((Mettre a jour les disponibilites professeurs))
     uc_replan((Replanifier localement les seances impactees))
-    uc_groups((Former des groupes reels))
-    uc_weekly((Construire la semaine type stable))
-    uc_retake_attach((Rattacher les reprises a des groupes reels))
-    uc_persist((Persister l'horaire et le rapport))
+    uc_export((Exporter les horaires))
 
-    admin --> uc_bootstrap
-    admin --> uc_sessions
-    admin --> uc_generate
-    admin --> uc_reports
-    admin --> uc_failures
-    admin --> uc_absences
-    admin --> uc_rooms
-    admin --> uc_prereq
-    admin --> uc_availability
-
+    responsable --> uc_login
+    responsable --> uc_admins
+    responsable --> uc_bootstrap
+    responsable --> uc_sessions
+    responsable --> uc_catalog
+    responsable --> uc_assign
+    responsable --> uc_generate
     responsable --> uc_reports
+    responsable --> uc_failures
+    responsable --> uc_absences
+    responsable --> uc_rooms
+    responsable --> uc_prereq
     responsable --> uc_target
     responsable --> uc_availability
+    responsable --> uc_export
 
-    uc_generate -. inclut .-> uc_groups
-    uc_generate -. inclut .-> uc_weekly
-    uc_generate -. inclut .-> uc_retake_attach
-    uc_generate -. inclut .-> uc_persist
+    admin --> uc_login
+    admin --> uc_profiles
+    admin --> uc_reports
+    admin --> uc_export
+
+    uc_generate -. inclut .-> uc_assign
+    uc_generate -. gere .-> uc_failures
     uc_availability -. declenche .-> uc_replan

@@ -1,5 +1,5 @@
 sequenceDiagram
-    actor Responsable
+    actor ResponsableAdministratif as Responsable administratif
     participant Frontend as DisponibilitesProfesseursPage
     participant Route as PUT /api/professeurs/:id/disponibilites
     participant Model as professeurs.model.js
@@ -7,7 +7,7 @@ sequenceDiagram
     participant Journal as availability-replanning-journal
     participant DB as MySQL
 
-    Responsable->>Frontend: Modifie les disponibilites et la portee temporelle
+    ResponsableAdministratif->>Frontend: Modifie les disponibilites et la portee temporelle
     Frontend->>Route: PUT /api/professeurs/:id/disponibilites
     Route->>Model: remplacerDisponibilitesProfesseur(...)
     Model->>DB: Sauvegarder les nouvelles disponibilites
@@ -26,4 +26,4 @@ sequenceDiagram
     Journal->>DB: INSERT journal_replanifications_disponibilites
     Model-->>Route: disponibilites + payload replanification
     Route-->>Frontend: 200 ou erreur metier avec details
-    Frontend-->>Responsable: Affiche succes, partiel ou echec
+    Frontend-->>ResponsableAdministratif: Affiche succes, partiel ou echec

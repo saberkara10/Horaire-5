@@ -1,13 +1,32 @@
 /**
- * MODEL - Gestion des groupes
+ * Modèle de données — Gestion des groupes d'étudiants.
  *
- * Ce module centralise la lecture
- * des groupes et de leurs horaires.
+ * Ce module gère la lecture des groupes d'étudiants et de leurs horaires.
+ * Les groupes sont des entités centrales dans le système : chaque étudiant
+ * appartient à un groupe, et chaque groupe reçoit un horaire généré
+ * par le planificateur (scheduler).
+ *
+ * Types de groupes :
+ *  - Groupes normaux : formés automatiquement lors de la création de cohortes
+ *  - Groupes spéciaux (`est_groupe_special = 1`) : groupes créés manuellement
+ *    pour des situations particulières (étudiants en reprise, cas exceptionnels)
+ *
+ * @module model/groupes
  */
 
 import pool from "../../db.js";
 import { assurerSchemaSchedulerAcademique } from "../services/academic-scheduler-schema.js";
 
+/**
+ * Sous-requête SQL réutilisable pour récupérer l'ID de la session active.
+ *
+ * On prend la session avec `active = TRUE` et l'ID le plus élevé
+ * au cas où plusieurs sessions seraient marquées actives par erreur.
+ * Cette constante est injectée directement dans les requêtes SQL pour éviter
+ * les répétitions et maintenir la cohérence.
+ *
+ * @type {string}
+ */
 const SESSION_ACTIVE_SQL = `(
   SELECT id_session
   FROM sessions
@@ -17,10 +36,29 @@ const SESSION_ACTIVE_SQL = `(
 )`;
 
 /**
- * Recuperer la liste des groupes.
+ * Récupère la liste des groupes d'étudiants avec options de filtrage.
  *
- * @param {boolean} details Inclure programme, etape, session et effectif.
- * @returns {Promise<Array<Object>>} Liste des groupes.
+ * Mode simple (details = false) : retourne seulement id + nom_groupe.
+ * Mode détaillé (details = true) : inclut programme, étape, session,
+ * effectif calculé, nombre de séances planifiées et indicateur d'horaire.
+ *
+ * Les filtres dans `options` peuvent être combinés librement :
+ *  - sessionActive         → limiter à la session académique active
+ *  - seulementAvecEffectif → exclure les groupes vides
+ *  - seulementAvecPlanning → exclure les groupes sans aucune séance planifiée
+ *  - inclureGroupesSpeciaux → inclure les groupes spéciaux (exclus par défaut)
+ *
+ * L'effectif est calculé différemment selon le type de groupe :
+ *  - Groupes normaux : COUNT(DISTINCT e.id_etudiant)
+ *  - Groupes spéciaux : COUNT via affectation_etudiants pour la session active
+ *
+ * @param {boolean} [details=false] - Si true, inclut les informations détaillées
+ * @param {object} [options={}] - Options de filtrage
+ * @param {boolean} [options.sessionActive=false] - Limiter à la session active
+ * @param {boolean} [options.seulementAvecEffectif=false] - Exclure les groupes vides
+ * @param {boolean} [options.seulementAvecPlanning=false] - Exclure sans planning
+ * @param {boolean} [options.inclureGroupesSpeciaux=false] - Inclure les groupes spéciaux
+ * @returns {Promise<object[]>} Liste des groupes selon les critères demandés
  */
 export async function recupererGroupes(details = false, options = {}) {
   const {
@@ -30,8 +68,10 @@ export async function recupererGroupes(details = false, options = {}) {
     inclureGroupesSpeciaux = false,
   } = options;
 
+  // Vérifier que le schéma de la BDD est à jour avant toute requête
   await assurerSchemaSchedulerAcademique();
 
+  // Construction dynamique des clauses WHERE selon les options
   const clauses = [];
   const valeurs = [];
 
@@ -48,6 +88,7 @@ export async function recupererGroupes(details = false, options = {}) {
   }
 
   if (seulementAvecPlanning) {
+    // Sous-requête EXISTS : rapide et optimisée par MySQL même sur grandes tables
     clauses.push(
       `EXISTS (
         SELECT 1
@@ -58,11 +99,14 @@ export async function recupererGroupes(details = false, options = {}) {
   }
 
   if (!inclureGroupesSpeciaux) {
+    // COALESCE gère le cas où est_groupe_special est NULL dans l'ancien schéma
     clauses.push(`COALESCE(ge.est_groupe_special, 0) = 0`);
   }
 
   const clauseWhere =
     clauses.length > 0 ? `WHERE ${clauses.join(" AND ")}` : "";
+
+  // HAVING sur l'effectif calculé (ne peut pas être dans WHERE car c'est un agrégat)
   const clauseHaving = seulementAvecEffectif
     ? `HAVING CASE
          WHEN COALESCE(ge.est_groupe_special, 0) = 1
@@ -111,6 +155,7 @@ export async function recupererGroupes(details = false, options = {}) {
         valeurs
       )
     : await pool.query(
+        // Mode simplifié — pas de jointures, juste l'essentiel
         `SELECT ge.id_groupes_etudiants, ge.nom_groupe, ge.est_groupe_special
          FROM groupes_etudiants ge
          ${clauseWhere}
@@ -122,10 +167,13 @@ export async function recupererGroupes(details = false, options = {}) {
 }
 
 /**
- * Recuperer un groupe par son identifiant.
+ * Récupère les informations complètes d'un groupe par son identifiant.
  *
- * @param {number} idGroupe Identifiant du groupe.
- * @returns {Promise<Object|null>} Groupe trouve ou null.
+ * Retourne les mêmes colonnes que recupererGroupes() en mode détaillé,
+ * mais pour un seul groupe. Inclut programme, étape, session et effectif.
+ *
+ * @param {number} idGroupe - L'identifiant du groupe à récupérer
+ * @returns {Promise<object|null>} Le groupe avec ses détails, ou null s'il n'existe pas
  */
 export async function recupererGroupeParId(idGroupe) {
   await assurerSchemaSchedulerAcademique();
@@ -165,10 +213,20 @@ export async function recupererGroupeParId(idGroupe) {
 }
 
 /**
- * Recuperer l'horaire detaille d'un groupe.
+ * Récupère l'horaire détaillé d'un groupe (toutes ses séances planifiées).
  *
- * @param {number} idGroupe Identifiant du groupe.
- * @returns {Promise<Array<Object>>} Liste des seances.
+ * Retourne uniquement les séances de la session active via la sous-requête
+ * SESSION_ACTIVE_SQL. Les séances sont triées par date puis par heure de début.
+ *
+ * Champs retournés par séance :
+ *  - Identifiants (affectation, cours, professeur, salle, plage horaire)
+ *  - Code et nom du cours
+ *  - Nom et prénom du professeur
+ *  - Code et type de la salle
+ *  - Date (format YYYY-MM-DD), heure_debut, heure_fin
+ *
+ * @param {number} idGroupe - L'identifiant du groupe
+ * @returns {Promise<object[]>} Liste des séances triées par date et heure
  */
 export async function recupererHoraireGroupe(idGroupe) {
   const [horaire] = await pool.query(
@@ -210,16 +268,19 @@ export async function recupererHoraireGroupe(idGroupe) {
 }
 
 /**
- * Recuperer les informations completes d'un groupe avec son horaire.
+ * Récupère le planning complet d'un groupe : informations du groupe + toutes ses séances.
  *
- * @param {number} idGroupe Identifiant du groupe.
- * @returns {Promise<Object|null>} Resume complet du groupe ou null.
+ * Combine recupererGroupeParId() et recupererHoraireGroupe() en un seul appel.
+ * Retourne null si le groupe n'existe pas.
+ *
+ * @param {number} idGroupe - L'identifiant du groupe
+ * @returns {Promise<{groupe: object, horaire: object[]}|null>} Planning complet ou null
  */
 export async function recupererPlanningCompletGroupe(idGroupe) {
   const groupe = await recupererGroupeParId(idGroupe);
 
   if (!groupe) {
-    return null;
+    return null; // Le groupe n'existe pas, inutile de chercher son horaire
   }
 
   const horaire = await recupererHoraireGroupe(idGroupe);

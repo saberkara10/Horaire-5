@@ -23,6 +23,11 @@ const SCORING_PROFILES = Object.freeze({
       etudiant: 0.8,
       professeur: 0.2,
     }),
+    globalWeights: Object.freeze({
+      etudiant: 0.7,
+      professeur: 0.15,
+      groupe: 0.15,
+    }),
   }),
   professeur: Object.freeze({
     mode: "professeur",
@@ -31,6 +36,11 @@ const SCORING_PROFILES = Object.freeze({
       etudiant: 0.2,
       professeur: 0.8,
     }),
+    globalWeights: Object.freeze({
+      etudiant: 0.15,
+      professeur: 0.7,
+      groupe: 0.15,
+    }),
   }),
   equilibre: Object.freeze({
     mode: "equilibre",
@@ -38,6 +48,11 @@ const SCORING_PROFILES = Object.freeze({
     weights: Object.freeze({
       etudiant: 0.5,
       professeur: 0.5,
+    }),
+    globalWeights: Object.freeze({
+      etudiant: 0.4,
+      professeur: 0.35,
+      groupe: 0.25,
     }),
   }),
 });

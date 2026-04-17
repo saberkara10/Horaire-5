@@ -1,3 +1,13 @@
+/**
+ * Logique d'audit scheduler de la migration v12.
+ *
+ * Role:
+ * - cree la trace d'audit des changements manuels ou simules du scheduler
+ *
+ * Impact sur le projet:
+ * - ajoute `journal_modifications_affectations_scheduler`
+ * - rend tracables les optimisations et reaffectations
+ */
 export async function isApplied({ connection, tools }) {
   return (
     (await tools.tableExists(

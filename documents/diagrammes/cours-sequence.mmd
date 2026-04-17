@@ -1,12 +1,12 @@
 sequenceDiagram
-    actor Responsable
+    actor ResponsableAdministratif as Responsable administratif
     participant Frontend
     participant RouteCours as Route /api/cours
     participant Validation as cours.validations.js
     participant ModelCours as cours.model.js
     participant MySQL
 
-    Responsable->>Frontend: Soumet un nouveau cours
+    ResponsableAdministratif->>Frontend: Soumet un nouveau cours
     Frontend->>RouteCours: POST /api/cours
     RouteCours->>Validation: validerCreateCours()
     Validation->>ModelCours: recupererCoursParCode(code)

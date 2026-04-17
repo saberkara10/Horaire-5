@@ -24,8 +24,14 @@ import {
   ACADEMIC_WEEKDAY_TIME_SLOTS,
 } from "../AcademicCatalog.js";
 import { AvailabilityChecker } from "../AvailabilityChecker.js";
+import { BreakConstraintValidator } from "../constraints/BreakConstraintValidator.js";
+import { ResourceDayPlacementIndex } from "../constraints/ResourceDayPlacementIndex.js";
 import { GroupFormer } from "../GroupFormer.js";
 import { ScheduleScorer } from "../scoring/ScheduleScorer.js";
+import {
+  buildStartTimeCandidates,
+  getCandidateMetadataForTimeRange,
+} from "../time/StartTimeCandidates.js";
 import { PlacementEvaluator } from "./PlacementEvaluator.js";
 
 const DEFAULT_MAX_IMPROVEMENTS = 4;
@@ -148,6 +154,30 @@ function rememberDaySlot(index, entityId, weekday, slotIndex) {
   }
 
   slotsByDay.get(weekday).add(slotIndex);
+}
+
+function rememberDaySession(index, entityId, weekday, sessionWindow) {
+  if (!sessionWindow || !Number.isInteger(Number(sessionWindow.slotStartIndex))) {
+    return;
+  }
+
+  const entityKey = String(entityId);
+  if (!index.has(entityKey)) {
+    index.set(entityKey, new Map());
+  }
+
+  const sessionsByDay = index.get(entityKey);
+  if (!sessionsByDay.has(weekday)) {
+    sessionsByDay.set(weekday, []);
+  }
+
+  sessionsByDay.get(weekday).push({
+    slotStartIndex: Number(sessionWindow.slotStartIndex),
+    slotEndIndex: Number(sessionWindow.slotEndIndex),
+    dureeHeures: Number(sessionWindow.dureeHeures || 0),
+    heure_debut: sessionWindow.heure_debut || null,
+    heure_fin: sessionWindow.heure_fin || null,
+  });
 }
 
 export class LocalSearchOptimizer {
@@ -307,10 +337,13 @@ export class LocalSearchOptimizer {
 
     for (const placement of Array.isArray(placements) ? placements : []) {
       const weekday = LocalSearchOptimizer.resolveWeekday(placement.date);
-      const slotIndex = LocalSearchOptimizer.resolveSlotIndex(
+      const timeMetadata = LocalSearchOptimizer.resolveSlotMetadata(
         placement.heure_debut,
         placement.heure_fin
       );
+      if (!timeMetadata) {
+        continue;
+      }
       const seriesKey = [
         placement.id_cours,
         placement.id_groupe,
@@ -333,7 +366,10 @@ export class LocalSearchOptimizer {
             debut: placement.heure_debut,
             fin: placement.heure_fin,
           },
-          slotIndex,
+          slotIndex: timeMetadata.slotStartIndex,
+          slotStartIndex: timeMetadata.slotStartIndex,
+          slotEndIndex: timeMetadata.slotEndIndex,
+          dureeHeures: timeMetadata.dureeHeures,
           est_en_ligne: Boolean(placement.est_en_ligne),
           est_cours_cle: Boolean(placement.est_cours_cle),
           code_cours: placement.code_cours || null,
@@ -393,7 +429,7 @@ export class LocalSearchOptimizer {
     currentScore,
     maxCandidatesPerSeries,
   }) {
-    if (!Number.isInteger(series.slotIndex) || series.slotIndex < 0) {
+    if (!Number.isInteger(series.slotStartIndex) || series.slotStartIndex < 0) {
       return null;
     }
 
@@ -421,6 +457,10 @@ export class LocalSearchOptimizer {
 
     const remainingSeries = allSeries.filter((currentSeries) => currentSeries.key !== series.key);
     const evaluationContext = LocalSearchOptimizer.buildEvaluationContext(remainingSeries);
+    const resourcePlacementIndex = LocalSearchOptimizer.buildResourcePlacementIndex({
+      seriesList: remainingSeries,
+      groupIndex,
+    });
     const rawCandidates = LocalSearchOptimizer.enumerateCandidates({
       series: originalSeries,
       group,
@@ -428,6 +468,7 @@ export class LocalSearchOptimizer {
       weekdayDateLookup,
       workingMatrix,
       studentIds,
+      resourcePlacementIndex,
       dispParProf,
       absencesParProf,
       indispoParSalle,
@@ -527,6 +568,7 @@ export class LocalSearchOptimizer {
     weekdayDateLookup,
     workingMatrix,
     studentIds,
+    resourcePlacementIndex,
     dispParProf,
     absencesParProf,
     indispoParSalle,
@@ -557,8 +599,14 @@ export class LocalSearchOptimizer {
         continue;
       }
 
-      for (const [slotIndex, timeSlot] of ACADEMIC_WEEKDAY_TIME_SLOTS.entries()) {
-        if (targetWeekday === series.jourSemaine && slotIndex === series.slotIndex) {
+      const timeCandidates = buildStartTimeCandidates(series.dureeHeures || 1);
+
+      for (const [candidateIndex, timeWindow] of timeCandidates.entries()) {
+        if (
+          targetWeekday === series.jourSemaine &&
+          String(timeWindow.heure_debut) === String(series.creneau.debut) &&
+          String(timeWindow.heure_fin) === String(series.creneau.fin)
+        ) {
           continue;
         }
 
@@ -567,7 +615,7 @@ export class LocalSearchOptimizer {
             series,
             targetDates,
             targetWeekday,
-            timeSlot,
+            timeWindow,
             room: null,
           });
 
@@ -578,6 +626,7 @@ export class LocalSearchOptimizer {
               room: null,
               workingMatrix,
               studentIds,
+              resourcePlacementIndex,
               dispParProf,
               absencesParProf,
               indispoParSalle,
@@ -590,11 +639,17 @@ export class LocalSearchOptimizer {
               salle: null,
               idGroupe: series.id_groupe,
               jourSemaine: targetWeekday,
-              creneau: timeSlot,
-              slotIndex,
+              creneau: {
+                debut: timeWindow.heure_debut,
+                fin: timeWindow.heure_fin,
+              },
+              slotIndex: timeWindow.slotStartIndex,
+              slotStartIndex: timeWindow.slotStartIndex,
+              slotEndIndex: timeWindow.slotEndIndex,
+              dureeHeures: timeWindow.dureeHeures,
               indexStrategie: targetWeekday === series.jourSemaine ? 0 : 1,
               indexProfesseur: 0,
-              indexCreneau: slotIndex,
+              indexCreneau: candidateIndex,
               indexSalle: 0,
               coverageRatio: 1,
               roomCoverageRatio: 0,
@@ -610,7 +665,7 @@ export class LocalSearchOptimizer {
             series,
             targetDates,
             targetWeekday,
-            timeSlot,
+            timeWindow,
             room,
           });
 
@@ -621,6 +676,7 @@ export class LocalSearchOptimizer {
               room,
               workingMatrix,
               studentIds,
+              resourcePlacementIndex,
               dispParProf,
               absencesParProf,
               indispoParSalle,
@@ -636,11 +692,17 @@ export class LocalSearchOptimizer {
             salle: room,
             idGroupe: series.id_groupe,
             jourSemaine: targetWeekday,
-            creneau: timeSlot,
-            slotIndex,
+            creneau: {
+              debut: timeWindow.heure_debut,
+              fin: timeWindow.heure_fin,
+            },
+            slotIndex: timeWindow.slotStartIndex,
+            slotStartIndex: timeWindow.slotStartIndex,
+            slotEndIndex: timeWindow.slotEndIndex,
+            dureeHeures: timeWindow.dureeHeures,
             indexStrategie: targetWeekday === series.jourSemaine ? 0 : 1,
             indexProfesseur: 0,
-            indexCreneau: slotIndex,
+            indexCreneau: candidateIndex,
             indexSalle: roomIndex,
             coverageRatio: 1,
             roomCoverageRatio: 1,
@@ -673,10 +735,22 @@ export class LocalSearchOptimizer {
     room,
     workingMatrix,
     studentIds,
+    resourcePlacementIndex,
     dispParProf,
     absencesParProf,
     indispoParSalle,
   }) {
+    if (
+      !LocalSearchOptimizer.respectsBreakConstraints({
+        series,
+        placements,
+        studentIds,
+        resourcePlacementIndex,
+      })
+    ) {
+      return false;
+    }
+
     return placements.every((placement) => {
       if (
         !workingMatrix.profLibre(
@@ -750,18 +824,21 @@ export class LocalSearchOptimizer {
    * Effets secondaires : aucun.
    * Cas particuliers : le nombre d'occurrences est conserve.
    */
-  static buildCandidatePlacements({ series, targetDates, targetWeekday, timeSlot, room }) {
+  static buildCandidatePlacements({ series, targetDates, targetWeekday, timeWindow, room }) {
     return [...targetDates]
       .sort((left, right) => String(left).localeCompare(String(right), "fr"))
       .map((date) => ({
         ...series.placements[0],
         date,
-        heure_debut: timeSlot.debut,
-        heure_fin: timeSlot.fin,
+        heure_debut: timeWindow.heure_debut,
+        heure_fin: timeWindow.heure_fin,
         id_salle: room ? room.id_salle : null,
         code_salle: room ? room.code : "EN LIGNE",
         est_en_ligne: room ? false : Boolean(series.est_en_ligne),
         jour_semaine: targetWeekday,
+        slotStartIndex: timeWindow.slotStartIndex,
+        slotEndIndex: timeWindow.slotEndIndex,
+        dureeHeures: timeWindow.dureeHeures,
       }));
   }
 
@@ -826,6 +903,8 @@ export class LocalSearchOptimizer {
     const chargeSeriesParProfJour = new Map();
     const slotsParGroupeJour = new Map();
     const slotsParProfJour = new Map();
+    const sessionsParGroupeJour = new Map();
+    const sessionsParProfJour = new Map();
 
     for (const series of Array.isArray(seriesList) ? seriesList : []) {
       chargeSeriesParJour.set(
@@ -834,12 +913,24 @@ export class LocalSearchOptimizer {
       );
       incrementDayLoad(chargeSeriesParGroupeJour, series.id_groupe, series.jourSemaine);
       incrementDayLoad(chargeSeriesParProfJour, series.id_professeur, series.jourSemaine);
-      rememberDaySlot(slotsParGroupeJour, series.id_groupe, series.jourSemaine, series.slotIndex);
+      rememberDaySlot(
+        slotsParGroupeJour,
+        series.id_groupe,
+        series.jourSemaine,
+        series.slotStartIndex
+      );
       rememberDaySlot(
         slotsParProfJour,
         series.id_professeur,
         series.jourSemaine,
-        series.slotIndex
+        series.slotStartIndex
+      );
+      rememberDaySession(sessionsParGroupeJour, series.id_groupe, series.jourSemaine, series);
+      rememberDaySession(
+        sessionsParProfJour,
+        series.id_professeur,
+        series.jourSemaine,
+        series
       );
     }
 
@@ -849,7 +940,46 @@ export class LocalSearchOptimizer {
       chargeSeriesParProfJour,
       slotsParGroupeJour,
       slotsParProfJour,
+      sessionsParGroupeJour,
+      sessionsParProfJour,
     };
+  }
+
+  static buildResourcePlacementIndex({ seriesList, groupIndex }) {
+    const index = new ResourceDayPlacementIndex();
+
+    for (const series of Array.isArray(seriesList) ? seriesList : []) {
+      const group = groupIndex.get(String(series.id_groupe));
+      const studentIds = group
+        ? LocalSearchOptimizer.getStudentIdsForCourse(group, series.id_cours)
+        : [];
+
+      for (const placement of Array.isArray(series.placements) ? series.placements : []) {
+        index.add({
+          resourceType: "professeur",
+          resourceId: series.id_professeur,
+          date: placement.date,
+          placement,
+        });
+        index.add({
+          resourceType: "groupe",
+          resourceId: series.id_groupe,
+          date: placement.date,
+          placement,
+        });
+
+        for (const studentId of studentIds) {
+          index.add({
+            resourceType: "etudiant",
+            resourceId: studentId,
+            date: placement.date,
+            placement,
+          });
+        }
+      }
+    }
+
+    return index;
   }
 
   /**
@@ -915,6 +1045,51 @@ export class LocalSearchOptimizer {
       : [];
 
     return [...new Set([...regularStudentIds, ...recoveryStudentIds])];
+  }
+
+  static respectsBreakConstraints({
+    series,
+    placements,
+    studentIds,
+    resourcePlacementIndex,
+  }) {
+    if (!(resourcePlacementIndex instanceof ResourceDayPlacementIndex)) {
+      return true;
+    }
+
+    const resources = [
+      {
+        resourceType: "professeur",
+        resourceId: series.id_professeur,
+      },
+      {
+        resourceType: "groupe",
+        resourceId: series.id_groupe,
+      },
+      ...[...(Array.isArray(studentIds) ? studentIds : [])].map((studentId) => ({
+        resourceType: "etudiant",
+        resourceId: studentId,
+      })),
+    ].filter(
+      (resource) =>
+        Number.isInteger(Number(resource.resourceId)) &&
+        Number(resource.resourceId) > 0
+    );
+
+    return (Array.isArray(placements) ? placements : []).every((placement) =>
+      resources.every((resource) =>
+        BreakConstraintValidator.validateSequenceBreakConstraint({
+          placements: resourcePlacementIndex.get({
+            resourceType: resource.resourceType,
+            resourceId: resource.resourceId,
+            date: placement.date,
+          }),
+          proposedPlacement: placement,
+          resourceType: resource.resourceType,
+          resourceId: resource.resourceId,
+        }).valid
+      )
+    );
   }
 
   /**
@@ -1069,9 +1244,28 @@ export class LocalSearchOptimizer {
    * Effets secondaires : aucun.
    * Cas particuliers : retourne -1 si l'horaire sort du catalogue auto.
    */
-  static resolveSlotIndex(startTime, endTime) {
-    return ACADEMIC_WEEKDAY_TIME_SLOTS.findIndex(
+  static resolveSlotMetadata(startTime, endTime) {
+    const metadata = getCandidateMetadataForTimeRange(startTime, endTime);
+    if (metadata) {
+      return metadata;
+    }
+
+    const slotIndex = ACADEMIC_WEEKDAY_TIME_SLOTS.findIndex(
       (slot) => slot.debut === startTime && slot.fin === endTime
     );
+
+    if (slotIndex < 0) {
+      return null;
+    }
+
+    return {
+      slotStartIndex: slotIndex,
+      slotEndIndex: slotIndex + 1,
+      dureeHeures: 1,
+    };
+  }
+
+  static resolveSlotIndex(startTime, endTime) {
+    return LocalSearchOptimizer.resolveSlotMetadata(startTime, endTime)?.slotStartIndex ?? -1;
   }
 }

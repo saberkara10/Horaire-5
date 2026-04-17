@@ -11,6 +11,7 @@ import {
   MAX_WEEKLY_SESSIONS_PER_GROUP_WITH_RECOVERY,
   REQUIRED_WEEKLY_SESSIONS_PER_GROUP,
 } from "../scheduler/AcademicCatalog.js";
+import { BreakConstraintValidator } from "../scheduler/constraints/BreakConstraintValidator.js";
 import { disponibiliteCouvreDate, normaliserDateIso } from "./availability-temporal.js";
 
 const PAS_RECHERCHE_MINUTES = 15;
@@ -344,6 +345,172 @@ function reservationTransitoireEnConflit(
     // a invalider le placement candidat.
     return true;
   });
+}
+
+function extraireIdEtudiantsSeance(affectation) {
+  return [
+    ...(Array.isArray(affectation?.etudiants_reguliers)
+      ? affectation.etudiants_reguliers.map((etudiant) => Number(etudiant?.id_etudiant))
+      : []),
+    ...(Array.isArray(affectation?.etudiants_reprises)
+      ? affectation.etudiants_reprises.map((etudiant) => Number(etudiant?.id_etudiant))
+      : []),
+  ]
+    .filter((idEtudiant) => Number.isInteger(idEtudiant) && idEtudiant > 0);
+}
+
+function normaliserIdUnique(values) {
+  return [...new Set(
+    (Array.isArray(values) ? values : [])
+      .map((value) => Number(value))
+      .filter((value) => Number.isInteger(value) && value > 0)
+  )];
+}
+
+function extrairePlacementsJourDepuisSeances(seances, date, idsAffectationsExclues = []) {
+  const idsExclus = new Set(normaliserIdUnique(idsAffectationsExclues));
+
+  return (Array.isArray(seances) ? seances : [])
+    .filter(
+      (seance) =>
+        String(seance?.date) === String(date) &&
+        !idsExclus.has(Number(seance?.id_affectation_cours))
+    )
+    .map((seance) => ({
+      date: String(seance.date).slice(0, 10),
+      heure_debut: normaliserHeure(seance.heure_debut),
+      heure_fin: normaliserHeure(seance.heure_fin),
+      id_affectation_cours: Number(seance.id_affectation_cours) || null,
+    }))
+    .filter(
+      (seance) =>
+        heureVersMinutes(seance.heure_debut) < heureVersMinutes(seance.heure_fin)
+    );
+}
+
+function resumerViolationPause(violation, fallbackRole) {
+  const role = String(violation?.resourceType || fallbackRole || "ressource");
+  return `Contrainte de pause invalide pour ${role}: ${violation?.message || "pause insuffisante."}`;
+}
+
+function validerPauseRessource({
+  resourceType,
+  resourceId,
+  placements,
+  proposedPlacement,
+}) {
+  return BreakConstraintValidator.validateSequenceBreakConstraint({
+    placements,
+    proposedPlacement,
+    resourceType,
+    resourceId,
+  });
+}
+
+async function recupererPlacementsEtudiantsJour(
+  etudiantIds,
+  date,
+  idsAffectationsImpactees,
+  connection
+) {
+  const idsValides = normaliserIdUnique(etudiantIds);
+
+  if (idsValides.length === 0) {
+    return new Map();
+  }
+
+  const placeholders = idsValides.map(() => "?").join(", ");
+  let clauseExclusion = "";
+  const valeursExclusion = [];
+
+  if (idsAffectationsImpactees.length > 0) {
+    const placeholdersAffectations = idsAffectationsImpactees.map(() => "?").join(", ");
+    clauseExclusion = ` AND ac.id_affectation_cours NOT IN (${placeholdersAffectations})`;
+    valeursExclusion.push(...idsAffectationsImpactees);
+  }
+
+  const [rows] = await connection.query(
+    `SELECT DISTINCT e.id_etudiant,
+            ac.id_affectation_cours,
+            DATE_FORMAT(ph.date, '%Y-%m-%d') AS date,
+            ph.heure_debut,
+            ph.heure_fin
+     FROM etudiants e
+     JOIN groupes_etudiants ge
+       ON ge.id_groupes_etudiants = e.id_groupes_etudiants
+     JOIN affectation_groupes ag
+       ON ag.id_groupes_etudiants = ge.id_groupes_etudiants
+     JOIN affectation_cours ac
+       ON ac.id_affectation_cours = ag.id_affectation_cours
+     JOIN plages_horaires ph
+       ON ph.id_plage_horaires = ac.id_plage_horaires
+     WHERE e.id_etudiant IN (${placeholders})
+       AND ph.date = ?
+       AND NOT EXISTS (
+         SELECT 1
+         FROM affectation_etudiants ae_override
+         WHERE ae_override.id_etudiant = e.id_etudiant
+           AND ae_override.id_cours = ac.id_cours
+           AND ae_override.id_session = ge.id_session
+           AND ae_override.source_type = 'individuelle'
+       )${clauseExclusion}
+     UNION
+     SELECT DISTINCT e.id_etudiant,
+            ac.id_affectation_cours,
+            DATE_FORMAT(ph.date, '%Y-%m-%d') AS date,
+            ph.heure_debut,
+            ph.heure_fin
+     FROM affectation_etudiants ae
+     JOIN etudiants e
+       ON e.id_etudiant = ae.id_etudiant
+     JOIN affectation_groupes ag
+       ON ag.id_groupes_etudiants = ae.id_groupes_etudiants
+     JOIN affectation_cours ac
+       ON ac.id_affectation_cours = ag.id_affectation_cours
+      AND ac.id_cours = ae.id_cours
+     JOIN plages_horaires ph
+       ON ph.id_plage_horaires = ac.id_plage_horaires
+     WHERE e.id_etudiant IN (${placeholders})
+       AND ae.source_type IN ('reprise', 'individuelle')
+       AND ph.date = ?${clauseExclusion}
+     ORDER BY id_etudiant ASC, heure_debut ASC, heure_fin ASC, id_affectation_cours ASC`,
+    [...idsValides, date, ...valeursExclusion, ...idsValides, date, ...valeursExclusion]
+  );
+
+  const placementsParEtudiant = new Map();
+
+  rows.forEach((row) => {
+    const idEtudiant = Number(row.id_etudiant);
+    if (!placementsParEtudiant.has(idEtudiant)) {
+      placementsParEtudiant.set(idEtudiant, []);
+    }
+
+    placementsParEtudiant.get(idEtudiant).push({
+      id_etudiant: idEtudiant,
+      id_affectation_cours: Number(row.id_affectation_cours) || null,
+      date: String(row.date || "").slice(0, 10),
+      heure_debut: normaliserHeure(row.heure_debut),
+      heure_fin: normaliserHeure(row.heure_fin),
+    });
+  });
+
+  return placementsParEtudiant;
+}
+
+function trouverViolationPausePourRessource({
+  resourceType,
+  resourceId,
+  placements,
+  proposedPlacement,
+}) {
+  const resultat = validerPauseRessource({
+    resourceType,
+    resourceId,
+    placements,
+    proposedPlacement,
+  });
+
+  return resultat.valid ? null : resultat.violations[0] || null;
 }
 
 function compterReservationsTransitoiresSemaine(
@@ -1166,6 +1333,7 @@ async function trouverNouveauPlacement({
   absences,
   salles,
   indisponibilitesParSalle,
+  seancesAVenir,
   reservationsTransitoires,
   idsAffectationsImpactees,
   dateFinSession,
@@ -1202,6 +1370,7 @@ async function trouverNouveauPlacement({
   );
   let meilleurPlacement = null;
   let meilleurScore = Number.NEGATIVE_INFINITY;
+  let raisonPauseDetectee = null;
 
   for (const date of datesRecherche) {
     if (professeurEstAbsent(date, absences)) {
@@ -1323,6 +1492,88 @@ async function trouverNouveauPlacement({
           continue;
         }
 
+        const placementCandidat = {
+          id_affectation_cours: Number(affectation.id_affectation_cours),
+          date,
+          heure_debut: creneau.heure_debut,
+          heure_fin: creneau.heure_fin,
+        };
+        let pauseViolated = false;
+        const placementsProfesseurJour = extrairePlacementsJourDepuisSeances(
+          [
+            ...seancesAVenir,
+            ...reservationsTransitoires.filter(
+              (reservation) =>
+                Number(reservation.id_professeur) === Number(affectation.id_professeur)
+            ),
+          ],
+          date,
+          idsAffectationsImpactees
+        );
+        const violationPauseProfesseur = trouverViolationPausePourRessource({
+          resourceType: "professeur",
+          resourceId: Number(affectation.id_professeur) || null,
+          placements: placementsProfesseurJour,
+          proposedPlacement: placementCandidat,
+        });
+
+        if (violationPauseProfesseur) {
+          raisonPauseDetectee =
+            raisonPauseDetectee ||
+            resumerViolationPause(violationPauseProfesseur, "professeur");
+          continue;
+        }
+
+        const etudiantsIds = extraireIdEtudiantsSeance(affectation);
+
+        if (etudiantsIds.length > 0) {
+          const placementsEtudiantsParId = await recupererPlacementsEtudiantsJour(
+            etudiantsIds,
+            date,
+            idsAffectationsImpactees,
+            connection
+          );
+
+          for (const idEtudiant of etudiantsIds) {
+            const placementsEtudiantJour = [
+              ...(placementsEtudiantsParId.get(Number(idEtudiant)) || []),
+              ...reservationsTransitoires
+                .filter((reservation) =>
+                  Array.isArray(reservation.etudiants_ids) &&
+                  reservation.etudiants_ids.some(
+                    (idReservation) => Number(idReservation) === Number(idEtudiant)
+                  ) &&
+                  String(reservation.date) === String(date)
+                )
+                .map((reservation) => ({
+                  id_affectation_cours: Number(reservation.id_affectation_cours) || null,
+                  date: String(reservation.date).slice(0, 10),
+                  heure_debut: normaliserHeure(reservation.heure_debut),
+                  heure_fin: normaliserHeure(reservation.heure_fin),
+                })),
+            ];
+
+            const violationPauseEtudiant = trouverViolationPausePourRessource({
+              resourceType: "etudiant",
+              resourceId: Number(idEtudiant) || null,
+              placements: placementsEtudiantJour,
+              proposedPlacement: placementCandidat,
+            });
+
+            if (violationPauseEtudiant) {
+              raisonPauseDetectee =
+                raisonPauseDetectee ||
+                resumerViolationPause(violationPauseEtudiant, "etudiant");
+              pauseViolated = true;
+              break;
+            }
+          }
+        }
+
+        if (pauseViolated) {
+          continue;
+        }
+
         const score = calculerScorePlacementCandidat({
           affectation,
           date,
@@ -1356,6 +1607,7 @@ async function trouverNouveauPlacement({
   return {
     ok: false,
     raison:
+      raisonPauseDetectee ||
       "Aucun creneau compatible n'a ete trouve sur la fenetre de rattrapage automatique.",
   };
 }
@@ -1500,6 +1752,7 @@ export async function replanifierSeancesImpacteesParDisponibilites(
       absences,
       salles,
       indisponibilitesParSalle,
+      seancesAVenir,
       reservationsTransitoires,
       idsAffectationsImpactees,
       dateFinSession: sessionActive.date_fin,
@@ -1524,6 +1777,8 @@ export async function replanifierSeancesImpacteesParDisponibilites(
       groupes_ids: affectation.groupes_details.map((groupe) =>
         Number(groupe.id_groupes_etudiants)
       ),
+      id_professeur: Number(affectation.id_professeur) || null,
+      etudiants_ids: extraireIdEtudiantsSeance(affectation),
     });
 
     deplacementsPlanifies.push({

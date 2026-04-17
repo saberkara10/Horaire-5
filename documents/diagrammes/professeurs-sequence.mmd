@@ -1,12 +1,12 @@
 sequenceDiagram
-    actor Responsable
+    actor ResponsableAdministratif as Responsable administratif
     participant Frontend
     participant RouteProf as Route /api/professeurs/:id
     participant Validation as professeurs.validation.js
     participant ModelProf as professeurs.model.js
     participant MySQL
 
-    Responsable->>Frontend: Demande la suppression d'un professeur
+    ResponsableAdministratif->>Frontend: Demande la suppression d'un professeur
     Frontend->>RouteProf: DELETE /api/professeurs/:id
     RouteProf->>Validation: validerIdProfesseur()
     Validation->>ModelProf: recupererProfesseurParId(id)

@@ -1,3 +1,14 @@
+/**
+ * Logique d'enrichissement identitaire etudiant de la migration v9.
+ *
+ * Role:
+ * - ajoute la gestion de l'email etudiant et normalise les metadonnees de cohorte
+ *
+ * Impact sur le projet:
+ * - ajoute `etudiants.email`
+ * - normalise `session` et `annee`
+ * - impose l'unicite des emails etudiants lorsque les donnees le permettent
+ */
 function sessionParDefaut(nomSession, dateDebut) {
   const valeur = String(nomSession || "").trim().toLowerCase();
 

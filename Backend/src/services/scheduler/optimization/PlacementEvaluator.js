@@ -21,6 +21,7 @@ import {
 } from "../AcademicCatalog.js";
 import { GroupFormer } from "../GroupFormer.js";
 import { ScoringProfiles } from "../scoring/ScoringProfiles.js";
+import { getCandidateMetadataForTimeRange } from "../time/StartTimeCandidates.js";
 
 const OPTIMIZATION_MODES = new Set(["legacy", ...ScoringProfiles.list()]);
 
@@ -87,6 +88,26 @@ function readDaySlots(index, entityId, weekday) {
 }
 
 /**
+ * Lit les placements/journees deja connus pour une entite.
+ *
+ * @param {Map<string, Map<number, Object[]>>} index - index des plages.
+ * @param {number|string|null} entityId - groupe ou professeur.
+ * @param {number} weekday - jour ISO.
+ *
+ * @returns {Object[]} Liste de sessions multi-slots.
+ */
+function readDaySessions(index, entityId, weekday) {
+  const sessionsByDay = index?.get?.(String(entityId));
+  if (!sessionsByDay) {
+    return [];
+  }
+
+  return [...(sessionsByDay.get(weekday) || [])]
+    .map(normalizeSessionWindow)
+    .filter(Boolean);
+}
+
+/**
  * Projette un nouveau slot dans un ensemble de slots deja utilises.
  *
  * @param {Set<number>} existingSlots - slots deja occupes.
@@ -97,10 +118,94 @@ function readDaySlots(index, entityId, weekday) {
  * Effets secondaires : aucun.
  * Cas particuliers : ignore les slots invalides.
  */
-function projectSlotSet(existingSlots, slotIndex) {
-  return [...new Set([...[...(existingSlots || new Set())], Number(slotIndex)])]
+function projectSlotSet(existingSlots, slotStartIndex, slotEndIndex = Number(slotStartIndex) + 1) {
+  const startIndex = Number(slotStartIndex);
+  const endIndex = Number(slotEndIndex);
+  const projectedValues = [...(existingSlots || new Set())];
+
+  if (Number.isInteger(startIndex) && Number.isInteger(endIndex) && endIndex > startIndex) {
+    for (let cursor = startIndex; cursor < endIndex; cursor += 1) {
+      projectedValues.push(cursor);
+    }
+  }
+
+  return [...new Set(projectedValues)]
     .filter((value) => Number.isInteger(value) && value >= 0)
     .sort((left, right) => left - right);
+}
+
+function normalizeSessionWindow(sessionLike) {
+  if (!sessionLike) {
+    return null;
+  }
+
+  if (
+    Number.isInteger(Number(sessionLike.slotStartIndex)) &&
+    Number.isInteger(Number(sessionLike.slotEndIndex)) &&
+    Number(sessionLike.slotEndIndex) > Number(sessionLike.slotStartIndex)
+  ) {
+    return {
+      slotStartIndex: Number(sessionLike.slotStartIndex),
+      slotEndIndex: Number(sessionLike.slotEndIndex),
+      dureeHeures:
+        Number(sessionLike.dureeHeures) ||
+        (Number(sessionLike.slotEndIndex) - Number(sessionLike.slotStartIndex)),
+    };
+  }
+
+  if (
+    Number.isInteger(Number(sessionLike.slotIndex)) &&
+    Number(sessionLike.slotIndex) >= 0
+  ) {
+    const slotCount = Math.max(1, Number(sessionLike.slotCount || 1));
+    return {
+      slotStartIndex: Number(sessionLike.slotIndex),
+      slotEndIndex: Number(sessionLike.slotIndex) + slotCount,
+      dureeHeures: slotCount,
+    };
+  }
+
+  const startTime =
+    sessionLike.heure_debut ??
+    sessionLike.debut ??
+    sessionLike.creneau?.debut ??
+    null;
+  const endTime =
+    sessionLike.heure_fin ??
+    sessionLike.fin ??
+    sessionLike.creneau?.fin ??
+    null;
+
+  if (!startTime || !endTime) {
+    return null;
+  }
+
+  const metadata = getCandidateMetadataForTimeRange(startTime, endTime);
+  if (!metadata) {
+    return null;
+  }
+
+  return {
+    slotStartIndex: metadata.slotStartIndex,
+    slotEndIndex: metadata.slotEndIndex,
+    dureeHeures: metadata.dureeHeures,
+  };
+}
+
+function projectSessionWindows(existingSessions, candidate) {
+  return [
+    ...(Array.isArray(existingSessions) ? existingSessions : []),
+    candidate,
+  ]
+    .map(normalizeSessionWindow)
+    .filter(Boolean)
+    .sort((left, right) => {
+      if (left.slotStartIndex !== right.slotStartIndex) {
+        return left.slotStartIndex - right.slotStartIndex;
+      }
+
+      return left.slotEndIndex - right.slotEndIndex;
+    });
 }
 
 /**
@@ -140,14 +245,16 @@ function distanceToExistingSlots(slotIndex, existingSlots) {
  * Effets secondaires : aucun.
  * Cas particuliers : retourne 0 si moins de deux slots sont occupes.
  */
-function computeGapPenalty(projectedSlots, audience) {
-  if (!Array.isArray(projectedSlots) || projectedSlots.length < 2) {
+function computeGapPenalty(projectedSessions, audience) {
+  if (!Array.isArray(projectedSessions) || projectedSessions.length < 2) {
     return 0;
   }
 
   let penalty = 0;
-  for (let index = 1; index < projectedSlots.length; index += 1) {
-    const missingSlots = projectedSlots[index] - projectedSlots[index - 1] - 1;
+  for (let index = 1; index < projectedSessions.length; index += 1) {
+    const missingSlots =
+      projectedSessions[index].slotStartIndex -
+      projectedSessions[index - 1].slotEndIndex;
     if (missingSlots <= 0) {
       continue;
     }
@@ -172,14 +279,15 @@ function computeGapPenalty(projectedSlots, audience) {
  * Effets secondaires : aucun.
  * Cas particuliers : false si moins de deux slots.
  */
-function hasAdjacentBlock(projectedSlots) {
-  if (!Array.isArray(projectedSlots) || projectedSlots.length < 2) {
+function hasAdjacentBlock(projectedSessions) {
+  if (!Array.isArray(projectedSessions) || projectedSessions.length < 2) {
     return false;
   }
 
-  return projectedSlots.some(
-    (slotValue, index) =>
-      index > 0 && slotValue - projectedSlots[index - 1] === 1
+  return projectedSessions.some(
+    (session, index) =>
+      index > 0 &&
+      session.slotStartIndex === projectedSessions[index - 1].slotEndIndex
   );
 }
 
@@ -197,12 +305,15 @@ function hasAdjacentBlock(projectedSlots) {
  * Effets secondaires : aucun.
  * Cas particuliers : retourne 0 si aucun slot n'est fourni.
  */
-function computeAmplitudeSlots(projectedSlots) {
-  if (!Array.isArray(projectedSlots) || projectedSlots.length === 0) {
+function computeAmplitudeSlots(projectedSessions) {
+  if (!Array.isArray(projectedSessions) || projectedSessions.length === 0) {
     return 0;
   }
 
-  return projectedSlots[projectedSlots.length - 1] - projectedSlots[0] + 1;
+  return (
+    projectedSessions[projectedSessions.length - 1].slotEndIndex -
+    projectedSessions[0].slotStartIndex
+  );
 }
 
 /**
@@ -220,12 +331,27 @@ function computeAmplitudeSlots(projectedSlots) {
  * Effets secondaires : aucun.
  * Cas particuliers : false si moins de trois slots.
  */
-function isCompactThreeBlockDay(projectedSlots) {
-  if (!Array.isArray(projectedSlots) || projectedSlots.length < 3) {
+function isCompactThreeBlockDay(projectedSessions) {
+  if (!Array.isArray(projectedSessions) || projectedSessions.length !== 3) {
     return false;
   }
 
-  return projectedSlots.length === 3 && computeGapPenalty(projectedSlots, "student") === 0;
+  let smallGaps = 0;
+  for (let index = 1; index < projectedSessions.length; index += 1) {
+    const gap =
+      projectedSessions[index].slotStartIndex -
+      projectedSessions[index - 1].slotEndIndex;
+
+    if (gap < 0 || gap > 1) {
+      return false;
+    }
+
+    if (gap <= 1) {
+      smallGaps += 1;
+    }
+  }
+
+  return smallGaps === 2;
 }
 
 /**
@@ -239,10 +365,18 @@ function isCompactThreeBlockDay(projectedSlots) {
  * Cas particuliers : retourne -1 pour un creneau libre ou hors catalogue.
  */
 function resolveReferenceSlotIndex(timeSlot) {
-  return ACADEMIC_WEEKDAY_TIME_SLOTS.findIndex(
-    (slot) =>
-      String(slot.debut) === String(timeSlot?.debut) &&
-      String(slot.fin) === String(timeSlot?.fin)
+  const metadata = normalizeSessionWindow(timeSlot);
+  return metadata ? metadata.slotStartIndex : -1;
+}
+
+function resolveCandidateWindow(candidate) {
+  return (
+    normalizeSessionWindow(candidate) ||
+    normalizeSessionWindow(candidate?.creneau) || {
+      slotStartIndex: Number(candidate?.slotIndex) || 0,
+      slotEndIndex: (Number(candidate?.slotIndex) || 0) + 1,
+      dureeHeures: 1,
+    }
   );
 }
 
@@ -260,6 +394,7 @@ function resolveReferenceSlotIndex(timeSlot) {
  */
 function scoreLegacyWeeklyCandidate(candidate, context) {
   let score = 0;
+  const candidateWindow = resolveCandidateWindow(candidate);
   const groupDayLoad =
     readDayLoad(context.chargeSeriesParGroupeJour, candidate.idGroupe, candidate.jourSemaine) +
     1;
@@ -291,8 +426,14 @@ function scoreLegacyWeeklyCandidate(candidate, context) {
     candidate.professeur.id_professeur,
     candidate.jourSemaine
   );
-  const groupSlotDistance = distanceToExistingSlots(candidate.slotIndex, groupSlots);
-  const teacherSlotDistance = distanceToExistingSlots(candidate.slotIndex, teacherSlots);
+  const groupSlotDistance = distanceToExistingSlots(
+    candidateWindow.slotStartIndex,
+    groupSlots
+  );
+  const teacherSlotDistance = distanceToExistingSlots(
+    candidateWindow.slotStartIndex,
+    teacherSlots
+  );
   const groupSize = GroupFormer.lireEffectifCours(candidate.groupe, candidate.cours?.id_cours);
   const roomCapacity = Number(candidate.salle?.capacite || 0);
 
@@ -482,6 +623,7 @@ function computeCoverageBonus(candidate, phase) {
  */
 function scoreStudentAdjustment(candidate, context) {
   let adjustment = 0;
+  const candidateWindow = resolveCandidateWindow(candidate);
   const groupDayLoadBefore = readDayLoad(
     context.chargeSeriesParGroupeJour,
     candidate.idGroupe,
@@ -496,11 +638,11 @@ function scoreStudentAdjustment(candidate, context) {
   const groupActiveDaysAfter = groupDayAlreadyActive
     ? groupActiveDaysBefore
     : groupActiveDaysBefore + 1;
-  const projectedGroupSlots = projectSlotSet(
-    readDaySlots(context.slotsParGroupeJour, candidate.idGroupe, candidate.jourSemaine),
-    candidate.slotIndex
+  const projectedGroupSessions = projectSessionWindows(
+    readDaySessions(context.sessionsParGroupeJour, candidate.idGroupe, candidate.jourSemaine),
+    candidateWindow
   );
-  const groupGapPenalty = computeGapPenalty(projectedGroupSlots, "student");
+  const groupGapPenalty = computeGapPenalty(projectedGroupSessions, "student");
 
   if (candidate.jourSemaine === 6) {
     adjustment -= 22;
@@ -517,17 +659,17 @@ function scoreStudentAdjustment(candidate, context) {
   }
 
   if (groupDayLoadAfter === 1) {
-    if (candidate.slotIndex === 0) {
+    if (candidateWindow.slotStartIndex === 0) {
       adjustment += 8;
-    } else if (candidate.slotIndex === ACADEMIC_WEEKDAY_TIME_SLOTS.length - 1) {
+    } else if (candidateWindow.slotEndIndex === ACADEMIC_WEEKDAY_TIME_SLOTS.length) {
       adjustment += 4;
     } else {
       adjustment -= 10;
     }
   } else if (groupDayLoadAfter === 2) {
-    adjustment += hasAdjacentBlock(projectedGroupSlots) ? 16 : -8;
+    adjustment += hasAdjacentBlock(projectedGroupSessions) ? 16 : -8;
   } else if (groupDayLoadAfter === 3) {
-    adjustment += isCompactThreeBlockDay(projectedGroupSlots) ? 8 : -10;
+    adjustment += isCompactThreeBlockDay(projectedGroupSessions) ? 8 : -10;
   } else {
     adjustment -= 28;
   }
@@ -550,6 +692,7 @@ function scoreStudentAdjustment(candidate, context) {
  */
 function scoreTeacherAdjustment(candidate, context) {
   let adjustment = 0;
+  const candidateWindow = resolveCandidateWindow(candidate);
   const teacherDayLoadBefore = readDayLoad(
     context.chargeSeriesParProfJour,
     candidate.professeur.id_professeur,
@@ -561,16 +704,16 @@ function scoreTeacherAdjustment(candidate, context) {
     candidate.professeur.id_professeur
   );
   const teacherDayAlreadyActive = teacherDayLoadBefore > 0;
-  const projectedTeacherSlots = projectSlotSet(
-    readDaySlots(
-      context.slotsParProfJour,
+  const projectedTeacherSessions = projectSessionWindows(
+    readDaySessions(
+      context.sessionsParProfJour,
       candidate.professeur.id_professeur,
       candidate.jourSemaine
     ),
-    candidate.slotIndex
+    candidateWindow
   );
-  const teacherGapPenalty = computeGapPenalty(projectedTeacherSlots, "teacher");
-  const amplitudeSlots = computeAmplitudeSlots(projectedTeacherSlots);
+  const teacherGapPenalty = computeGapPenalty(projectedTeacherSessions, "teacher");
+  const amplitudeSlots = computeAmplitudeSlots(projectedTeacherSessions);
 
   if (teacherDayAlreadyActive) {
     adjustment += 5;
@@ -585,7 +728,7 @@ function scoreTeacherAdjustment(candidate, context) {
   if (teacherDayLoadAfter === 1) {
     adjustment += 2;
   } else if (teacherDayLoadAfter === 2) {
-    adjustment += hasAdjacentBlock(projectedTeacherSlots) ? 10 : -6;
+    adjustment += hasAdjacentBlock(projectedTeacherSessions) ? 10 : -6;
   } else if (teacherDayLoadAfter === 3) {
     adjustment += 5;
   } else {

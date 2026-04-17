@@ -6,7 +6,9 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "../components/layout/AppShell.jsx";
+import { ProfesseurSearchField } from "../components/ui/ProfesseurSearchField.jsx";
 import {
+
   recupererProfesseurs,
   recupererDisponibilitesProfesseur,
   recupererJournalDisponibilitesProfesseur,
@@ -25,6 +27,7 @@ import { emettreSynchronisationPlanning } from "../utils/planningSync.js";
 import { getLibelleProgrammesProfesseur } from "../utils/professeurs.js";
 import { usePopup } from "../components/feedback/PopupProvider.jsx";
 import "../styles/ProfesseursPage.css";
+import "../styles/CrudPages.css";
 
 const HEURES = Array.from({ length: 15 }, (_, index) =>
   `${String(index + 8).padStart(2, "0")}:00`
@@ -834,24 +837,18 @@ export function DisponibilitesProfesseursPage({ utilisateur, onLogout }) {
                 </p>
               </div>
 
-              <select
-                className="professeurs-page__select"
-                value={idProfesseurActif || ""}
-                onChange={(event) =>
-                  setIdProfesseurActif(Number(event.target.value) || null)
-                }
-                disabled={chargement}
-              >
-                <option value="">Choisir un professeur</option>
-                {professeurs.map((professeur) => (
-                  <option
-                    key={professeur.id_professeur}
-                    value={professeur.id_professeur}
-                  >
-                    {professeur.matricule} - {professeur.prenom} {professeur.nom}
-                  </option>
-                ))}
-              </select>
+              {/* ─── Sélecteur intelligent de professeur ─── */}
+              <div style={{ minWidth: "280px", maxWidth: "420px" }}>
+                <ProfesseurSearchField
+                  professeurs={professeurs}
+                  selectedId={idProfesseurActif}
+                  onSelect={(id) => setIdProfesseurActif(id ? Number(id) : null)}
+                  loading={chargement}
+                  disabled={chargement}
+                  label="Choisir un professeur"
+                  placeholder="Matricule, nom ou prénom…"
+                />
+              </div>
             </div>
 
             {chargement ? (

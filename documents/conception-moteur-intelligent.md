@@ -60,14 +60,62 @@ Le scheduler doit etre distingue de la planification standard exposee sous
 
 ## 3. Acteurs et cas d'usage
 
-![Diagramme de cas d'usage du scheduler](diagrammes/scheduler-use-case.svg)
+```mermaid
+flowchart LR
+    ra[Responsable administratif]
+    admin[Administrateur]
+
+    uc_login((Se connecter))
+    uc_bootstrap((Preparer le jeu de donnees))
+    uc_admins((Creer et gerer les administrateurs))
+    uc_profiles((Gerer les profils utilisateurs))
+    uc_sessions((Creer ou activer une session))
+    uc_catalog((Gerer cours, salles et professeurs))
+    uc_assign((Affecter cours, salles, plages et professeurs))
+    uc_generate((Lancer une generation complete))
+    uc_reports((Consulter les rapports et diagnostics))
+    uc_failures((Gerer les cours echoues))
+    uc_absences((Declarer des absences professeurs))
+    uc_rooms((Declarer des indisponibilites salles))
+    uc_prereq((Gerer les prerequis))
+    uc_target((Regenerer un groupe cible))
+    uc_availability((Mettre a jour les disponibilites professeurs))
+    uc_replan((Replanifier localement les seances impactees))
+    uc_export((Exporter les horaires))
+
+    ra --> uc_login
+    ra --> uc_admins
+    ra --> uc_sessions
+    ra --> uc_catalog
+    ra --> uc_assign
+    ra --> uc_generate
+    ra --> uc_reports
+    ra --> uc_failures
+    ra --> uc_absences
+    ra --> uc_rooms
+    ra --> uc_prereq
+    ra --> uc_target
+    ra --> uc_availability
+    ra --> uc_export
+
+    admin --> uc_login
+    admin --> uc_profiles
+    admin --> uc_reports
+    admin --> uc_export
+
+    uc_generate -. inclut .-> uc_assign
+    uc_generate -. inclut .-> uc_failures
+    uc_availability -. declenche .-> uc_replan
+```
 
 Lecture du diagramme :
 
-- `Admin` pilote la session, le bootstrap, la generation complete et les
-  objets de contrainte ;
-- `Responsable` consulte les rapports, lance des generations ciblees et
-  exploite les diagnostics ;
+- seuls deux acteurs se connectent : `Administrateur` et `Responsable administratif` ;
+- le `Responsable administratif` pilote la session, le bootstrap, la generation complete
+  et les objets de contrainte ;
+- l'`Administrateur` reste un acteur administratif delegue, sans devenir un
+  acteur de gouvernance globale ;
+- `Professeur` et `Etudiant` ne sont pas des acteurs authentifies du systeme ;
 - la mise a jour des disponibilites professeurs prolonge le scheduler par
   une replanification locale au lieu de casser silencieusement l'horaire ;
 - le rapport de generation est un livrable fonctionnel, pas un simple log.

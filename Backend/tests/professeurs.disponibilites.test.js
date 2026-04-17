@@ -17,6 +17,7 @@ const professeursModelMock = {
   recupererCoursProfesseur: jest.fn(),
   recupererIndexCoursProfesseurs: jest.fn(),
   recupererDisponibilitesProfesseur: jest.fn(),
+  recupererJournalDisponibilitesProfesseur: jest.fn(),
   recupererDisponibilitesProfesseurs: jest.fn(),
   recupererHoraireProfesseur: jest.fn(),
   remplacerCoursProfesseur: jest.fn(),
@@ -92,6 +93,36 @@ describe("Tests routes Professeurs disponibilites", () => {
 
     expect(response.statusCode).toBe(500);
     expect(response.body).toEqual({ message: "Erreur serveur." });
+  });
+
+  test("GET /api/professeurs/:id/disponibilites/journal retourne le journal de replanification", async () => {
+    professeursModelMock.recupererProfesseurParId.mockResolvedValue({
+      id_professeur: 1,
+      matricule: "INF01",
+    });
+    professeursModelMock.recupererJournalDisponibilitesProfesseur.mockResolvedValue([
+      {
+        id_journal_disponibilite_professeur: 7,
+        statut: "SUCCES",
+      },
+    ]);
+
+    const response = await request(app).get(
+      "/api/professeurs/1/disponibilites/journal?limit=5"
+    );
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toEqual([
+      {
+        id_journal_disponibilite_professeur: 7,
+        statut: "SUCCES",
+      },
+    ]);
+    expect(
+      professeursModelMock.recupererJournalDisponibilitesProfesseur
+    ).toHaveBeenCalledWith(1, {
+      limit: "5",
+    });
   });
 
   test("PUT /api/professeurs/:id/disponibilites retourne 400 si disponibilites n'est pas un tableau", async () => {

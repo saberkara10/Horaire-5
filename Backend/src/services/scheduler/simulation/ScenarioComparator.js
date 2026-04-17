@@ -14,6 +14,8 @@
  * - aucune ecriture ni mutation de l'horaire officiel n'a lieu ici.
  */
 
+import { buildSlotMetadataFromTimeRange } from "../time/TimeSlotUtils.js";
+
 /**
  * Convertit une heure HH:MM:SS en minutes.
  *
@@ -67,6 +69,76 @@ function round(value) {
   }
 
   return Math.round(Number(value) * 100) / 100;
+}
+
+function parseDateUtc(dateValue) {
+  const [year, month, day] = String(dateValue || "")
+    .split("-")
+    .map((part) => Number(part));
+
+  if (
+    !Number.isInteger(year) ||
+    !Number.isInteger(month) ||
+    !Number.isInteger(day) ||
+    year <= 0 ||
+    month <= 0 ||
+    day <= 0
+  ) {
+    return null;
+  }
+
+  return new Date(Date.UTC(year, month - 1, day));
+}
+
+function getIsoWeekday(dateValue) {
+  const date = parseDateUtc(dateValue);
+  if (!date) {
+    return null;
+  }
+
+  const weekday = date.getUTCDay();
+  return weekday === 0 ? 7 : weekday;
+}
+
+function summarizePlacementTiming(placement) {
+  const metadata = buildSlotMetadataFromTimeRange(
+    placement?.heure_debut,
+    placement?.heure_fin
+  );
+  const slotStartIndex = Number(placement?.slotStartIndex);
+  const slotEndIndex = Number(placement?.slotEndIndex);
+  const durationHours = Number(placement?.dureeHeures);
+
+  return {
+    jourSemaine:
+      Number.isInteger(Number(placement?.jourSemaine)) &&
+      Number(placement?.jourSemaine) >= 1 &&
+      Number(placement?.jourSemaine) <= 7
+        ? Number(placement.jourSemaine)
+        : getIsoWeekday(placement?.date),
+    dureeHeures:
+      Number(metadata?.dureeHeures) > 0
+        ? Number(metadata.dureeHeures)
+        : durationHours > 0
+          ? durationHours
+          : Number.isInteger(slotStartIndex) && Number.isInteger(slotEndIndex) && slotEndIndex > slotStartIndex
+            ? slotEndIndex - slotStartIndex
+            : 0,
+    slotStartIndex:
+      Number.isInteger(Number(metadata?.slotStartIndex)) &&
+      Number(metadata.slotStartIndex) >= 0
+        ? Number(metadata.slotStartIndex)
+        : Number.isInteger(slotStartIndex)
+          ? slotStartIndex
+          : null,
+    slotEndIndex:
+      Number.isInteger(Number(metadata?.slotEndIndex)) &&
+      Number(metadata.slotEndIndex) > Number(metadata.slotStartIndex)
+        ? Number(metadata.slotEndIndex)
+        : Number.isInteger(slotEndIndex)
+          ? slotEndIndex
+          : null,
+  };
 }
 
 /**
@@ -126,6 +198,8 @@ function buildConflictKey(type, left, right, studentIds = null) {
  * Cas particuliers : on garde uniquement les champs utiles a la lecture UI.
  */
 function summarizePlacement(placement) {
+  const timing = summarizePlacementTiming(placement);
+
   return {
     id_affectation_cours: Number(placement?.id_affectation_cours || 0) || null,
     id_cours: Number(placement?.id_cours || 0) || null,
@@ -135,6 +209,10 @@ function summarizePlacement(placement) {
     date: placement?.date || null,
     heure_debut: placement?.heure_debut || null,
     heure_fin: placement?.heure_fin || null,
+    jourSemaine: timing.jourSemaine,
+    dureeHeures: timing.dureeHeures,
+    slotStartIndex: timing.slotStartIndex,
+    slotEndIndex: timing.slotEndIndex,
   };
 }
 
@@ -191,6 +269,12 @@ function buildStudentImpactSummary(beforeScore, afterScore) {
   const deltaActiveDays =
     readNumeric(beforeScore, ["details", "etudiant", "averages", "activeDaysPerWeek"]) -
     readNumeric(afterScore, ["details", "etudiant", "averages", "activeDaysPerWeek"]);
+  const deltaLatePenalty =
+    readNumeric(beforeScore, ["details", "etudiant", "totals", "lateCoursePenalty"]) -
+    readNumeric(afterScore, ["details", "etudiant", "totals", "lateCoursePenalty"]);
+  const deltaPauseMissed =
+    readNumeric(beforeScore, ["details", "etudiant", "totals", "pauseMissedCount"]) -
+    readNumeric(afterScore, ["details", "etudiant", "totals", "pauseMissedCount"]);
 
   const fragments = [];
 
@@ -216,6 +300,18 @@ function buildStudentImpactSummary(beforeScore, afterScore) {
     fragments.push(`jours actifs moyens reduits de ${round(deltaActiveDays)}`);
   } else if (deltaActiveDays < 0) {
     fragments.push(`jours actifs moyens augmentes de ${round(Math.abs(deltaActiveDays))}`);
+  }
+
+  if (deltaLatePenalty > 0) {
+    fragments.push(`penalite tardive reduite de ${round(deltaLatePenalty)}`);
+  } else if (deltaLatePenalty < 0) {
+    fragments.push(`penalite tardive accrue de ${round(Math.abs(deltaLatePenalty))}`);
+  }
+
+  if (deltaPauseMissed > 0) {
+    fragments.push(`pauses manquantes reduites de ${deltaPauseMissed}`);
+  } else if (deltaPauseMissed < 0) {
+    fragments.push(`pauses manquantes accrues de ${Math.abs(deltaPauseMissed)}`);
   }
 
   return fragments.length > 0
@@ -248,6 +344,12 @@ function buildTeacherImpactSummary(beforeScore, afterScore) {
   const deltaLongAmplitudeDays =
     readNumeric(beforeScore, ["details", "professeur", "totals", "longAmplitudeDays"]) -
     readNumeric(afterScore, ["details", "professeur", "totals", "longAmplitudeDays"]);
+  const deltaLatePenalty =
+    readNumeric(beforeScore, ["details", "professeur", "totals", "lateCoursePenalty"]) -
+    readNumeric(afterScore, ["details", "professeur", "totals", "lateCoursePenalty"]);
+  const deltaPauseMissed =
+    readNumeric(beforeScore, ["details", "professeur", "totals", "pauseMissedCount"]) -
+    readNumeric(afterScore, ["details", "professeur", "totals", "pauseMissedCount"]);
 
   const fragments = [];
 
@@ -271,9 +373,79 @@ function buildTeacherImpactSummary(beforeScore, afterScore) {
     );
   }
 
+  if (deltaLatePenalty > 0) {
+    fragments.push(`penalite tardive reduite de ${round(deltaLatePenalty)}`);
+  } else if (deltaLatePenalty < 0) {
+    fragments.push(`penalite tardive accrue de ${round(Math.abs(deltaLatePenalty))}`);
+  }
+
+  if (deltaPauseMissed > 0) {
+    fragments.push(`pauses manquantes reduites de ${deltaPauseMissed}`);
+  } else if (deltaPauseMissed < 0) {
+    fragments.push(`pauses manquantes accrues de ${Math.abs(deltaPauseMissed)}`);
+  }
+
   return fragments.length > 0
     ? fragments.join(", ")
     : "Impact professeur neutre sur les indicateurs principaux.";
+}
+
+function buildGroupImpactSummary(beforeScore, afterScore) {
+  if (!beforeScore || !afterScore) {
+    return "Aucun impact groupe exploitable tant que le scenario reste infaisable.";
+  }
+
+  const deltaHoleHours =
+    readNumeric(beforeScore, ["details", "groupe", "totals", "holeHours"]) -
+    readNumeric(afterScore, ["details", "groupe", "totals", "holeHours"]);
+  const deltaFragmentedDays =
+    readNumeric(beforeScore, ["details", "groupe", "totals", "fragmentedDays"]) -
+    readNumeric(afterScore, ["details", "groupe", "totals", "fragmentedDays"]);
+  const deltaLatePenalty =
+    readNumeric(beforeScore, ["details", "groupe", "totals", "lateCoursePenalty"]) -
+    readNumeric(afterScore, ["details", "groupe", "totals", "lateCoursePenalty"]);
+  const deltaPauseMissed =
+    readNumeric(beforeScore, ["details", "groupe", "totals", "pauseMissedCount"]) -
+    readNumeric(afterScore, ["details", "groupe", "totals", "pauseMissedCount"]);
+  const deltaActiveDays =
+    readNumeric(beforeScore, ["details", "groupe", "averages", "activeDaysPerWeek"]) -
+    readNumeric(afterScore, ["details", "groupe", "averages", "activeDaysPerWeek"]);
+
+  const fragments = [];
+
+  if (deltaHoleHours > 0) {
+    fragments.push(`trous groupes en baisse de ${round(deltaHoleHours)}h`);
+  } else if (deltaHoleHours < 0) {
+    fragments.push(`trous groupes en hausse de ${round(Math.abs(deltaHoleHours))}h`);
+  }
+
+  if (deltaFragmentedDays > 0) {
+    fragments.push(`fragmentation groupe reduite de ${deltaFragmentedDays} jour(s)`);
+  } else if (deltaFragmentedDays < 0) {
+    fragments.push(`fragmentation groupe accrue de ${Math.abs(deltaFragmentedDays)} jour(s)`);
+  }
+
+  if (deltaActiveDays > 0) {
+    fragments.push(`jours actifs moyens groupes reduits de ${round(deltaActiveDays)}`);
+  } else if (deltaActiveDays < 0) {
+    fragments.push(`jours actifs moyens groupes augmentes de ${round(Math.abs(deltaActiveDays))}`);
+  }
+
+  if (deltaLatePenalty > 0) {
+    fragments.push(`penalite tardive groupe reduite de ${round(deltaLatePenalty)}`);
+  } else if (deltaLatePenalty < 0) {
+    fragments.push(`penalite tardive groupe accrue de ${round(Math.abs(deltaLatePenalty))}`);
+  }
+
+  if (deltaPauseMissed > 0) {
+    fragments.push(`pauses groupes manquantes reduites de ${deltaPauseMissed}`);
+  } else if (deltaPauseMissed < 0) {
+    fragments.push(`pauses groupes manquantes accrues de ${Math.abs(deltaPauseMissed)}`);
+  }
+
+  return fragments.length > 0
+    ? fragments.join(", ")
+    : "Impact groupe neutre sur les indicateurs principaux.";
 }
 
 /**
@@ -329,7 +501,7 @@ function buildRoomImpactSummary({
  * Effets secondaires : aucun.
  * Cas particuliers : retourne `null` si aucun score apres n'est disponible.
  */
-function buildScoreDifference(beforeScore, afterScore) {
+function buildScoreDifference(beforeScore, afterScore, resolvedConflictCount = 0) {
   if (!beforeScore || !afterScore) {
     return null;
   }
@@ -342,6 +514,40 @@ function buildScoreDifference(beforeScore, afterScore) {
     scoreProfesseur: round(
       Number(afterScore.scoreProfesseur || 0) - Number(beforeScore.scoreProfesseur || 0)
     ),
+    scoreGroupe: round(
+      Number(afterScore.scoreGroupe || 0) - Number(beforeScore.scoreGroupe || 0)
+    ),
+    metrics: {
+      pausesEtudiantsRespectees: round(
+        readNumeric(afterScore, ["metrics", "pausesEtudiantsRespectees"]) -
+          readNumeric(beforeScore, ["metrics", "pausesEtudiantsRespectees"])
+      ),
+      pausesEtudiantsManquees: round(
+        readNumeric(afterScore, ["metrics", "pausesEtudiantsManquees"]) -
+          readNumeric(beforeScore, ["metrics", "pausesEtudiantsManquees"])
+      ),
+      pausesProfesseursRespectees: round(
+        readNumeric(afterScore, ["metrics", "pausesProfesseursRespectees"]) -
+          readNumeric(beforeScore, ["metrics", "pausesProfesseursRespectees"])
+      ),
+      pausesProfesseursManquees: round(
+        readNumeric(afterScore, ["metrics", "pausesProfesseursManquees"]) -
+          readNumeric(beforeScore, ["metrics", "pausesProfesseursManquees"])
+      ),
+      pausesGroupesRespectees: round(
+        readNumeric(afterScore, ["metrics", "pausesGroupesRespectees"]) -
+          readNumeric(beforeScore, ["metrics", "pausesGroupesRespectees"])
+      ),
+      pausesGroupesManquees: round(
+        readNumeric(afterScore, ["metrics", "pausesGroupesManquees"]) -
+          readNumeric(beforeScore, ["metrics", "pausesGroupesManquees"])
+      ),
+      nbCoursNonPlanifies: round(
+        readNumeric(afterScore, ["metrics", "nbCoursNonPlanifies"]) -
+          readNumeric(beforeScore, ["metrics", "nbCoursNonPlanifies"])
+      ),
+      nbConflitsEvites: Number(resolvedConflictCount || 0),
+    },
   };
 }
 
@@ -612,7 +818,11 @@ export class ScenarioComparator {
     const resolvedConflicts = (beforeConflicts?.all || []).filter(
       (conflict) => !afterKeySet.has(conflict.key)
     );
-    const difference = buildScoreDifference(beforeScore, afterScore);
+    const difference = buildScoreDifference(
+      beforeScore,
+      afterScore,
+      resolvedConflicts.length
+    );
 
     return {
       readOnly: true,
@@ -626,6 +836,7 @@ export class ScenarioComparator {
       scoreAvant: beforeScore || null,
       scoreApres: afterScore || null,
       difference,
+      nbConflitsEvites: resolvedConflicts.length,
       conflitsCrees: createdConflicts.length,
       conflitsResolus: resolvedConflicts.length,
       detailsConflits: {
@@ -665,6 +876,13 @@ export class ScenarioComparator {
               (conflict) => conflict.type === "room"
             ).length,
           }),
+        },
+        groupes: {
+          idsImpactes: collectUniqueNumericValues(
+            [originalPlacement, proposedPlacement].filter(Boolean),
+            "id_groupe"
+          ),
+          resume: buildGroupImpactSummary(beforeScore, afterScore),
         },
       },
       validation: {
@@ -720,7 +938,11 @@ export class ScenarioComparator {
     const resolvedConflicts = (beforeConflicts?.all || []).filter(
       (conflict) => !afterKeySet.has(conflict.key)
     );
-    const difference = buildScoreDifference(beforeScore, afterScore);
+    const difference = buildScoreDifference(
+      beforeScore,
+      afterScore,
+      resolvedConflicts.length
+    );
     const impactedStudentIds = [...new Set(validation?.participantIds || [])].sort(
       (first, second) => first - second
     );
@@ -731,6 +953,10 @@ export class ScenarioComparator {
     const impactedRoomIds = collectUniqueNumericValues(
       [...originalPlacements, ...proposedPlacements],
       "id_salle"
+    );
+    const impactedGroupIds = collectUniqueNumericValues(
+      [...originalPlacements, ...proposedPlacements],
+      "id_groupe"
     );
 
     return {
@@ -754,6 +980,7 @@ export class ScenarioComparator {
       scoreAvant: beforeScore || null,
       scoreApres: afterScore || null,
       difference,
+      nbConflitsEvites: resolvedConflicts.length,
       conflitsCrees: createdConflicts.length,
       conflitsResolus: resolvedConflicts.length,
       detailsConflits: {
@@ -777,6 +1004,10 @@ export class ScenarioComparator {
             createdConflicts.filter((conflict) => conflict.type === "room").length,
             resolvedConflicts.filter((conflict) => conflict.type === "room").length
           ),
+        },
+        groupes: {
+          idsImpactes: impactedGroupIds,
+          resume: buildGroupImpactSummary(beforeScore, afterScore),
         },
       },
       validation: {

@@ -10,6 +10,7 @@
  */
 import pool from "../../../db.js";
 import { assurerSchemaSchedulerAcademique } from "../academic-scheduler-schema.js";
+import { BreakConstraintValidator } from "../scheduler/constraints/BreakConstraintValidator.js";
 import { AvailabilityChecker } from "../scheduler/AvailabilityChecker.js";
 import { recupererDisponibilitesProfesseurs } from "../../model/professeurs.model.js";
 import { programmesCorrespondent } from "../../utils/programmes.js";
@@ -389,7 +390,7 @@ async function recupererEtudiantsAffectesCoursGroupe(
  * @param {Object} [executor=pool] Executeur SQL ou connexion transactionnelle.
  * @returns {Promise<Object>} Participants regroupes et effectif reel.
  */
-async function recupererParticipantsSeance(
+export async function recupererParticipantsSeance(
   idGroupeEtudiants,
   idCours,
   idSession,
@@ -838,6 +839,303 @@ async function listerConflitsEtudiants(
   return rows;
 }
 
+async function recupererSeancesRessourceJour(
+  typeRessource,
+  idRessource,
+  date,
+  idsAffectationsExclues = [],
+  executor = pool
+) {
+  const exclusion = construireClauseExclusionAffectations(idsAffectationsExclues);
+  const idNumerique = Number(idRessource);
+
+  if (!Number.isInteger(idNumerique) || idNumerique <= 0 || !date) {
+    return [];
+  }
+
+  const champs = {
+    professeur: "ac.id_professeur",
+    groupe: "ag.id_groupes_etudiants",
+  };
+
+  if (!champs[typeRessource]) {
+    return [];
+  }
+
+  const jointureGroupe =
+    typeRessource === "groupe"
+      ? `JOIN affectation_groupes ag
+           ON ag.id_affectation_cours = ac.id_affectation_cours`
+      : "";
+
+  const whereRessource =
+    typeRessource === "groupe"
+      ? "ag.id_groupes_etudiants = ?"
+      : "ac.id_professeur = ?";
+
+  const [rows] = await executor.query(
+    `SELECT DISTINCT ac.id_affectation_cours,
+            DATE_FORMAT(ph.date, '%Y-%m-%d') AS date,
+            ph.heure_debut,
+            ph.heure_fin
+     FROM affectation_cours ac
+     ${jointureGroupe}
+     JOIN plages_horaires ph
+       ON ph.id_plage_horaires = ac.id_plage_horaires
+     WHERE ${whereRessource}
+       AND ph.date = ?${exclusion.clause}
+     ORDER BY ph.heure_debut ASC, ph.heure_fin ASC, ac.id_affectation_cours ASC`,
+    [idNumerique, date, ...exclusion.valeurs]
+  );
+
+  return rows.map((row) => ({
+    id_affectation_cours: Number(row.id_affectation_cours) || null,
+    date: row.date || null,
+    heure_debut: row.heure_debut || null,
+    heure_fin: row.heure_fin || null,
+  }));
+}
+
+async function recupererSeancesEtudiantsJour(
+  idsEtudiants,
+  date,
+  idSession,
+  idsAffectationsExclues = [],
+  executor = pool
+) {
+  const ids = [...new Set(
+    (Array.isArray(idsEtudiants) ? idsEtudiants : [])
+      .map((id) => Number(id))
+      .filter((id) => Number.isInteger(id) && id > 0)
+  )];
+
+  if (ids.length === 0 || !Number.isInteger(Number(idSession)) || !date) {
+    return [];
+  }
+
+  const placeholders = ids.map(() => "?").join(", ");
+  const exclusion = construireClauseExclusionAffectations(idsAffectationsExclues);
+  const requete = `
+    SELECT DISTINCT conflits.id_etudiant,
+                    conflits.id_affectation_cours,
+                    conflits.date,
+                    conflits.heure_debut,
+                    conflits.heure_fin
+    FROM (
+      SELECT e.id_etudiant,
+             ac.id_affectation_cours,
+             DATE_FORMAT(ph.date, '%Y-%m-%d') AS date,
+             ph.heure_debut,
+             ph.heure_fin
+      FROM etudiants e
+      JOIN groupes_etudiants ge
+        ON ge.id_groupes_etudiants = e.id_groupes_etudiants
+      JOIN affectation_groupes ag
+        ON ag.id_groupes_etudiants = ge.id_groupes_etudiants
+      JOIN affectation_cours ac
+        ON ac.id_affectation_cours = ag.id_affectation_cours
+      JOIN plages_horaires ph
+        ON ph.id_plage_horaires = ac.id_plage_horaires
+      WHERE e.id_etudiant IN (${placeholders})
+        AND NOT EXISTS (
+          SELECT 1
+          FROM affectation_etudiants ae_override
+          WHERE ae_override.id_etudiant = e.id_etudiant
+            AND ae_override.id_cours = ac.id_cours
+            AND ae_override.id_session = ge.id_session
+            AND ae_override.source_type = 'individuelle'
+        )
+        AND ph.date = ?${exclusion.clause}
+
+      UNION
+
+      SELECT ae.id_etudiant,
+             ac.id_affectation_cours,
+             DATE_FORMAT(ph.date, '%Y-%m-%d') AS date,
+             ph.heure_debut,
+             ph.heure_fin
+      FROM affectation_etudiants ae
+      JOIN affectation_groupes ag
+        ON ag.id_groupes_etudiants = ae.id_groupes_etudiants
+      JOIN affectation_cours ac
+        ON ac.id_affectation_cours = ag.id_affectation_cours
+       AND ac.id_cours = ae.id_cours
+      JOIN plages_horaires ph
+        ON ph.id_plage_horaires = ac.id_plage_horaires
+      WHERE ae.id_etudiant IN (${placeholders})
+        AND ae.id_session = ?
+        AND ae.source_type IN ('reprise', 'individuelle')
+        AND ph.date = ?${exclusion.clause}
+    ) conflits
+    ORDER BY conflits.id_etudiant ASC,
+             conflits.heure_debut ASC,
+             conflits.heure_fin ASC,
+             conflits.id_affectation_cours ASC
+  `;
+
+  const valeurs = [
+    ...ids,
+    date,
+    ...exclusion.valeurs,
+    ...ids,
+    Number(idSession),
+    date,
+    ...exclusion.valeurs,
+  ];
+
+  const [rows] = await executor.query(requete, valeurs);
+
+  return rows.map((row) => ({
+    id_etudiant: Number(row.id_etudiant) || null,
+    id_affectation_cours: Number(row.id_affectation_cours) || null,
+    date: row.date || null,
+    heure_debut: row.heure_debut || null,
+    heure_fin: row.heure_fin || null,
+  }));
+}
+
+function transformerViolationsPause(violations) {
+  return (Array.isArray(violations) ? violations : []).map((violation) => ({
+    ...violation,
+    resourceType: violation.resourceType || null,
+    resourceId: Number(violation.resourceId || 0) || null,
+    date: violation.date || null,
+  }));
+}
+
+export async function detecterViolationsPauseSeance(
+  {
+    professeurId = null,
+    groupeIds = [],
+    participantIds = [],
+    date,
+    heureDebut,
+    heureFin,
+    idSession = null,
+    idsAffectationsExclues = [],
+  },
+  executor = pool
+) {
+  const violations = [];
+  const dateIso = String(date || "").slice(0, 10);
+  const heureDebutNormalisee = normaliserHeure(heureDebut);
+  const heureFinNormalisee = normaliserHeure(heureFin);
+  const candidate = {
+    date: dateIso,
+    heure_debut: heureDebutNormalisee,
+    heure_fin: heureFinNormalisee,
+  };
+
+  if (!dateIso || !heureDebutNormalisee || !heureFinNormalisee) {
+    return violations;
+  }
+
+  const professeurNumerique = Number(professeurId);
+  if (Number.isInteger(professeurNumerique) && professeurNumerique > 0) {
+    const placementsProfesseur = await recupererSeancesRessourceJour(
+      "professeur",
+      professeurNumerique,
+      dateIso,
+      idsAffectationsExclues,
+      executor
+    );
+    const resultat = BreakConstraintValidator.validateSequenceBreakConstraint({
+      placements: placementsProfesseur,
+      proposedPlacement: candidate,
+      resourceType: "professeur",
+      resourceId: professeurNumerique,
+    });
+
+    violations.push(...transformerViolationsPause(resultat.violations));
+  }
+
+  const idsGroupes = [...new Set(
+    (Array.isArray(groupeIds) ? groupeIds : [])
+      .map((id) => Number(id))
+      .filter((id) => Number.isInteger(id) && id > 0)
+  )];
+
+  for (const idGroupe of idsGroupes) {
+    const placementsGroupe = await recupererSeancesRessourceJour(
+      "groupe",
+      idGroupe,
+      dateIso,
+      idsAffectationsExclues,
+      executor
+    );
+    const resultat = BreakConstraintValidator.validateSequenceBreakConstraint({
+      placements: placementsGroupe,
+      proposedPlacement: candidate,
+      resourceType: "groupe",
+      resourceId: idGroupe,
+    });
+
+    violations.push(...transformerViolationsPause(resultat.violations));
+  }
+
+  const idsEtudiants = [...new Set(
+    (Array.isArray(participantIds) ? participantIds : [])
+      .map((id) => Number(id))
+      .filter((id) => Number.isInteger(id) && id > 0)
+  )];
+
+  if (idsEtudiants.length > 0) {
+    const placementsEtudiants = await recupererSeancesEtudiantsJour(
+      idsEtudiants,
+      dateIso,
+      idSession,
+      idsAffectationsExclues,
+      executor
+    );
+
+    const placementsParEtudiant = new Map();
+    for (const placement of placementsEtudiants) {
+      if (!placementsParEtudiant.has(placement.id_etudiant)) {
+        placementsParEtudiant.set(placement.id_etudiant, []);
+      }
+
+      placementsParEtudiant.get(placement.id_etudiant).push(placement);
+    }
+
+    for (const idEtudiant of idsEtudiants) {
+      const resultat = BreakConstraintValidator.validateSequenceBreakConstraint({
+        placements: placementsParEtudiant.get(idEtudiant) || [],
+        proposedPlacement: candidate,
+        resourceType: "etudiant",
+        resourceId: idEtudiant,
+      });
+
+      violations.push(...transformerViolationsPause(resultat.violations));
+    }
+  }
+
+  return violations;
+}
+
+export async function detecterViolationsPauseEtudiant(
+  {
+    idEtudiant,
+    date,
+    heureDebut,
+    heureFin,
+    idSession,
+    idsAffectationsExclues = [],
+  },
+  executor = pool
+) {
+  return detecterViolationsPauseSeance(
+    {
+      participantIds: [idEtudiant],
+      date,
+      heureDebut,
+      heureFin,
+      idSession,
+      idsAffectationsExclues,
+    },
+    executor
+  );
+}
+
 async function creerPlageHoraire(date, heureDebut, heureFin, executor = pool) {
   const [result] = await executor.query(
     `INSERT INTO plages_horaires (date, heure_debut, heure_fin)
@@ -1206,6 +1504,35 @@ async function validerOccurrenceGroupe(
       }
     );
   }
+
+  const violationsPause = await detecterViolationsPauseSeance(
+    {
+      professeurId: professeur.id_professeur,
+      groupeIds: [groupe.id_groupes_etudiants],
+      participantIds: participants.idsParticipants,
+      date: occurrence.date,
+      heureDebut,
+      heureFin,
+      idSession: session.id_session,
+      idsAffectationsExclues,
+    },
+    executor
+  );
+
+  if (violationsPause.length > 0) {
+    const violation = violationsPause[0];
+    throw creerErreurPlanification(
+      violation.message,
+      409,
+      violation.code || "BREAK_AFTER_TWO_CONSECUTIVE_REQUIRED",
+      {
+        resource_type: violation.resourceType || null,
+        resource_id: violation.resourceId || null,
+        date: violation.date || occurrence.date,
+        violations: violationsPause,
+      }
+    );
+  }
 }
 
 async function recupererAffectationDetaillee(idAffectation, executor = pool) {
@@ -1378,11 +1705,11 @@ async function rechargerContexteParticipants(payload, executor = pool) {
   return {
     session: contexte.groupe?.id_session
       ? {
-          id_session: contexte.groupe.id_session,
-          date_debut: contexte.groupe.session_date_debut || session.date_debut,
-          date_fin: contexte.groupe.session_date_fin || session.date_fin,
-          nom: contexte.groupe.session_nom || session.nom,
-        }
+        id_session: contexte.groupe.id_session,
+        date_debut: contexte.groupe.session_date_debut || session.date_debut,
+        date_fin: contexte.groupe.session_date_fin || session.date_fin,
+        nom: contexte.groupe.session_nom || session.nom,
+      }
       : session,
     contexte,
     participants,
@@ -1418,15 +1745,15 @@ export async function planifierCoursGroupeManuellement(payload, executor = pool)
         // Une serie n'est creee que lorsqu'on persiste plusieurs occurrences
         // d'un meme motif; cela facilite ensuite la replanification ciblee.
         ? await creerSeriePlanification(
-            {
-              idSession: session.id_session,
-              typePlanification: "groupe",
-              recurrence: "hebdomadaire",
-              dateDebut: dates[0],
-              dateFin: dates[dates.length - 1],
-            },
-            transactionExecutor
-          )
+          {
+            idSession: session.id_session,
+            typePlanification: "groupe",
+            recurrence: "hebdomadaire",
+            dateDebut: dates[0],
+            dateFin: dates[dates.length - 1],
+          },
+          transactionExecutor
+        )
         : null;
 
     const caches = {
@@ -1558,19 +1885,19 @@ export async function replanifierCoursGroupeManuellement(
     const datesCibles =
       occurrencesCibles.length > 1
         ? resoudreDatesOccurrences(
-            dateAncre,
-            {
-              mode: "custom_range",
-              date_debut: dateAncre,
-              date_fin: formatDateIso(
-                ajouterJours(
-                  parseDateIso(dateAncre),
-                  (occurrencesCibles.length - 1) * 7
-                )
-              ),
-            },
-            session
-          )
+          dateAncre,
+          {
+            mode: "custom_range",
+            date_debut: dateAncre,
+            date_fin: formatDateIso(
+              ajouterJours(
+                parseDateIso(dateAncre),
+                (occurrencesCibles.length - 1) * 7
+              )
+            ),
+          },
+          session
+        )
         : [payloadBase.date];
 
     if (datesCibles.length !== occurrencesCibles.length) {
@@ -1989,6 +2316,23 @@ export async function listerGroupesCompatiblesPourCoursEchoue(
       );
 
       if (conflits.length > 0) {
+        conflitEtudiant = true;
+        break;
+      }
+
+      const violationsPause = await detecterViolationsPauseEtudiant(
+        {
+          idEtudiant,
+          date: seance.date,
+          heureDebut: seance.heure_debut,
+          heureFin: seance.heure_fin,
+          idSession: session.id_session,
+          idsAffectationsExclues: [],
+        },
+        executor
+      );
+
+      if (violationsPause.length > 0) {
         conflitEtudiant = true;
         break;
       }

@@ -32,6 +32,7 @@ import { recupererProfesseurs } from "../services/professeurs.api.js";
 import { recupererProgrammes } from "../services/programmes.api.js";
 import {
   genererSessionScheduler,
+  hydrateSchedulerSimulationReport,
   modifierAffectationIntelligemment,
   recupererSessionsScheduler,
   simulerModificationAffectation,
@@ -51,6 +52,10 @@ import {
   formaterLibelleModeOptimisation,
   resoudreOptionModeOptimisation,
 } from "../utils/optimizationModes.js";
+import {
+  readSchedulerScoringSummary,
+  selectSchedulerScoringMode,
+} from "../utils/schedulerScoring.js";
 import "../styles/AffectationsPage.css";
 
 const ETAPES_REFERENCE = ["1", "2", "3", "4", "5", "6", "7", "8"];
@@ -571,6 +576,18 @@ function formaterStatutRepriseEtudiant(etudiant) {
   }
 
   return "Aucun cours echoue actif dans la session.";
+}
+
+function formaterValeurScoringResume(value) {
+  const numericValue = Number(value);
+
+  if (!Number.isFinite(numericValue)) {
+    return "-";
+  }
+
+  return Number.isInteger(numericValue)
+    ? String(numericValue)
+    : numericValue.toFixed(2);
 }
 
 function estimerGroupes(programme, etape, session, effectifTotal, capaciteMaximale) {
@@ -1329,6 +1346,21 @@ export function AffectationsPage({ utilisateur, onLogout }) {
     return resoudreOptionModeOptimisation(modeOptimisationGeneration);
   }, [modeOptimisationGeneration]);
 
+  const resumeGenerationScoring = useMemo(() => {
+    return readSchedulerScoringSummary(resumeGeneration);
+  }, [resumeGeneration]);
+
+  const resumeGenerationModeScoring = useMemo(() => {
+    return selectSchedulerScoringMode(
+      resumeGenerationScoring,
+      resumeGeneration?.details?.modeOptimisationUtilise || modeOptimisationGeneration
+    );
+  }, [
+    modeOptimisationGeneration,
+    resumeGeneration?.details?.modeOptimisationUtilise,
+    resumeGenerationScoring,
+  ]);
+
   const requeteModificationIntelligente = useMemo(() => {
     return construireRequeteModificationIntelligente(
       affectationEnEdition,
@@ -1958,10 +1990,10 @@ export function AffectationsPage({ utilisateur, onLogout }) {
     } catch (error) {
       const payload = error.payload || null;
       const simulationErreur = payload?.simulation
-        ? {
+        ? hydrateSchedulerSimulationReport({
             ...payload.simulation,
             ...(Array.isArray(payload?.warnings) ? { warnings: payload.warnings } : {}),
-          }
+          })
         : null;
 
       if (simulationErreur) {
@@ -2066,10 +2098,10 @@ export function AffectationsPage({ utilisateur, onLogout }) {
     } catch (error) {
       const payload = error.payload || null;
       const simulationErreur = payload?.simulation
-        ? {
+        ? hydrateSchedulerSimulationReport({
             ...payload.simulation,
             ...(Array.isArray(payload?.warnings) ? { warnings: payload.warnings } : {}),
-          }
+          })
         : null;
 
       if (simulationErreur) {
@@ -2568,6 +2600,42 @@ export function AffectationsPage({ utilisateur, onLogout }) {
                     placements puis dans l'optimisation locale read-only.
                   </span>
                 </div>
+                {resumeGenerationModeScoring ? (
+                  <div className="affectations-page__simulation-block affectations-page__simulation-block--info">
+                    <strong>
+                      Scores {formaterValeurScoringResume(resumeGenerationModeScoring.scoreGlobal)}
+                      {" "}global · {formaterValeurScoringResume(resumeGenerationModeScoring.scoreEtudiant)}
+                      {" "}etudiant · {formaterValeurScoringResume(resumeGenerationModeScoring.scoreProfesseur)}
+                      {" "}professeur · {formaterValeurScoringResume(resumeGenerationModeScoring.scoreGroupe)}
+                      {" "}groupe
+                    </strong>
+                    <span>
+                      Pauses etudiants {formaterValeurScoringResume(
+                        resumeGenerationScoring?.metrics?.pausesEtudiantsRespectees
+                      )} respectees / {formaterValeurScoringResume(
+                        resumeGenerationScoring?.metrics?.pausesEtudiantsManquees
+                      )} manquees · pauses professeurs{" "}
+                      {formaterValeurScoringResume(
+                        resumeGenerationScoring?.metrics?.pausesProfesseursRespectees
+                      )} respectees / {formaterValeurScoringResume(
+                        resumeGenerationScoring?.metrics?.pausesProfesseursManquees
+                      )} manquees · pauses groupes{" "}
+                      {formaterValeurScoringResume(
+                        resumeGenerationScoring?.metrics?.pausesGroupesRespectees
+                      )} respectees / {formaterValeurScoringResume(
+                        resumeGenerationScoring?.metrics?.pausesGroupesManquees
+                      )} manquees
+                    </span>
+                    <small>
+                      Non planifies {formaterValeurScoringResume(
+                        resumeGenerationScoring?.metrics?.nbCoursNonPlanifies
+                      )} · conflits evites{" "}
+                      {formaterValeurScoringResume(
+                        resumeGenerationScoring?.metrics?.nbConflitsEvites
+                      )}
+                    </small>
+                  </div>
+                ) : null}
               </div>
             ) : null}
 

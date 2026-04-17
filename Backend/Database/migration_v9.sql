@@ -1,5 +1,12 @@
+-- ============================================================================
+-- ROLE DU FICHIER
+-- Fichier SQL indicatif pour la version de schema v9.
+--
+-- IMPACT SUR LE PROJET
+-- - le vrai travail se trouve dans `migration_v9.js`
+-- - v9 ajoute l'email etudiant et normalise les champs de cohorte
+-- ============================================================================
 -- migration_v9.sql
 -- Ajout de l'email optionnel sur les etudiants et normalisation des valeurs
 -- de session / annee existantes. L'execution detaillee est geree par
 -- migration_v9.js.
-

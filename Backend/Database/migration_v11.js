@@ -1,3 +1,14 @@
+/**
+ * Logique d'echange etudiant de la migration v11.
+ *
+ * Role:
+ * - trace les echanges de cours entre etudiants
+ * - relie les affectations etudiantes a un echange optionnel
+ *
+ * Impact sur le projet:
+ * - cree `echanges_cours_etudiants`
+ * - ajoute `affectation_etudiants.id_echange_cours`
+ */
 async function assurerTableEchangesCoursEtudiants(connection) {
   await connection.query(
     `CREATE TABLE IF NOT EXISTS echanges_cours_etudiants (

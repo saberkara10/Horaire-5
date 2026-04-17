@@ -3,6 +3,13 @@
  *
  * Cette page affiche le planning
  * detaille d'un groupe genere.
+ *
+ * Améliorations UX apportées :
+ *  - Filtres Programme + Étape avant la sélection du groupe.
+ *  - La liste des groupes se réduit dynamiquement selon les filtres actifs.
+ *  - Si un seul groupe reste après filtrage, il est présélectionné automatiquement.
+ *  - Message clair si aucun groupe ne correspond aux filtres.
+ *  - Réinitialisation des filtres en un clic.
  */
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
@@ -23,6 +30,7 @@ import { ecouterSynchronisationPlanning } from "../utils/planningSync.js";
 import { usePopup } from "../components/feedback/PopupProvider.jsx";
 import { formaterLibelleCohorte } from "../utils/sessions.js";
 import "../styles/PlanningEtudiantPage.css";
+import "../styles/CrudPages.css";
 
 const HEURES = Array.from({ length: 15 }, (_, index) =>
   `${String(index + 8).padStart(2, "0")}:00`
@@ -78,6 +86,25 @@ function getHauteur(heureDebut, heureFin) {
   return ((fin - debut) / 60) * 60;
 }
 
+/* ─── Normalisation accentuée pour la comparaison de filtres ─── */
+function normaliserTexte(valeur) {
+  return String(valeur || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+}
+
+/* ─── Extraire les valeurs uniques d'un champ dans un tableau ─── */
+function extraireValeursUniques(liste, cle) {
+  const valeurs = new Set();
+  liste.forEach((item) => {
+    const valeur = String(item[cle] || "").trim();
+    if (valeur) valeurs.add(valeur);
+  });
+  return [...valeurs].sort((a, b) => a.localeCompare(b, "fr"));
+}
+
 export function HorairesGroupesPage({ utilisateur, onLogout }) {
   const [groupes, setGroupes] = useState([]);
   const [idGroupeActif, setIdGroupeActif] = useState("");
@@ -91,6 +118,11 @@ export function HorairesGroupesPage({ utilisateur, onLogout }) {
     getDebutSemaine(new Date())
   );
 
+  /* ─── Filtres programme et étape ─── */
+  const [filtreProgramme, setFiltreProgramme] = useState("");
+  const [filtreEtape, setFiltreEtape] = useState("");
+
+  /* ─── Chargement initial des groupes ─── */
   useEffect(() => {
     async function chargerGroupes() {
       setLoading(true);
@@ -119,6 +151,7 @@ export function HorairesGroupesPage({ utilisateur, onLogout }) {
     chargerGroupes();
   }, []);
 
+  /* ─── Chargement du planning quand le groupe actif change ─── */
   useEffect(() => {
     async function chargerPlanning() {
       if (!idGroupeActif) {
@@ -143,11 +176,10 @@ export function HorairesGroupesPage({ utilisateur, onLogout }) {
     chargerPlanning();
   }, [idGroupeActif]);
 
+  /* ─── Synchronisation en temps réel ─── */
   useEffect(() => {
     return ecouterSynchronisationPlanning((payload) => {
-      if (!idGroupeActif) {
-        return;
-      }
+      if (!idGroupeActif) return;
 
       const groupesImpactes = Array.isArray(payload?.groupes_impactes)
         ? payload.groupes_impactes.map((idGroupe) => Number(idGroupe))
@@ -166,6 +198,66 @@ export function HorairesGroupesPage({ utilisateur, onLogout }) {
         .catch(() => {});
     });
   }, [idGroupeActif]);
+
+  /* ─── Valeurs uniques de programmes et d'étapes (pour les filtres) ─── */
+  const programmesDisponibles = useMemo(
+    () => extraireValeursUniques(groupes, "programme"),
+    [groupes]
+  );
+
+  const etapesDisponibles = useMemo(() => {
+    // Si un programme est filtré, on ne propose que les étapes de ce programme
+    const source = filtreProgramme
+      ? groupes.filter(
+          (groupe) =>
+            normaliserTexte(groupe.programme) === normaliserTexte(filtreProgramme)
+        )
+      : groupes;
+    return extraireValeursUniques(source, "etape");
+  }, [groupes, filtreProgramme]);
+
+  /* ─── Liste filtrée des groupes ─── */
+  const groupesFiltres = useMemo(() => {
+    let liste = groupes;
+
+    if (filtreProgramme) {
+      liste = liste.filter(
+        (groupe) =>
+          normaliserTexte(groupe.programme) === normaliserTexte(filtreProgramme)
+      );
+    }
+
+    if (filtreEtape) {
+      liste = liste.filter(
+        (groupe) => normaliserTexte(groupe.etape) === normaliserTexte(filtreEtape)
+      );
+    }
+
+    return liste;
+  }, [groupes, filtreProgramme, filtreEtape]);
+
+  /* ─── Présélection automatique si un seul groupe reste ─── */
+  useEffect(() => {
+    if (groupesFiltres.length === 1) {
+      const seulGroupe = String(groupesFiltres[0].id_groupes_etudiants);
+      if (seulGroupe !== idGroupeActif) {
+        setIdGroupeActif(seulGroupe);
+      }
+    }
+  }, [groupesFiltres]);
+
+  /* ─── Cohérence : si le groupe sélectionné n'est plus dans la liste filtrée → vider ─── */
+  useEffect(() => {
+    if (!idGroupeActif) return;
+    const toujoursDansListe = groupesFiltres.some(
+      (groupe) => String(groupe.id_groupes_etudiants) === idGroupeActif
+    );
+    if (!toujoursDansListe && groupesFiltres.length > 0) {
+      setIdGroupeActif(String(groupesFiltres[0].id_groupes_etudiants));
+    } else if (!toujoursDansListe) {
+      setIdGroupeActif("");
+    }
+  }, [groupesFiltres]);
 
   const finSemaine = useMemo(() => {
     const date = new Date(lundiCourant);
@@ -186,12 +278,18 @@ export function HorairesGroupesPage({ utilisateur, onLogout }) {
     [horaire, lundiCourant]
   );
 
+  /* ─── Réinitialiser les filtres ─── */
+  function reinitialiserFiltres() {
+    setFiltreProgramme("");
+    setFiltreEtape("");
+  }
+
   return (
     <AppShell
       utilisateur={utilisateur}
       onLogout={onLogout}
       title="Horaires groupes"
-      subtitle="Consultez l'horaire exact de chaque groupe genere."
+      subtitle="Filtrez par programme et étape, puis consultez l'horaire exact de chaque groupe."
     >
       <motion.div
         className="planning-container"
@@ -199,6 +297,62 @@ export function HorairesGroupesPage({ utilisateur, onLogout }) {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.35, ease: "easeOut" }}
       >
+        {/* ── Filtres Programme + Étape ── */}
+        <div className="groupe-filtres">
+          {/* Filtre Programme */}
+          <div className="groupe-filtres__champ">
+            <span>Programme</span>
+            <select
+              value={filtreProgramme}
+              onChange={(event) => {
+                setFiltreProgramme(event.target.value);
+                setFiltreEtape(""); // réinitialiser l'étape si le programme change
+              }}
+              disabled={loading || programmesDisponibles.length === 0}
+            >
+              <option value="">Tous les programmes</option>
+              {programmesDisponibles.map((programme) => (
+                <option key={programme} value={programme}>
+                  {programme}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Filtre Étape */}
+          <div className="groupe-filtres__champ">
+            <span>Étape</span>
+            <select
+              value={filtreEtape}
+              onChange={(event) => setFiltreEtape(event.target.value)}
+              disabled={loading || etapesDisponibles.length === 0}
+            >
+              <option value="">Toutes les étapes</option>
+              {etapesDisponibles.map((etape) => (
+                <option key={etape} value={etape}>
+                  Étape {etape}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Réinitialiser */}
+          {(filtreProgramme || filtreEtape) && (
+            <button
+              type="button"
+              className="groupe-filtres__reset"
+              onClick={reinitialiserFiltres}
+            >
+              Réinitialiser
+            </button>
+          )}
+
+          {/* Compteur */}
+          <span className="groupe-filtres__compteur">
+            {loading ? "Chargement…" : `${groupesFiltres.length} groupe(s)`}
+          </span>
+        </div>
+
         {/* ── Barre d'infos + Export ── */}
         <div className="planning-infos" style={{ marginBottom: "24px" }}>
           <div className="planning-info-item">
@@ -207,17 +361,25 @@ export function HorairesGroupesPage({ utilisateur, onLogout }) {
               className="crud-page__search"
               value={idGroupeActif}
               onChange={(event) => setIdGroupeActif(event.target.value)}
-              disabled={loading || groupes.length === 0}
+              disabled={loading || groupesFiltres.length === 0}
             >
-              <option value="">Choisir un groupe</option>
-              {groupes.map((groupe) => (
-                <option
-                  key={groupe.id_groupes_etudiants}
-                  value={groupe.id_groupes_etudiants}
-                >
-                  {groupe.nom_groupe}
-                </option>
-              ))}
+              {groupesFiltres.length === 0 ? (
+                <option value="">Aucun groupe correspondant</option>
+              ) : (
+                <>
+                  {groupesFiltres.length > 1 && (
+                    <option value="">Choisir un groupe</option>
+                  )}
+                  {groupesFiltres.map((groupe) => (
+                    <option
+                      key={groupe.id_groupes_etudiants}
+                      value={groupe.id_groupes_etudiants}
+                    >
+                      {groupe.nom_groupe}
+                    </option>
+                  ))}
+                </>
+              )}
             </select>
           </div>
           <div className="planning-info-item">
@@ -260,6 +422,25 @@ export function HorairesGroupesPage({ utilisateur, onLogout }) {
           <p className="planning-message">Chargement des groupes...</p>
         ) : groupes.length === 0 ? (
           <p className="planning-message">Aucun groupe genere pour le moment.</p>
+        ) : groupesFiltres.length === 0 ? (
+          <p className="planning-message">
+            Aucun groupe ne correspond aux filtres sélectionnés.{" "}
+            <button
+              type="button"
+              onClick={reinitialiserFiltres}
+              style={{
+                background: "none",
+                border: "none",
+                color: "#0ea5e9",
+                cursor: "pointer",
+                fontWeight: 700,
+                textDecoration: "underline",
+                font: "inherit",
+              }}
+            >
+              Réinitialiser les filtres
+            </button>
+          </p>
         ) : chargementPlanning ? (
           <p className="planning-message">Chargement du planning...</p>
         ) : (

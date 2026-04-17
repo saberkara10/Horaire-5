@@ -1,6 +1,42 @@
 import { apiRequest } from "./api.js";
+import { readSchedulerScoringSummary } from "../utils/schedulerScoring.js";
 
 const BASE_URL = "/api/scheduler";
+
+function hydrateSchedulerGenerationReport(report) {
+  if (!report || typeof report !== "object") {
+    return report;
+  }
+
+  const scoringSummary = report.resume_scoring_v1 || readSchedulerScoringSummary(report);
+
+  return scoringSummary
+    ? {
+        ...report,
+        resume_scoring_v1: scoringSummary,
+      }
+    : report;
+}
+
+export function hydrateSchedulerSimulationReport(report) {
+  if (!report || typeof report !== "object") {
+    return report;
+  }
+
+  return {
+    ...report,
+    warnings: Array.isArray(report?.warnings) ? report.warnings : [],
+    validation: {
+      ...(report?.validation || {}),
+      raisonsBlocage: Array.isArray(report?.validation?.raisonsBlocage)
+        ? report.validation.raisonsBlocage
+        : [],
+      detailsParAffectation: Array.isArray(report?.validation?.detailsParAffectation)
+        ? report.validation.detailsParAffectation
+        : [],
+    },
+  };
+}
 
 /**
  * Normalise le payload de generation du scheduler.
@@ -66,13 +102,17 @@ export async function recupererSessionsScheduler() {
  */
 export async function genererSessionScheduler(payload = {}) {
   const normalizedPayload = normaliserPayloadGenerationScheduler(payload);
-
-  return apiRequest(`${BASE_URL}/generer`, {
+  const response = await apiRequest(`${BASE_URL}/generer`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(normalizedPayload),
     credentials: "include",
   });
+
+  return {
+    ...response,
+    rapport: hydrateSchedulerGenerationReport(response?.rapport),
+  };
 }
 
 /**
@@ -82,12 +122,14 @@ export async function genererSessionScheduler(payload = {}) {
  * @returns {Promise<Object>} Rapport de simulation.
  */
 export async function simulerScenarioScheduler(payload = {}) {
-  return apiRequest(`${BASE_URL}/what-if`, {
+  const response = await apiRequest(`${BASE_URL}/what-if`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
     credentials: "include",
   });
+
+  return hydrateSchedulerSimulationReport(response);
 }
 
 /**
@@ -125,10 +167,15 @@ export async function simulerModificationAffectation(payload = {}) {
  * @returns {Promise<Object>} Resultat metier complet.
  */
 export async function modifierAffectationIntelligemment(payload = {}) {
-  return apiRequest(`${BASE_URL}/modify-assignment`, {
+  const response = await apiRequest(`${BASE_URL}/modify-assignment`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
     credentials: "include",
   });
+
+  return {
+    ...response,
+    simulation: hydrateSchedulerSimulationReport(response?.simulation),
+  };
 }

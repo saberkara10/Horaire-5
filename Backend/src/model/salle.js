@@ -725,6 +725,26 @@ export async function getAllSalles() {
 }
 
 /**
+ * Retourne les types de salles distincts existants dans la base.
+ *
+ * Les types sont trimmes, dedoublonnes, filtrés (non vides)
+ * et tries alphabetiquement avant renvoi.
+ *
+ * @returns {Promise<string[]>} Liste des types distincts.
+ */
+export async function getTypesSalles() {
+  const [lignes] = await pool.query(
+    `SELECT DISTINCT TRIM(type) AS type
+     FROM salles
+     WHERE type IS NOT NULL
+       AND TRIM(type) <> ''
+     ORDER BY type ASC;`
+  );
+
+  return lignes.map((ligne) => ligne.type);
+}
+
+/**
  * Retourne une salle par son identifiant.
  *
  * @param {number} idSalle Identifiant de la salle.

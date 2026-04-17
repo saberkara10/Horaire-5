@@ -1,3 +1,16 @@
+/**
+ * Logique d'evolution de la migration v2.
+ *
+ * Role:
+ * - fait evoluer le schema v1 vers le premier jeu de fonctions complet
+ * - realise une normalisation sure des donnees deja presentes
+ *
+ * Impact sur le projet:
+ * - ajoute les sessions, les cours echoues, les absences, les indisponibilites
+ *   de salles et les rapports
+ * - enrichit les utilisateurs, etudiants, cours et groupes avec de nouveaux
+ *   champs operationnels
+ */
 const DEFAULT_SESSION_NAME = "Automne 2026";
 const DEFAULT_SESSION_START = "2026-08-25";
 const DEFAULT_SESSION_END = "2026-12-20";

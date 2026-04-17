@@ -29,6 +29,7 @@ import {
   getSchedulerMaxGroupsPerProfessor,
   getSchedulerMaxWeeklySessionsPerProfessor,
 } from "../SchedulerConfig.js";
+import { BreakConstraintValidator } from "../constraints/BreakConstraintValidator.js";
 
 /**
  * Normalise une heure dans le format HH:MM:SS.
@@ -310,6 +311,135 @@ function collectConflictDiagnostics({
     groupConflicts,
     studentConflicts,
   };
+}
+
+/**
+ * Transforme les violations de pause en issues de validation explicites.
+ *
+ * @param {Object[]} violations - violations produites par le validateur de pause.
+ * @param {string} resourceType - type de ressource cible.
+ * @param {number} resourceId - identifiant de la ressource cible.
+ * @param {string} date - date concernee.
+ *
+ * @returns {Object[]} Issues standardisees.
+ *
+ * Effets secondaires : aucun.
+ * Cas particuliers : conserve les details structurels pour un diagnostic UI lisible.
+ */
+function transformBreakViolations(violations, resourceType, resourceId, date) {
+  return (Array.isArray(violations) ? violations : []).map((violation) =>
+    createIssue(
+      violation.code || "BREAK_AFTER_TWO_CONSECUTIVE_REQUIRED",
+      violation.message ||
+        "Apres 2 cours consecutifs, une pause d'au moins 1h est obligatoire avant un 3e cours.",
+      {
+        ...violation.details,
+        resource_type: violation.resourceType || resourceType || null,
+        resource_id: Number(violation.resourceId || resourceId || 0) || null,
+        date: violation.date || date || null,
+      }
+    )
+  );
+}
+
+/**
+ * Releve les conflits de pause sur un ensemble de placements d'une ressource.
+ *
+ * @param {Object[]} placements - placements concurrents.
+ * @param {Object} proposedPlacement - placement candidat.
+ * @param {string} resourceType - type de ressource.
+ * @param {number} resourceId - identifiant de ressource.
+ *
+ * @returns {Object[]} Issues de pause.
+ *
+ * Effets secondaires : aucun.
+ * Cas particuliers : la validation repose sur l'ordre temporel réel du jour.
+ */
+function collectBreakIssuesForResource(
+  placements,
+  proposedPlacement,
+  resourceType,
+  resourceId
+) {
+  const resultat = BreakConstraintValidator.validateSequenceBreakConstraint({
+    placements,
+    proposedPlacement,
+    resourceType,
+    resourceId,
+  });
+
+  return transformBreakViolations(
+    resultat.violations,
+    resourceType,
+    resourceId,
+    proposedPlacement?.date
+  );
+}
+
+/**
+ * Releve les conflits de pause pour chaque etudiant reel de la seance.
+ *
+ * @param {Object} snapshot - snapshot officiel.
+ * @param {Object[]} placements - placements concurrents.
+ * @param {Object} proposedPlacement - placement candidat.
+ * @param {number[]} participantIds - etudiants reels de la seance.
+ *
+ * @returns {Object[]} Issues de pause.
+ *
+ * Effets secondaires : aucun.
+ * Cas particuliers : les reprises et affectations individuelles sont deja inclues dans les participants.
+ */
+function collectBreakIssuesForStudents(
+  snapshot,
+  placements,
+  proposedPlacement,
+  participantIds
+) {
+  const issues = [];
+  const normalizedParticipants = [...new Set(
+    (Array.isArray(participantIds) ? participantIds : [])
+      .map((studentId) => Number(studentId))
+      .filter((studentId) => Number.isInteger(studentId) && studentId > 0)
+  )];
+
+  if (normalizedParticipants.length === 0) {
+    return issues;
+  }
+
+  const participantsByPlacement = new Map();
+
+  for (const placement of placements) {
+    const assignmentId = Number(placement?.id_affectation_cours || 0);
+
+    if (!assignmentId) {
+      continue;
+    }
+
+    participantsByPlacement.set(
+      assignmentId,
+      new Set(snapshot.getParticipantsForAssignment(assignmentId))
+    );
+  }
+
+  for (const studentId of normalizedParticipants) {
+    const studentPlacements = placements.filter((placement) => {
+      const assignmentId = Number(placement?.id_affectation_cours || 0);
+      const participants = participantsByPlacement.get(assignmentId);
+
+      return participants ? participants.has(studentId) : false;
+    });
+
+    issues.push(
+      ...collectBreakIssuesForResource(
+        studentPlacements,
+        proposedPlacement,
+        "etudiant",
+        studentId
+      )
+    );
+  }
+
+  return issues;
 }
 
 /**
@@ -781,11 +911,44 @@ export class ScheduleMutationValidator {
       issues.push(...buildConflictIssues({ ...diagnostics, roomConflicts: [], professorConflicts: [], groupConflicts: [] }));
     }
 
+    issues.push(
+      ...collectBreakIssuesForResource(
+        competingPlacements.filter(
+          (placement) =>
+            Number(placement?.id_professeur || 0) === Number(proposedPlacement.id_professeur || 0)
+        ),
+        proposedPlacement,
+        "professeur",
+        Number(proposedPlacement.id_professeur || 0)
+      )
+    );
+
+    issues.push(
+      ...collectBreakIssuesForResource(
+        competingPlacements.filter(
+          (placement) =>
+            Number(placement?.id_groupe || 0) === Number(proposedPlacement.id_groupe || 0)
+        ),
+        proposedPlacement,
+        "groupe",
+        Number(proposedPlacement.id_groupe || 0)
+      )
+    );
+
+    issues.push(
+      ...collectBreakIssuesForStudents(
+        snapshot,
+        competingPlacements,
+        proposedPlacement,
+        participantIds
+      )
+    );
+
     const deduplicatedReasons = [];
     const seenIssueKeys = new Set();
 
     for (const issue of issues) {
-      const key = `${issue.code}|${issue.message}`;
+      const key = `${issue.code}|${issue.message}|${JSON.stringify(issue.details || {})}`;
       if (seenIssueKeys.has(key)) {
         continue;
       }

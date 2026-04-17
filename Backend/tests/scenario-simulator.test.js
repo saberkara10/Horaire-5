@@ -448,6 +448,14 @@ describe("ScenarioSimulator", () => {
     expect(result.mutationAppliquee).toBe(true);
     expect(result.modeOptimisationUtilise).toBe("etudiant");
     expect(result.scoreApres.scoreGlobal).toBeGreaterThan(result.scoreAvant.scoreGlobal);
+    expect(result.scoreAvant.scoreGroupe).toBeDefined();
+    expect(result.scoreApres.scoreGroupe).toBeDefined();
+    expect(result.difference.scoreGroupe).toBeGreaterThan(0);
+    expect(result.difference.metrics.nbConflitsEvites).toBe(0);
+    expect(result.impact.groupes.idsImpactes).toEqual([1]);
+    expect(result.scoreAvant.details.groupe.totals.lateCoursePenalty).toBeGreaterThan(
+      result.scoreApres.details.groupe.totals.lateCoursePenalty
+    );
     expect(result.conflitsCrees).toBe(0);
     expect(normalizePlacementKeys(snapshot.clonePlacements())).toEqual(beforeKeys);
   });

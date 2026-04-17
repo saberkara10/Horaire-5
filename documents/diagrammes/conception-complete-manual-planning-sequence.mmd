@@ -1,0 +1,30 @@
+sequenceDiagram
+  actor A as Responsable administratif
+  participant UI as Frontend React
+  participant Route as horaire.routes
+  participant Service as manual-planning.service
+  participant Validator as BreakConstraintValidator
+  participant Model as horaire.js
+  participant DB as MySQL
+
+  A->>UI: Saisit une planification manuelle
+  UI->>Route: POST /api/horaires
+  Route->>Service: planifierCoursGroupeManuellement(payload)
+  Service->>DB: charger cours, prof, salle, groupe, session
+  Service->>Model: recupererParticipantsSeance / verifier conflits
+  Model->>DB: lire affectations existantes
+  Model-->>Service: contexte de validation
+  Service->>Validator: verifier la contrainte de pause
+  Validator-->>Service: valide ou violation
+  alt contraintes respectees
+    Service->>DB: inserer plage_horaire
+    Service->>DB: inserer affectation_cours
+    Service->>DB: inserer affectation_groupes
+    Service->>DB: maintenir planification_series
+    DB-->>Service: commit
+    Service-->>Route: affectation validee
+    Route-->>UI: 201 Created
+  else conflit detecte
+    Service-->>Route: erreur metier
+    Route-->>UI: 400 erreur explicable
+  end

@@ -46,6 +46,84 @@ function buildReasonBreakdown(items, reasonKey = "raison_code") {
     .sort((a, b) => b.total - a.total || a.code.localeCompare(b.code, "fr"));
 }
 
+function readNumeric(value, fallback = 0) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
+
+function extractScoringV1(payload) {
+  return payload?.details?.scoring_v1 || payload?.scoring_v1 || null;
+}
+
+function buildScoringModeSummary(modeKey, modePayload = {}) {
+  return {
+    mode: modePayload?.mode || modeKey,
+    scoreGlobal: readNumeric(modePayload?.scoreGlobal),
+    scoreEtudiant: readNumeric(modePayload?.scoreEtudiant),
+    scoreProfesseur: readNumeric(modePayload?.scoreProfesseur),
+    scoreGroupe: readNumeric(modePayload?.scoreGroupe),
+  };
+}
+
+function buildScoringSummary(payload, row = {}) {
+  const scoring = extractScoringV1(payload);
+  const modes = scoring?.modes || {};
+  const studentTotals = scoring?.details?.etudiant?.totals || {};
+  const teacherTotals = scoring?.details?.professeur?.totals || {};
+  const groupTotals = scoring?.details?.groupe?.totals || {};
+
+  return {
+    disponible: Boolean(scoring),
+    version: scoring?.version || "v1",
+    modes: Object.fromEntries(
+      ["etudiant", "professeur", "equilibre"].map((modeKey) => [
+        modeKey,
+        buildScoringModeSummary(modeKey, modes?.[modeKey] || {}),
+      ])
+    ),
+    metrics: {
+      pausesEtudiantsRespectees: readNumeric(
+        scoring?.metrics?.pausesEtudiantsRespectees ??
+          studentTotals.pauseRespectedCount ??
+          studentTotals.dynamicBreaksRespected
+      ),
+      pausesEtudiantsManquees: readNumeric(
+        scoring?.metrics?.pausesEtudiantsManquees ??
+          studentTotals.pauseMissedCount ??
+          studentTotals.dynamicBreaksMissed
+      ),
+      pausesProfesseursRespectees: readNumeric(
+        scoring?.metrics?.pausesProfesseursRespectees ??
+          teacherTotals.pauseRespectedCount
+      ),
+      pausesProfesseursManquees: readNumeric(
+        scoring?.metrics?.pausesProfesseursManquees ??
+          teacherTotals.pauseMissedCount
+      ),
+      pausesGroupesRespectees: readNumeric(
+        scoring?.metrics?.pausesGroupesRespectees ??
+          groupTotals.pauseRespectedCount
+      ),
+      pausesGroupesManquees: readNumeric(
+        scoring?.metrics?.pausesGroupesManquees ??
+          groupTotals.pauseMissedCount
+      ),
+      nbCoursNonPlanifies: readNumeric(
+        scoring?.metrics?.nbCoursNonPlanifies ??
+          (Array.isArray(payload?.non_planifies) ? payload.non_planifies.length : null) ??
+          row?.nb_cours_non_planifies
+      ),
+      nbConflitsEvites: readNumeric(scoring?.metrics?.nbConflitsEvites),
+      penaliteCoursTardifsTotale: readNumeric(
+        scoring?.metrics?.penaliteCoursTardifsTotale ??
+          readNumeric(studentTotals.lateCoursePenalty) +
+            readNumeric(teacherTotals.lateCoursePenalty) +
+            readNumeric(groupTotals.lateCoursePenalty)
+      ),
+    },
+  };
+}
+
 export class SchedulerReportService {
   static async listerRapports(executor = pool) {
     const [rows] = await executor.query(
@@ -78,6 +156,7 @@ export class SchedulerReportService {
 
       return {
         ...row,
+        resume_scoring_v1: buildScoringSummary(payload, row),
         resume_metier: {
           raisons_non_planifiees: buildReasonBreakdown(nonPlanifies),
           raisons_reprises: buildReasonBreakdown(reprises),
@@ -153,6 +232,7 @@ export class SchedulerReportService {
     return {
       ...row,
       details_bruts: payload,
+      resume_scoring_v1: buildScoringSummary(payload, row),
       reprises_non_resolues: reprisesNonResolues,
       cours_non_planifies: coursNonPlanifies,
       resume_metier: {
@@ -163,7 +243,20 @@ export class SchedulerReportService {
   }
 
   static _parsePayload(detailsRaw) {
-    return parseJson(detailsRaw, {});
+    const payload = parseJson(detailsRaw, {});
+
+    if (!payload.details || typeof payload.details !== "object") {
+      payload.details = {};
+    }
+
+    if (!payload.details.scoring_v1 && payload.scoring_v1 && typeof payload.scoring_v1 === "object") {
+      payload.details = {
+        ...payload.details,
+        scoring_v1: payload.scoring_v1,
+      };
+    }
+
+    return payload;
   }
 
   static _extractNonPlanifies(payload) {

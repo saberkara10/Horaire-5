@@ -9,6 +9,18 @@ Le module d'authentification permet de :
 - retourner l'utilisateur connecte ;
 - deconnecter proprement l'utilisateur.
 
+Dans la conception cible du projet, **seuls deux types d'utilisateurs se connectent** :
+
+- `Administrateur`
+- `Responsable administratif`
+
+Regles a retenir :
+
+- `Professeur` et `Etudiant` ne disposent pas de connexion applicative ;
+- ils restent des entites metier consultees et gerees par les utilisateurs administratifs ;
+- si le depot expose encore `ADMIN_RESPONSABLE`, ce code doit etre interprete comme
+  un alias technique transitoire du `Responsable administratif`, et non comme un troisieme profil fonctionnel.
+
 Ce document est aligne avec :
 
 - `Backend/app.js`
@@ -45,7 +57,39 @@ Autrement dit :
 
 ## 3. Diagramme UML de sequence du login
 
-![Diagramme UML de sequence du login](diagrammes/auth-sequence.svg)
+```mermaid
+sequenceDiagram
+    actor UtilisateurAdministratif as Administrateur / Responsable administratif
+    participant Frontend
+    participant RouteAuth as Route /auth/login
+    participant RouteLogic as auth.routes.js
+    participant Bcrypt
+    participant Session
+    participant MySQL
+
+    UtilisateurAdministratif->>Frontend: Saisit email et mot de passe
+    Frontend->>RouteAuth: POST /auth/login
+    RouteAuth->>RouteLogic: Normaliser l'email
+    RouteLogic->>MySQL: SELECT id_utilisateur, email, motdepasse, nom, prenom, role FROM utilisateurs WHERE email = ?
+    MySQL-->>RouteLogic: ligne utilisateur ou aucune ligne
+    RouteLogic-->>RouteAuth: resultat
+
+    alt utilisateur introuvable
+        RouteAuth-->>Frontend: 401 Identifiants invalides
+    else utilisateur trouve
+        RouteAuth->>Bcrypt: compare(password, hash)
+        Bcrypt-->>RouteAuth: true ou false
+
+        alt mot de passe invalide
+            RouteAuth-->>Frontend: 401 Identifiants invalides
+        else mot de passe valide
+            RouteAuth->>RouteLogic: Construire {id, email, nom, prenom, role}
+            RouteAuth->>Session: req.session.user = {id, email, nom, prenom, role}
+            Session-->>RouteAuth: session active
+            RouteAuth-->>Frontend: 200 Connexion reussie
+        end
+    end
+```
 
 ### Lecture du schema
 
@@ -58,7 +102,29 @@ Autrement dit :
 
 ## 4. Diagramme UML de sequence de la session
 
-![Diagramme UML de sequence de consultation et deconnexion](diagrammes/auth-session-sequence.svg)
+```mermaid
+sequenceDiagram
+    actor UtilisateurAdministratif as Administrateur / Responsable administratif
+    participant Frontend
+    participant RouteMe as Route /auth/me
+    participant RouteLogout as Route /auth/logout
+    participant Session
+
+    UtilisateurAdministratif->>Frontend: Ouvre l'application
+    Frontend->>RouteMe: GET /auth/me
+    RouteMe->>Session: Lire req.session.user
+
+    alt session absente
+        RouteMe-->>Frontend: 401 Authentification requise
+    else session presente
+        RouteMe-->>Frontend: 200 { user: req.session.user }
+        UtilisateurAdministratif->>Frontend: Clique sur deconnexion
+        Frontend->>RouteLogout: POST /auth/logout
+        RouteLogout->>Session: Detruire la session
+        Session-->>RouteLogout: Session supprimee
+        RouteLogout-->>Frontend: 200 Deconnexion reussie + clearCookie(sid)
+    end
+```
 
 ### Lecture du schema
 

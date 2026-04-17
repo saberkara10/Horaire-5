@@ -1,38 +1,63 @@
 /**
- * SERVICE - Salles API
+ * Service — Salles API.
  *
- * Ce service centralise les appels HTTP
- * lies aux salles.
+ * Centralise tous les appels HTTP liés à la gestion des salles.
+ * Couvre les opérations CRUD de base et la lecture de l'occupation.
+ *
+ * @module services/salles.api
  */
+
 import { apiRequest } from "./api.js";
 
+/**
+ * URL de base pour toutes les routes des salles.
+ * @type {string}
+ */
 const BASE_URL = "/api/salles";
 
+/**
+ * Récupère la liste complète de toutes les salles.
+ *
+ * @returns {Promise<object[]>} Liste des salles avec leurs attributs
+ */
 export async function recupererSalles() {
   return apiRequest(BASE_URL);
 }
 
 /**
- * Lecture metier de l'occupation d'une salle.
+ * Récupère la liste des types de salles distincts enregistrés dans la base.
  *
- * Le backend renvoie a la fois :
- * - les occupations detaillees de la session ;
- * - une vue hebdomadaire initiale ;
- * - les indicateurs V2 ;
- * - le resume dynamique V3.
+ * Utilisée pour alimenter le sélecteur de type dans le formulaire d'ajout
+ * de salle ou de cours. Retourne uniquement les types existants (pas de suggestion).
  *
- * Le frontend reutilise ensuite la liste `occupations` pour naviguer de
- * semaine en semaine sans reconstruire un systeme parallele.
+ * @returns {Promise<string[]>} Liste triée des types (ex: ["Classe", "Laboratoire"])
+ */
+export async function recupererTypesSalles() {
+  return apiRequest(`${BASE_URL}/types`);
+}
+
+/**
+ * Récupère la vue complète d'occupation d'une salle.
  *
- * @param {number|string} id Identifiant de la salle.
- * @param {Object} [options={}] Parametres de lecture.
- * @param {number|string} [options.id_session] Session cible.
- * @param {string} [options.date_reference] Date ISO de la semaine initiale.
- * @returns {Promise<Object>} Vue complete d'occupation.
+ * Le backend retourne un objet riche incluant :
+ *  - `occupations` : toutes les séances planifiées dans cette salle pour la session
+ *  - Une vue hebdomadaire initiale pour affichage immédiat
+ *  - Des indicateurs de taux d'utilisation (V2)
+ *  - Un résumé dynamique calculé côté serveur (V3)
+ *
+ * Le frontend utilise la liste `occupations` pour naviguer entre les semaines
+ * sans avoir à refaire un appel API à chaque changement de semaine.
+ *
+ * @param {number|string} id - L'identifiant de la salle
+ * @param {object} [options={}] - Options de filtrage
+ * @param {number|string} [options.id_session] - ID de la session à afficher
+ * @param {string} [options.date_reference] - Date ISO de la semaine initiale (YYYY-MM-DD)
+ * @returns {Promise<object>} Vue complète d'occupation de la salle
  */
 export async function recupererOccupationSalle(id, options = {}) {
   const params = new URLSearchParams();
 
+  // Accepter les deux formats de clé (snake_case et camelCase) pour compatibilité
   if (options.id_session ?? options.idSession) {
     params.set("id_session", String(options.id_session ?? options.idSession));
   }
@@ -48,6 +73,15 @@ export async function recupererOccupationSalle(id, options = {}) {
   return apiRequest(`${BASE_URL}/${id}/occupation${suffixe}`);
 }
 
+/**
+ * Crée une nouvelle salle.
+ *
+ * @param {object} salle - Les données de la salle à créer
+ * @param {string} salle.code - Code unique de la salle (ex: "A-101")
+ * @param {string} salle.type - Type de salle (ex: "Classe", "Laboratoire")
+ * @param {number} salle.capacite - Nombre de places disponibles
+ * @returns {Promise<object>} La salle créée avec son ID
+ */
 export async function creerSalle(salle) {
   return apiRequest(BASE_URL, {
     method: "POST",
@@ -56,6 +90,13 @@ export async function creerSalle(salle) {
   });
 }
 
+/**
+ * Met à jour les informations d'une salle existante.
+ *
+ * @param {number|string} id - L'identifiant de la salle à modifier
+ * @param {object} salle - Les nouvelles données de la salle
+ * @returns {Promise<object>} La salle mise à jour
+ */
 export async function modifierSalle(id, salle) {
   return apiRequest(`${BASE_URL}/${id}`, {
     method: "PUT",
@@ -64,6 +105,15 @@ export async function modifierSalle(id, salle) {
   });
 }
 
+/**
+ * Supprime une salle.
+ *
+ * Le backend vérifie que la salle n'est pas utilisée dans un horaire actif
+ * avant de la supprimer. Si c'est le cas, la suppression est refusée.
+ *
+ * @param {number|string} id - L'identifiant de la salle à supprimer
+ * @returns {Promise<object>} Résultat de la suppression
+ */
 export async function supprimerSalle(id) {
   return apiRequest(`${BASE_URL}/${id}`, {
     method: "DELETE",

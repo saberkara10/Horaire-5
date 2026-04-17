@@ -1,3 +1,15 @@
+/**
+ * Logique d'affectation etudiante de la migration v8.
+ *
+ * Role:
+ * - introduit des affectations de cours durables au niveau etudiant
+ * - impose l'unicite du nom de groupe a l'interieur d'une session
+ *
+ * Impact sur le projet:
+ * - ajoute `affectation_etudiants`
+ * - ajoute `cours_echoues.id_groupe_reprise`
+ * - ajoute `uniq_groupes_session_nom`
+ */
 async function assurerTableAffectationEtudiants(connection) {
   await connection.query(
     `CREATE TABLE IF NOT EXISTS affectation_etudiants (

@@ -1,228 +1,102 @@
 /**
- * TeacherScheduleAnalyzer
+ * Analyseur de confort horaire pour les professeurs.
  *
- * Ce module mesure le confort professeur a partir d'un horaire deja genere.
+ * Ce module mesure la qualité du planning d'un professeur en calculant un score
+ * de confort sur 100. Un score élevé = planning agréable pour l'enseignant.
+ * Un score bas = planning fragmenté, surchargé ou avec de longs trous.
  *
- * Responsabilites principales :
- * - evaluer les horaires hebdomadaires des professeurs ;
- * - traduire les preferences metier professeurs en penalites et bonus ;
- * - exposer des indicateurs lisibles pour scoring_v1 et les rapports.
+ * Métriques analysées par jour :
+ *  - Trous (holeCount) : cours non consécutifs le même jour
+ *  - Amplitude (amplitudeMinutes) : durée entre le premier et dernier cours
+ *  - Surcharge (overloadDays) : journées avec plus de 3 cours
+ *  - Jours fragmentés : au moins 1 trou dans la journée
  *
- * Integration dans le systeme :
- * - ScheduleScorer l'utilise pour calculer `scoreProfesseur` ;
- * - PlacementEvaluator et le what-if lisent ensuite ces resultats ;
- * - aucune contrainte dure n'est verifiee ici, uniquement le confort.
+ * Pénalités appliquées :
+ *  - Trou court (1–60 min) : 0 points (pause acceptable)
+ *  - Trou moyen (61–120 min) : 3 points
+ *  - Trou long (121–180 min) : 8 points
+ *  - Trou très long (>180 min) : 14 + 5*(durée-3h)/h
+ *  - Amplitude > 9h : 5 points par heure supplémentaire
+ *  - Plus de 3 cours/jour : 12 + 10 par cours supplémentaire
+ *  - Trous multiples : 4 points par trou supplémentaire au-delà du premier
+ *  - Pause manquée : 8 points
+ *  - Cours tardifs : transmis depuis buildDayTimeline
+ *
+ * Bonus accordés :
+ *  - Journée avec 1 seul cours : +1 point
+ *  - Journée avec 2 cours consécutifs (aucun trou) : +3 points
+ *  - Pause respectée : +4 points
+ *  - Répartition correcte sur 4–5 jours (avec ≥4 cours) : +2 points
+ *
+ * @module services/scheduler/scoring/TeacherScheduleAnalyzer
  */
 
-/**
- * Borne une note entre 0 et 100.
- *
- * @param {number} value - valeur source.
- * @param {number} [min=0] - borne basse.
- * @param {number} [max=100] - borne haute.
- *
- * @returns {number} Valeur bornee.
- *
- * Effets secondaires : aucun.
- * Cas particuliers : les valeurs hors bornes sont rabotees.
- */
-function clamp(value, min = 0, max = 100) {
-  return Math.max(min, Math.min(max, value));
-}
+import {
+  buildDayTimeline,
+  clamp,
+  comparePlacementsByTime,
+  getWeekKey,
+  mergeTotals,
+  round,
+} from "./GroupScheduleAnalyzer.js";
 
 /**
- * Arrondit une valeur numerique.
+ * Calcule la pénalité pour un trou entre deux cours.
  *
- * @param {number} value - valeur source.
- * @param {number} [digits=2] - nombre de decimales.
+ * Un court trou (≤ 60 min = pause réglementaire) n'est pas pénalisé.
+ * Au-delà, plus le trou est long, plus la pénalité est grande.
  *
- * @returns {number} Valeur arrondie.
+ * Barème :
+ *  - 0 à 60 min  : 0 point (pause normale)
+ *  - 61 à 120 min : 3 points
+ *  - 121 à 180 min : 8 points
+ *  - > 180 min   : 14 + 5 par heure supplémentaire au-delà de 3h
  *
- * Effets secondaires : aucun.
- * Cas particuliers : retourne `0` pour une valeur non numerique.
- */
-function round(value, digits = 2) {
-  if (!Number.isFinite(Number(value))) {
-    return 0;
-  }
-
-  const factor = 10 ** digits;
-  return Math.round(Number(value) * factor) / factor;
-}
-
-/**
- * Convertit une heure HH:MM:SS en minutes.
- *
- * @param {string|null|undefined} timeValue - heure source.
- *
- * @returns {number} Nombre de minutes depuis minuit.
- *
- * Effets secondaires : aucun.
- * Cas particuliers : retourne `0` si l'heure est invalide.
- */
-function parseTimeToMinutes(timeValue) {
-  const [hours = "0", minutes = "0"] = String(timeValue || "0:0:0").split(":");
-  const hourValue = Number(hours);
-  const minuteValue = Number(minutes);
-
-  if (!Number.isFinite(hourValue) || !Number.isFinite(minuteValue)) {
-    return 0;
-  }
-
-  return hourValue * 60 + minuteValue;
-}
-
-/**
- * Parse une date ISO en UTC.
- *
- * @param {string|null|undefined} dateValue - date source.
- *
- * @returns {Date|null} Date UTC ou `null`.
- *
- * Effets secondaires : aucun.
- * Cas particuliers : rejette les formats incomplets.
- */
-function parseDateUtc(dateValue) {
-  const [year, month, day] = String(dateValue || "")
-    .split("-")
-    .map((part) => Number(part));
-
-  if (
-    !Number.isInteger(year) ||
-    !Number.isInteger(month) ||
-    !Number.isInteger(day) ||
-    year <= 0 ||
-    month <= 0 ||
-    day <= 0
-  ) {
-    return null;
-  }
-
-  return new Date(Date.UTC(year, month - 1, day));
-}
-
-/**
- * Retourne le jour ISO de la semaine.
- *
- * @param {string|null|undefined} dateValue - date source.
- *
- * @returns {number|null} Jour ISO 1..7 ou `null`.
- *
- * Effets secondaires : aucun.
- * Cas particuliers : le dimanche est mappe sur `7`.
- */
-function getIsoWeekday(dateValue) {
-  const date = parseDateUtc(dateValue);
-  if (!date) {
-    return null;
-  }
-
-  const weekday = date.getUTCDay();
-  return weekday === 0 ? 7 : weekday;
-}
-
-/**
- * Retourne la cle de semaine ISO simplifiee.
- *
- * @param {string|null|undefined} dateValue - date source.
- *
- * @returns {string|null} Cle `YYYY-MM-DD` du lundi de la semaine.
- *
- * Effets secondaires : aucun.
- * Cas particuliers : retourne `null` si la date est invalide.
- */
-function getWeekKey(dateValue) {
-  const date = parseDateUtc(dateValue);
-  if (!date) {
-    return null;
-  }
-
-  const weekday = getIsoWeekday(dateValue);
-  date.setUTCDate(date.getUTCDate() - ((weekday || 1) - 1));
-  return date.toISOString().slice(0, 10);
-}
-
-/**
- * Trie des placements dans l'ordre chronologique.
- *
- * @param {Object} a - placement de gauche.
- * @param {Object} b - placement de droite.
- *
- * @returns {number} Ordre de tri stable.
- *
- * Effets secondaires : aucun.
- * Cas particuliers : compare d'abord la date puis le creneau.
- */
-function comparePlacementsByTime(a, b) {
-  const dateCompare = String(a?.date || "").localeCompare(String(b?.date || ""), "fr");
-  if (dateCompare !== 0) {
-    return dateCompare;
-  }
-
-  const startCompare =
-    parseTimeToMinutes(a?.heure_debut) - parseTimeToMinutes(b?.heure_debut);
-  if (startCompare !== 0) {
-    return startCompare;
-  }
-
-  return parseTimeToMinutes(a?.heure_fin) - parseTimeToMinutes(b?.heure_fin);
-}
-
-/**
- * Convertit un trou journalier en penalite professeur.
- *
- * Regle metier :
- * - les trous doivent etre evites ;
- * - plus ils sont longs, plus la journee devient fragmentee et peu productive.
- *
- * @param {number} gapMinutes - duree du trou.
- *
- * @returns {number} Penalite correspondante.
- *
- * Effets secondaires : aucun.
- * Cas particuliers : un trou de 60 minutes ou moins reste tolere.
+ * @param {number} gapMinutes - Durée du trou en minutes
+ * @returns {number} La pénalité à appliquer
  */
 function gapPenaltyMinutes(gapMinutes) {
   if (gapMinutes <= 60) {
-    return 0;
+    return 0; // Trou court = pause acceptable, pas de pénalité
   }
 
   if (gapMinutes <= 120) {
-    return 3;
+    return 3; // Trou de 1h à 2h = inconfort léger
   }
 
   if (gapMinutes <= 180) {
-    return 8;
+    return 8; // Trou de 2h à 3h = inconfort notable
   }
 
+  // Au-delà de 3h : pénalité progressive par heure supplémentaire
   return 14 + Math.ceil((gapMinutes - 180) / 60) * 5;
 }
 
 /**
- * Penalise une repartition hebdomadaire trop compressee ou trop etalee.
+ * Calcule la pénalité pour le nombre de jours travaillés dans la semaine.
  *
- * Regle metier :
- * - 4 ou 5 jours travailles restent acceptables ;
- * - un fort volume tasse sur 2 ou 3 jours augmente la fatigue et l'amplitude.
+ * Objectif : encourager une répartition équilibrée des cours dans la semaine.
+ * Pénalise les situations extrêmes :
+ *  - Plus de 5 jours de travail par semaine
+ *  - Trop de cours concentrés sur trop peu de jours
  *
- * @param {number} workingDays - jours travailles sur la semaine.
- * @param {number} totalSessions - volume de seances sur la semaine.
- *
- * @returns {number} Penalite hebdomadaire.
- *
- * Effets secondaires : aucun.
- * Cas particuliers : les semaines legeres peuvent rester compactes sans penalite.
+ * @param {number} workingDays - Nombre de jours avec au moins 1 cours cette semaine
+ * @param {number} totalSessions - Nombre total de séances cette semaine
+ * @returns {number} La pénalité à appliquer
  */
 function workingDaysPenalty(workingDays, totalSessions) {
   if (workingDays > 5) {
+    // Travail le week-end ou sur 6+ jours → très pénalisé
     return (workingDays - 5) * 6;
   }
 
   if (totalSessions >= 8 && workingDays <= 3) {
+    // Beaucoup de cours concentrés sur 3 jours ou moins → surcharge
     return 6;
   }
 
   if (totalSessions >= 6 && workingDays <= 2) {
+    // 6+ cours sur 2 jours → surcharge extrême
     return 8;
   }
 
@@ -230,18 +104,15 @@ function workingDaysPenalty(workingDays, totalSessions) {
 }
 
 /**
- * Bonus leger pour une repartition hebdomadaire saine.
+ * Calcule un bonus pour une bonne répartition des jours de travail.
  *
- * @param {number} workingDays - jours travailles.
- * @param {number} totalSessions - volume hebdomadaire.
- *
- * @returns {number} Bonus applique.
- *
- * Effets secondaires : aucun.
- * Cas particuliers : vise les semaines de charge normale sur 4 ou 5 jours.
+ * @param {number} workingDays - Nombre de jours travaillés dans la semaine
+ * @param {number} totalSessions - Nombre de séances dans la semaine
+ * @returns {number} Le bonus à accorder
  */
 function workingDaysBonus(workingDays, totalSessions) {
   if (totalSessions >= 4 && workingDays >= 4 && workingDays <= 5) {
+    // Bonne répartition : 4+ cours sur 4-5 jours → planning équilibré
     return 2;
   }
 
@@ -249,134 +120,102 @@ function workingDaysBonus(workingDays, totalSessions) {
 }
 
 /**
- * Initialise les cumuls d'indicateurs professeurs.
+ * Initialise un objet de totaux pour accumuler les métriques.
  *
- * @returns {Object} Structure de totaux initialisee.
- *
- * Effets secondaires : aucun.
- * Cas particuliers : les amplitudes sont stockees en heures cumulees.
+ * @returns {object} Objet totaux avec toutes les propriétés à zéro
  */
 function initTotals() {
   return {
-    sessions: 0,
-    workingDays: 0,
-    overloadDays: 0,
-    fragmentedDays: 0,
-    holeCount: 0,
-    holeMinutes: 0,
-    amplitudeHours: 0,
-    longAmplitudeDays: 0,
-    pauseRespectedDays: 0,
-    pauseMissedDays: 0,
-    singleSessionDays: 0,
-    compactDoubleDays: 0,
+    sessions: 0,              // Nombre total de séances analysées
+    workingDays: 0,           // Nombre total de jours avec au moins 1 cours
+    overloadDays: 0,          // Jours avec > 3 cours
+    fragmentedDays: 0,        // Jours avec au moins 1 trou entre cours
+    holeCount: 0,             // Nombre total de trous dans les plannings
+    holeMinutes: 0,           // Durée totale des trous en minutes
+    amplitudeHours: 0,        // Amplitude cumulée en heures (premier cours → dernier cours)
+    longAmplitudeDays: 0,     // Jours avec amplitude > 9 heures
+    pauseRespectedDays: 0,    // Jours où la règle de pause a été respectée
+    pauseMissedDays: 0,       // Jours où la règle de pause a été violée
+    pauseRespectedCount: 0,   // Nombre de pauses respectées
+    pauseMissedCount: 0,      // Nombre de pauses manquées
+    singleSessionDays: 0,     // Jours avec exactement 1 cours
+    compactDoubleDays: 0,     // Jours avec 2 cours consécutifs (sans trou)
+    lateSlotsOccupied: 0,     // Nombre de créneaux tardifs occupés (pénalité)
+    lateCoursePenalty: 0,     // Pénalité totale pour les cours tardifs
   };
 }
 
 /**
- * Fusionne deux objets de totaux.
+ * Analyse le planning d'une journée et calcule ses pénalités et bonus.
  *
- * @param {Object} target - cible a enrichir.
- * @param {Object} source - source a additionner.
+ * Délègue la construction de la "timeline" à GroupScheduleAnalyzer.buildDayTimeline()
+ * qui calcule les trous, l'amplitude, les pauses, etc.
  *
- * @returns {void}
+ * Applique ensuite les règles spécifiques aux professeurs :
+ *  - Pénalités pour trous, surcharge, amplitude excessive
+ *  - Bonus pour jours simples ou jours compacts à 2 cours
  *
- * Effets secondaires : incremente `target`.
- * Cas particuliers : suppose des cles numeriques homogenes.
- */
-function mergeTotals(target, source) {
-  for (const [key, value] of Object.entries(source)) {
-    target[key] += value;
-  }
-}
-
-/**
- * Analyse une journee professeur.
- *
- * Regles metier importantes :
- * - plus de 3 seances dans une journee doit etre penalise ;
- * - l'amplitude ideale reste autour de 9h ;
- * - apres 2 blocs consecutifs, une pause raisonnable reste fortement preferee ;
- * - une journee avec une seule seance reste acceptable.
- *
- * @param {Object[]} placements - placements du jour.
- *
- * @returns {Object} Penalite, bonus et indicateurs du jour.
- *
- * Effets secondaires : aucun.
- * Cas particuliers : la pause reste dynamique, jamais codee comme une heure fixe.
+ * @param {object[]} placements - Liste des cours du professeur ce jour-là
+ * @returns {{ penalty: number, bonus: number, totals: object }} Résultat journalier
  */
 function analyzeDay(placements) {
-  const sessions = [...placements].sort(comparePlacementsByTime);
-  const positiveGaps = [];
-  const gaps = [];
+  const timeline = buildDayTimeline(placements);
+  const sessions = timeline.sessions;
   const totals = initTotals();
   let penalty = 0;
   let bonus = 0;
 
-  for (let index = 1; index < sessions.length; index += 1) {
-    const previousEnd = parseTimeToMinutes(sessions[index - 1].heure_fin);
-    const currentStart = parseTimeToMinutes(sessions[index].heure_debut);
-    const gapMinutes = Math.max(0, currentStart - previousEnd);
-    gaps.push(gapMinutes);
+  // Récupérer les métriques calculées par la timeline
+  totals.holeCount = timeline.holeCount;
+  totals.holeMinutes = timeline.holeMinutes;
+  totals.amplitudeHours = timeline.amplitudeMinutes / 60;
+  totals.pauseRespectedDays = timeline.pauseRespectedCount;
+  totals.pauseMissedDays = timeline.pauseMissedCount;
+  totals.pauseRespectedCount = timeline.pauseRespectedCount;
+  totals.pauseMissedCount = timeline.pauseMissedCount;
+  totals.lateSlotsOccupied = timeline.lateSlotsOccupied;
+  totals.lateCoursePenalty = timeline.lateCoursePenalty;
 
-    if (gapMinutes > 0) {
-      positiveGaps.push(gapMinutes);
-      penalty += gapPenaltyMinutes(gapMinutes);
-    }
+  // Pénalité pour chaque trou positif dans la journée (trous > 0 min)
+  for (const gapMinutes of timeline.positiveGaps) {
+    penalty += gapPenaltyMinutes(gapMinutes);
   }
 
-  const amplitudeMinutes =
-    sessions.length > 0
-      ? parseTimeToMinutes(sessions[sessions.length - 1].heure_fin) -
-        parseTimeToMinutes(sessions[0].heure_debut)
-      : 0;
-  const firstGap = gaps[0] ?? null;
-  const secondGap = gaps[1] ?? null;
-
-  totals.holeCount = positiveGaps.length;
-  totals.holeMinutes = positiveGaps.reduce((sum, gapMinutes) => sum + gapMinutes, 0);
-  totals.amplitudeHours = amplitudeMinutes / 60;
-
-  if (positiveGaps.length > 0) {
+  // Journée fragmentée : au moins 1 trou
+  if (timeline.holeCount > 0) {
     totals.fragmentedDays = 1;
   }
 
+  // Surcharge : plus de 3 cours en une journée
   if (sessions.length > 3) {
     totals.overloadDays = 1;
-    penalty += 12 + (sessions.length - 3) * 10;
+    penalty += 12 + (sessions.length - 3) * 10; // Base + 10 par cours de trop
   }
 
-  if (amplitudeMinutes > 9 * 60) {
+  // Amplitude trop longue : premier cours → dernier cours > 9 heures
+  if (timeline.amplitudeMinutes > 9 * 60) {
     totals.longAmplitudeDays = 1;
-    penalty += Math.ceil((amplitudeMinutes - 9 * 60) / 60) * 5;
+    penalty += Math.ceil((timeline.amplitudeMinutes - 9 * 60) / 60) * 5; // 5 pts/h supplémentaire
   }
 
-  if (positiveGaps.length > 1) {
-    penalty += (positiveGaps.length - 1) * 4;
+  // Trous multiples dans une journée : pénalité supplémentaire par trou au-delà du premier
+  if (timeline.holeCount > 1) {
+    penalty += (timeline.holeCount - 1) * 4;
   }
 
+  // Bonus pour journées légères ou bien structurées
   if (sessions.length === 1) {
     totals.singleSessionDays = 1;
-    bonus += 1;
-  } else if (sessions.length === 2 && positiveGaps.length === 0) {
+    bonus += 1; // Journée simple : petit bonus
+  } else if (sessions.length === 2 && timeline.holeCount === 0) {
     totals.compactDoubleDays = 1;
-    bonus += 3;
+    bonus += 3; // Deux cours consécutifs sans trou : meilleure structure
   }
 
-  if (sessions.length >= 3) {
-    if (firstGap === 0 && secondGap >= 45 && secondGap <= 75) {
-      totals.pauseRespectedDays = 1;
-      bonus += 4;
-    } else if (firstGap === 0 && secondGap != null && secondGap < 45) {
-      totals.pauseMissedDays = 1;
-      penalty += 8;
-    } else if (firstGap === 0 && secondGap != null && secondGap > 75) {
-      penalty += 3;
-    } else if (positiveGaps.length > 0) {
-      penalty += 4;
-    }
-  }
+  // Pénalités et bonus de pauses (transmis depuis la timeline)
+  penalty += timeline.lateCoursePenalty;    // Cours très tardifs (après 20h ou 21h)
+  penalty += timeline.pauseMissedCount * 8; // Pause obligatoire manquée
+  bonus += timeline.pauseRespectedCount * 4; // Pause bien respectée
 
   return {
     penalty,
@@ -385,24 +224,46 @@ function analyzeDay(placements) {
   };
 }
 
+/**
+ * Analyseur de qualité d'horaire pour les professeurs.
+ *
+ * Calcule un score global de confort pour l'ensemble des professeurs.
+ * Chaque professeur est analysé semaine par semaine, puis ses scores
+ * sont agrégés pour obtenir un score global du planning total.
+ */
 export class TeacherScheduleAnalyzer {
   /**
-   * Analyse un ensemble d'horaires professeurs.
+   * Analyse la qualité du planning de tous les professeurs.
    *
-   * @param {Object[]} [teacherSchedules=[]] - horaires par professeur.
+   * Algorithme :
+   *  1. Pour chaque professeur → regrouper ses cours par semaine puis par jour
+   *  2. Pour chaque journée → calculer pénalités et bonus via analyzeDay()
+   *  3. Pour chaque semaine → ajouter la pénalité de répartition workingDaysPenalty()
+   *  4. Calculer le score du professeur : clamp(100 - pénalité_effective / nb_semaines)
+   *  5. Agréger les scores de tous les professeurs en une moyenne
    *
-   * @returns {Object} Detail complet du confort professeur.
+   * Score retourné :
+   *  - 100 : planning parfait (cours bien répartis, sans trous, sans surcharge)
+   *  - < 70 : planning inconfortable (à améliorer)
+   *  - 0 : planning catastrophique (tous les critères violés)
    *
-   * Effets secondaires : aucun.
-   * Cas particuliers :
-   * - un professeur sans seance n'entre pas dans la moyenne principale ;
-   * - le score reste borne entre 0 et 100.
+   * @param {object[]} teacherSchedules - Liste des horaires, un par professeur
+   * @param {number} teacherSchedules[n].id_professeur - ID du professeur
+   * @param {object[]} teacherSchedules[n].placements - Placements triés chronologiquement
+   * @returns {{
+   *   score: number,        - Score global 0-100
+   *   teachersTotal: number,
+   *   teachersAnalyzed: number,
+   *   weeksAnalyzed: number,
+   *   totals: object,       - Métriques agrégées
+   *   averages: object      - Moyennes par semaine
+   * }}
    */
   static analyze(teacherSchedules = []) {
-    let teachersTotal = 0;
-    let teachersAnalyzed = 0;
-    let weeksAnalyzed = 0;
-    let scoreSum = 0;
+    let teachersTotal = 0;       // Tous les professeurs (même ceux sans cours)
+    let teachersAnalyzed = 0;    // Professeurs avec au moins 1 cours
+    let weeksAnalyzed = 0;       // Semaines analysées en tout
+    let scoreSum = 0;            // Somme des scores individuels (pour la moyenne)
     let totalEffectivePenalty = 0;
     const totals = initTotals();
 
@@ -412,18 +273,22 @@ export class TeacherScheduleAnalyzer {
       const placements = Array.isArray(teacherSchedule?.placements)
         ? teacherSchedule.placements
         : [];
+
       if (placements.length === 0) {
-        continue;
+        continue; // Professeur sans cours → pas d'analyse possible
       }
 
       teachersAnalyzed += 1;
 
-      const weeks = new Map();
+      // Regrouper les placements par semaine puis par jour
+      const weeks = new Map(); // Map<weekKey, Map<dayKey, placement[]>>
+
       for (const placement of placements.sort(comparePlacementsByTime)) {
-        const weekKey = getWeekKey(placement?.date);
-        const dayKey = String(placement?.date || "").trim();
+        const weekKey = getWeekKey(placement?.date);   // Ex: "2025-W03"
+        const dayKey = String(placement?.date || "").trim(); // Ex: "2025-01-15"
+
         if (!weekKey || !dayKey) {
-          continue;
+          continue; // Placement sans date → ignoré
         }
 
         if (!weeks.has(weekKey)) {
@@ -432,9 +297,11 @@ export class TeacherScheduleAnalyzer {
         if (!weeks.get(weekKey).has(dayKey)) {
           weeks.get(weekKey).set(dayKey, []);
         }
+
         weeks.get(weekKey).get(dayKey).push(placement);
       }
 
+      // Analyser chaque semaine
       const entityTotals = initTotals();
       entityTotals.sessions = placements.length;
       let entityPenalty = 0;
@@ -450,9 +317,12 @@ export class TeacherScheduleAnalyzer {
 
         entityWeekCount += 1;
         entityTotals.workingDays += workingDays;
+
+        // Pénalité pour la répartition dans la semaine
         entityPenalty += workingDaysPenalty(workingDays, sessionsThisWeek);
         entityBonus += workingDaysBonus(workingDays, sessionsThisWeek);
 
+        // Analyse journalière
         for (const dayPlacements of daysMap.values()) {
           const dayAnalysis = analyzeDay(dayPlacements);
           entityPenalty += dayAnalysis.penalty;
@@ -461,15 +331,20 @@ export class TeacherScheduleAnalyzer {
         }
       }
 
+      // Le bonus est plafonné à 8 points par semaine pour éviter les abus
       const maxBonus = entityWeekCount * 8;
+
+      // Pénalité effective = pénalité brute - bonus (capped)
       const effectivePenalty = Math.max(
         0,
         entityPenalty - Math.min(entityBonus, maxBonus)
       );
+
+      // Score du professeur : retranche la pénalité moyenne par semaine
       const entityScore =
         entityWeekCount > 0
           ? clamp(100 - effectivePenalty / entityWeekCount)
-          : 100;
+          : 100; // Pas de semaines analysées → score parfait par défaut
 
       weeksAnalyzed += entityWeekCount;
       totalEffectivePenalty += effectivePenalty;
@@ -478,6 +353,7 @@ export class TeacherScheduleAnalyzer {
     }
 
     return {
+      // Score global = moyenne des scores individuels
       score: teachersAnalyzed > 0 ? round(scoreSum / teachersAnalyzed) : 100,
       teachersTotal,
       teachersAnalyzed,
@@ -494,8 +370,12 @@ export class TeacherScheduleAnalyzer {
         longAmplitudeDays: totals.longAmplitudeDays,
         pauseRespectedDays: totals.pauseRespectedDays,
         pauseMissedDays: totals.pauseMissedDays,
+        pauseRespectedCount: totals.pauseRespectedCount,
+        pauseMissedCount: totals.pauseMissedCount,
         singleSessionDays: totals.singleSessionDays,
         compactDoubleDays: totals.compactDoubleDays,
+        lateSlotsOccupied: totals.lateSlotsOccupied,
+        lateCoursePenalty: totals.lateCoursePenalty,
       },
       averages: {
         sessionsPerWeek: weeksAnalyzed > 0 ? round(totals.sessions / weeksAnalyzed) : 0,
@@ -509,6 +389,8 @@ export class TeacherScheduleAnalyzer {
           weeksAnalyzed > 0 ? round(totals.overloadDays / weeksAnalyzed) : 0,
         longAmplitudeDaysPerWeek:
           weeksAnalyzed > 0 ? round(totals.longAmplitudeDays / weeksAnalyzed) : 0,
+        lateCoursePenaltyPerWeek:
+          weeksAnalyzed > 0 ? round(totals.lateCoursePenalty / weeksAnalyzed) : 0,
         effectivePenaltyPerWeek:
           weeksAnalyzed > 0 ? round(totalEffectivePenalty / weeksAnalyzed) : 0,
       },

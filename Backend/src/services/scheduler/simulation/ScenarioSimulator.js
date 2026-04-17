@@ -21,6 +21,7 @@ import { PlacementEvaluator } from "../optimization/PlacementEvaluator.js";
 import { ScheduleMutationValidator } from "../planning/ScheduleMutationValidator.js";
 import { ScenarioComparator } from "./ScenarioComparator.js";
 import { ScheduleSnapshot } from "./ScheduleSnapshot.js";
+import { buildSlotMetadataFromTimeRange } from "../time/TimeSlotUtils.js";
 
 const SUPPORTED_SCENARIO_TYPES = new Set([
   "DEPLACER_SEANCE",
@@ -93,6 +94,72 @@ function normalizeTime(timeValue) {
   }
 
   return value.slice(0, 8);
+}
+
+function parseDateUtc(dateValue) {
+  const [year, month, day] = String(dateValue || "")
+    .split("-")
+    .map((part) => Number(part));
+
+  if (
+    !Number.isInteger(year) ||
+    !Number.isInteger(month) ||
+    !Number.isInteger(day) ||
+    year <= 0 ||
+    month <= 0 ||
+    day <= 0
+  ) {
+    return null;
+  }
+
+  return new Date(Date.UTC(year, month - 1, day));
+}
+
+function getIsoWeekday(dateValue) {
+  const date = parseDateUtc(dateValue);
+  if (!date) {
+    return null;
+  }
+
+  const weekday = date.getUTCDay();
+  return weekday === 0 ? 7 : weekday;
+}
+
+function buildPlacementTemporalFields(placement, date, startTime, endTime) {
+  const normalizedDate = String(date || placement?.date || "").trim();
+  const metadata = buildSlotMetadataFromTimeRange(startTime, endTime);
+  const slotStartIndex = Number(placement?.slotStartIndex);
+  const slotEndIndex = Number(placement?.slotEndIndex);
+  const durationHours = Number(placement?.dureeHeures);
+
+  return {
+    date: normalizedDate,
+    heure_debut: normalizeTime(startTime || placement?.heure_debut),
+    heure_fin: normalizeTime(endTime || placement?.heure_fin),
+    jourSemaine: getIsoWeekday(normalizedDate),
+    dureeHeures:
+      Number(metadata?.dureeHeures) > 0
+        ? Number(metadata.dureeHeures)
+        : durationHours > 0
+          ? durationHours
+          : Number.isInteger(slotStartIndex) && Number.isInteger(slotEndIndex) && slotEndIndex > slotStartIndex
+            ? slotEndIndex - slotStartIndex
+            : 0,
+    slotStartIndex:
+      Number.isInteger(Number(metadata?.slotStartIndex)) &&
+      Number(metadata.slotStartIndex) >= 0
+        ? Number(metadata.slotStartIndex)
+        : Number.isInteger(slotStartIndex)
+          ? slotStartIndex
+          : null,
+    slotEndIndex:
+      Number.isInteger(Number(metadata?.slotEndIndex)) &&
+      Number(metadata.slotEndIndex) > Number(metadata.slotStartIndex)
+        ? Number(metadata.slotEndIndex)
+        : Number.isInteger(slotEndIndex)
+          ? slotEndIndex
+          : null,
+  };
 }
 
 /**
@@ -316,9 +383,12 @@ function buildMovePlacement(snapshot, originalPlacement, scenario) {
 
   return {
     ...originalPlacement,
-    date: scenario.date,
-    heure_debut: scenario.heureDebut,
-    heure_fin: scenario.heureFin,
+    ...buildPlacementTemporalFields(
+      originalPlacement,
+      scenario.date,
+      scenario.heureDebut,
+      scenario.heureFin
+    ),
     id_salle: room ? Number(room.id_salle) : null,
     code_salle: room ? room.code || null : "EN LIGNE",
     type_salle: room ? room.type || null : null,

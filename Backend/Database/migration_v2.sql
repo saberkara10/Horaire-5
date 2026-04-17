@@ -1,3 +1,13 @@
+-- ============================================================================
+-- ROLE DU FICHIER
+-- Definition SQL pour la version de schema v2.
+-- Elle etend le schema d'origine vers le premier flux metier complet.
+--
+-- IMPACT SUR LE PROJET
+-- - ajoute les sessions et le support des rapports
+-- - ajoute les cours echoues, absences et indisponibilites de salles
+-- - enrichit les utilisateurs, etudiants, cours et groupes
+-- ============================================================================
 -- migration_v2.sql
 -- Extension fonctionnelle initiale du schema.
 
@@ -110,4 +120,3 @@ CREATE TABLE IF NOT EXISTS rapports_generation (
   CONSTRAINT fk_rg_user
     FOREIGN KEY (genere_par) REFERENCES utilisateurs(id_utilisateur) ON DELETE SET NULL
 );
-

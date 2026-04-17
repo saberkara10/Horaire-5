@@ -132,6 +132,22 @@ function buildProfessorIdentityKey(professeur) {
   ].join("|");
 }
 
+function parseJson(value, fallback = {}) {
+  if (!value) {
+    return fallback;
+  }
+
+  if (typeof value === "object") {
+    return value;
+  }
+
+  try {
+    return JSON.parse(value);
+  } catch {
+    return fallback;
+  }
+}
+
 function filtrerEtudiantsSessionParProgramme(etudiants, sessionMetadata, programme, etape) {
   return etudiants.filter(
     (etudiant) =>
@@ -187,19 +203,45 @@ export class SchedulerDataBootstrap {
     salles = await SchedulerDataBootstrap._loadSalles(executor);
     const etudiantsAvantBootstrap =
       await SchedulerDataBootstrap._loadEtudiants(executor);
+    const groupesAvantBootstrap = await SchedulerDataBootstrap._loadGroupes(executor);
+    const autoriserInjectionEtudiantsBootstrap =
+      SchedulerDataBootstrap._peutInjecterEtudiantsBootstrap(
+        etudiantsAvantBootstrap
+      );
     const requiredGroupsByProgram =
       SchedulerDataBootstrap._buildRequiredGroupsByProgram(
         etudiantsAvantBootstrap,
+        groupesAvantBootstrap,
         salles,
-        sessionMetadata
+        sessionMetadata,
+        activeSession,
+        {
+          useAcademicTargets: autoriserInjectionEtudiantsBootstrap,
+        }
       );
+
+    if (!autoriserInjectionEtudiantsBootstrap) {
+      report.details.push(
+        [
+          "Jeu d'etudiants existant detecte:",
+          "l'injection automatique des etudiants bootstrap est desactivee",
+          "et le dimensionnement suit les donnees reelles.",
+        ].join(" ")
+      );
+    }
 
     await SchedulerDataBootstrap._mergeDuplicateProfesseurs(executor, report);
     const professeursExistantsAvantBootstrap =
       await SchedulerDataBootstrap._loadProfesseurs(executor);
+    const reserveCourseDemands =
+      await SchedulerDataBootstrap._loadReserveCourseDemands(
+        executor,
+        activeSession
+      );
     const academicProfessors = buildAcademicProfessors({
       requiredGroupsByProgram,
       existingProfessors: professeursExistantsAvantBootstrap,
+      reserveCourseDemands,
     });
     await SchedulerDataBootstrap._cleanupBootstrapProfesseurs(
       executor,
@@ -237,7 +279,10 @@ export class SchedulerDataBootstrap {
       groupes,
       activeSession,
       sessionMetadata,
-      report
+      report,
+      {
+        allowSyntheticStudents: autoriserInjectionEtudiantsBootstrap,
+      }
     );
     await SchedulerDataBootstrap._archiveSurplusCourses(executor, report);
     await SchedulerDataBootstrap._cleanupArchivedProfessorCourses(executor, report);
@@ -249,6 +294,11 @@ export class SchedulerDataBootstrap {
     report.details.push(
       `${TARGET_GROUP_SIZE} etudiants vises par groupe, ${MAX_PROGRAMS_PER_PROFESSOR} programmes max et ${MAX_COURSES_PER_PROGRAM_PER_PROFESSOR} cours par programme pour chaque professeur (${MAX_COURSES_PER_PROFESSOR} cours distincts max, ${MAX_WEEKLY_SESSIONS_PER_PROFESSOR} seances hebdomadaires max).`
     );
+    if (reserveCourseDemands.length > 0) {
+      report.details.push(
+        `Reserve professeurs derivee du dernier rapport: ${reserveCourseDemands.length} cours critiques sous surveillance.`
+      );
+    }
     const programmesEnDebordement = ACADEMIC_TARGETS.map((target) => ({
       programme: target.programme,
       etape: target.etape,
@@ -475,8 +525,51 @@ export class SchedulerDataBootstrap {
     }
   }
 
-  static _buildRequiredGroupsByProgram(etudiants, salles, sessionMetadata) {
+  static _buildRequiredGroupsByProgram(
+    etudiants,
+    groupes,
+    salles,
+    sessionMetadata,
+    activeSession = null,
+    options = {}
+  ) {
+    const { useAcademicTargets = true } = options;
     const requiredGroupsByProgram = new Map();
+    const groupesOperationnelsParProgramme = new Map();
+    const activeSessionId = Number(activeSession?.id_session);
+
+    for (const groupe of Array.isArray(groupes) ? groupes : []) {
+      const nomGroupe = String(groupe?.nom_groupe || "").trim();
+      const programme = String(groupe?.programme || "").trim();
+      const etape = groupe?.etape;
+      const idSession = Number(groupe?.id_session);
+
+      if (!nomGroupe || !programme || etape == null) {
+        continue;
+      }
+
+      if (/^SRC-/i.test(nomGroupe)) {
+        continue;
+      }
+
+      if (Number(groupe?.est_groupe_special || 0) === 1) {
+        continue;
+      }
+
+      if (
+        Number.isInteger(activeSessionId) &&
+        activeSessionId > 0 &&
+        (!Number.isInteger(idSession) || idSession !== activeSessionId)
+      ) {
+        continue;
+      }
+
+      const cleProgramme = buildAcademicTargetKey(programme, etape);
+      groupesOperationnelsParProgramme.set(
+        cleProgramme,
+        (groupesOperationnelsParProgramme.get(cleProgramme) || 0) + 1
+      );
+    }
 
     for (const target of ACADEMIC_TARGETS) {
       const etudiantsProgramme = filtrerEtudiantsSessionParProgramme(
@@ -496,18 +589,29 @@ export class SchedulerDataBootstrap {
         salles,
         TARGET_GROUP_SIZE
       );
-      const effectifVise = Math.max(
-        etudiantsProgramme.length,
-        Number(target.targetStudentCount || 0)
-      );
+      const effectifVise = useAcademicTargets
+        ? Math.max(etudiantsProgramme.length, Number(target.targetStudentCount || 0))
+        : etudiantsProgramme.length;
       const taillesGroupes = calculerTaillesGroupesEquilibres(
         effectifVise,
         capaciteMaximale
       );
+      const groupesOperationnels =
+        groupesOperationnelsParProgramme.get(
+          buildAcademicTargetKey(target.programme, target.etape)
+        ) || 0;
+
+      if (!useAcademicTargets && effectifVise <= 0 && groupesOperationnels <= 0) {
+        requiredGroupsByProgram.set(
+          buildAcademicTargetKey(target.programme, target.etape),
+          0
+        );
+        continue;
+      }
 
       requiredGroupsByProgram.set(
         buildAcademicTargetKey(target.programme, target.etape),
-        Math.max(1, taillesGroupes.length)
+        Math.max(1, taillesGroupes.length, groupesOperationnels)
       );
     }
 
@@ -767,8 +871,15 @@ export class SchedulerDataBootstrap {
     groupes,
     session,
     sessionMetadata,
-    report
+    report,
+    options = {}
   ) {
+    const { allowSyntheticStudents = true } = options;
+
+    if (!allowSyntheticStudents) {
+      return;
+    }
+
     const existingStudents = [...etudiants];
     const existingMatricules = new Set(
       existingStudents.map((student) => String(student.matricule))
@@ -854,6 +965,10 @@ export class SchedulerDataBootstrap {
         `${createdForTarget} etudiant(s) assures pour ${target.programme} etape ${target.etape}.`
       );
     }
+  }
+
+  static _peutInjecterEtudiantsBootstrap(etudiants = []) {
+    return !Array.isArray(etudiants) || etudiants.length === 0;
   }
 
   static async _ensureBootstrapGroup(
@@ -1065,11 +1180,98 @@ export class SchedulerDataBootstrap {
 
   static async _loadGroupes(executor) {
     const [rows] = await executor.query(
-      `SELECT id_groupes_etudiants, nom_groupe, programme, etape, id_session
+      `SELECT id_groupes_etudiants,
+              nom_groupe,
+              programme,
+              etape,
+              id_session,
+              est_groupe_special
        FROM groupes_etudiants
        ORDER BY id_groupes_etudiants ASC`
     );
     return rows;
+  }
+
+  static async _loadReserveCourseDemands(executor, activeSession) {
+    const activeSessionId = Number(activeSession?.id_session);
+
+    if (!Number.isInteger(activeSessionId) || activeSessionId <= 0) {
+      return [];
+    }
+
+    const [rows] = await executor.query(
+      `SELECT details
+       FROM rapports_generation
+       WHERE id_session = ?
+       ORDER BY date_generation DESC, id DESC
+       LIMIT 1`,
+      [activeSessionId]
+    );
+
+    if (rows.length === 0) {
+      return [];
+    }
+
+    const payload = parseJson(rows[0].details, {});
+    const nonPlanifies = Array.isArray(payload?.non_planifies)
+      ? payload.non_planifies
+      : [];
+    const reserveByCourse = new Map();
+    const seenCourseGroupReason = new Set();
+    const programmeByCourseCode = new Map(
+      ACADEMIC_COURSES.map((course) => [String(course.code).trim().toUpperCase(), course.programme])
+    );
+
+    for (const item of nonPlanifies) {
+      const reasonCode = String(item?.raison_code || "")
+        .replace(/^GARANTIE_/, "")
+        .trim()
+        .toUpperCase();
+
+      if (
+        reasonCode !== "PROFESSEURS_SATURES" &&
+        reasonCode !== "GROUPE_SATURE"
+      ) {
+        continue;
+      }
+
+      const code = String(item?.code || "").trim().toUpperCase();
+      const programme = String(
+        item?.programme || programmeByCourseCode.get(code) || ""
+      ).trim();
+      const groupe = String(item?.groupe || "").trim();
+
+      if (!code || !programme || !groupe) {
+        continue;
+      }
+
+      const uniqueKey = `${code}|${groupe}|${reasonCode}`;
+      if (seenCourseGroupReason.has(uniqueKey)) {
+        continue;
+      }
+      seenCourseGroupReason.add(uniqueKey);
+
+      const current = reserveByCourse.get(code) || {
+        code,
+        programme,
+        load: 0,
+      };
+      current.load += 1;
+      reserveByCourse.set(code, current);
+    }
+
+    return [...reserveByCourse.values()].sort((itemA, itemB) => {
+      if (itemB.load !== itemA.load) {
+        return itemB.load - itemA.load;
+      }
+
+      const programmeCompare = itemA.programme.localeCompare(itemB.programme, "fr");
+      if (programmeCompare !== 0) {
+        return programmeCompare;
+      }
+
+      return itemA.code.localeCompare(itemB.code, "fr");
+    });
   }
 
   static async _ensureProfessorCourseTable(executor) {

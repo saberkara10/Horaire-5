@@ -1,3 +1,13 @@
+/**
+ * Logique de nettoyage de la migration v5.
+ *
+ * Role:
+ * - supprime les liaisons obsoletes professeur/cours vers des cours archives
+ *
+ * Impact sur le projet:
+ * - garde `professeur_cours` aligne avec les donnees d'enseignement actives
+ * - reduit le bruit et les relations perimees dans les fonctions d'affectation
+ */
 async function compterAffectationsArchives(connection) {
   const [rows] = await connection.query(
     `SELECT COUNT(*) AS total

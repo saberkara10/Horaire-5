@@ -25,6 +25,7 @@ import { assurerSchemaSchedulerAcademique } from "../../academic-scheduler-schem
 import { PlacementEvaluator } from "../optimization/PlacementEvaluator.js";
 import { ScenarioSimulator } from "../simulation/ScenarioSimulator.js";
 import { ScheduleSnapshot } from "../simulation/ScheduleSnapshot.js";
+import { buildSlotMetadataFromTimeRange } from "../time/TimeSlotUtils.js";
 
 const STRONG_SCORE_DEGRADATION_THRESHOLD = -5;
 
@@ -134,6 +135,75 @@ function normalizeTime(timeValue) {
   }
 
   return value.slice(0, 8);
+}
+
+function parseDateUtc(dateValue) {
+  const [year, month, day] = String(dateValue || "")
+    .split("-")
+    .map((part) => Number(part));
+
+  if (
+    !Number.isInteger(year) ||
+    !Number.isInteger(month) ||
+    !Number.isInteger(day) ||
+    year <= 0 ||
+    month <= 0 ||
+    day <= 0
+  ) {
+    return null;
+  }
+
+  return new Date(Date.UTC(year, month - 1, day));
+}
+
+function getIsoWeekday(dateValue) {
+  const date = parseDateUtc(dateValue);
+  if (!date) {
+    return null;
+  }
+
+  const weekday = date.getUTCDay();
+  return weekday === 0 ? 7 : weekday;
+}
+
+function resolvePlacementTiming(placement) {
+  const normalizedStartTime = normalizeTime(placement?.heure_debut);
+  const normalizedEndTime = normalizeTime(placement?.heure_fin);
+  const metadata = buildSlotMetadataFromTimeRange(normalizedStartTime, normalizedEndTime);
+  const slotStartIndex = Number(placement?.slotStartIndex);
+  const slotEndIndex = Number(placement?.slotEndIndex);
+  const durationHours = Number(placement?.dureeHeures);
+
+  return {
+    jourSemaine:
+      Number.isInteger(Number(placement?.jourSemaine)) &&
+      Number(placement?.jourSemaine) >= 1 &&
+      Number(placement?.jourSemaine) <= 7
+        ? Number(placement.jourSemaine)
+        : getIsoWeekday(placement?.date),
+    dureeHeures:
+      Number(metadata?.dureeHeures) > 0
+        ? Number(metadata.dureeHeures)
+        : durationHours > 0
+          ? durationHours
+          : Number.isInteger(slotStartIndex) && Number.isInteger(slotEndIndex) && slotEndIndex > slotStartIndex
+            ? slotEndIndex - slotStartIndex
+            : 0,
+    slotStartIndex:
+      Number.isInteger(Number(metadata?.slotStartIndex)) &&
+      Number(metadata.slotStartIndex) >= 0
+        ? Number(metadata.slotStartIndex)
+        : Number.isInteger(slotStartIndex)
+          ? slotStartIndex
+          : null,
+    slotEndIndex:
+      Number.isInteger(Number(metadata?.slotEndIndex)) &&
+      Number(metadata.slotEndIndex) > Number(metadata.slotStartIndex)
+        ? Number(metadata.slotEndIndex)
+        : Number.isInteger(slotEndIndex)
+          ? slotEndIndex
+          : null,
+  };
 }
 
 /**
@@ -251,6 +321,8 @@ function buildProfessorDisplayName(professor) {
  * Cas particuliers : ne conserve que les champs utiles a l'audit.
  */
 function summarizePlacementForHistory(placement) {
+  const timing = resolvePlacementTiming(placement);
+
   return {
     id_affectation_cours: Number(placement?.id_affectation_cours || 0) || null,
     id_planification_serie: Number(placement?.id_planification_serie || 0) || null,
@@ -262,6 +334,38 @@ function summarizePlacementForHistory(placement) {
     date: placement?.date || null,
     heure_debut: placement?.heure_debut || null,
     heure_fin: placement?.heure_fin || null,
+    jourSemaine: timing.jourSemaine,
+    dureeHeures: timing.dureeHeures,
+    slotStartIndex: timing.slotStartIndex,
+    slotEndIndex: timing.slotEndIndex,
+  };
+}
+
+function summarizeSimulationScore(score) {
+  if (!score || typeof score !== "object") {
+    return null;
+  }
+
+  return {
+    mode: score.mode || null,
+    scoreGlobal: Number(score.scoreGlobal || 0),
+    scoreEtudiant: Number(score.scoreEtudiant || 0),
+    scoreProfesseur: Number(score.scoreProfesseur || 0),
+    scoreGroupe: Number(score.scoreGroupe || 0),
+    metrics: score.metrics || {},
+  };
+}
+
+function buildHistoryDetails(simulation, warnings) {
+  return {
+    warnings,
+    scoring_v1: {
+      mode_scoring_avant: simulation?.modeScoringAvant || null,
+      mode_scoring_apres: simulation?.modeScoringApres || null,
+      score_avant: summarizeSimulationScore(simulation?.scoreAvant),
+      score_apres: summarizeSimulationScore(simulation?.scoreApres),
+      difference: simulation?.difference || null,
+    },
   };
 }
 
@@ -734,16 +838,29 @@ function buildProposedPlacement(
       ? null
       : snapshot.getRoom(modifications.idSalle)
     : snapshot.getRoom(originalPlacement.id_salle);
+  const nextStartTime = modifications.hasTimeRange
+    ? modifications.heureDebut
+    : originalPlacement.heure_debut;
+  const nextEndTime = modifications.hasTimeRange
+    ? modifications.heureFin
+    : originalPlacement.heure_fin;
+  const nextDate = targetDate;
+  const timing = resolvePlacementTiming({
+    ...originalPlacement,
+    date: nextDate,
+    heure_debut: nextStartTime,
+    heure_fin: nextEndTime,
+  });
 
   return {
     ...originalPlacement,
-    date: targetDate,
-    heure_debut: modifications.hasTimeRange
-      ? modifications.heureDebut
-      : originalPlacement.heure_debut,
-    heure_fin: modifications.hasTimeRange
-      ? modifications.heureFin
-      : originalPlacement.heure_fin,
+    date: nextDate,
+    heure_debut: nextStartTime,
+    heure_fin: nextEndTime,
+    jourSemaine: timing.jourSemaine,
+    dureeHeures: timing.dureeHeures,
+    slotStartIndex: timing.slotStartIndex,
+    slotEndIndex: timing.slotEndIndex,
     id_professeur: hasExplicitProfessor
       ? Number(modifications.idProfesseur)
       : Number(originalPlacement.id_professeur),
@@ -1199,7 +1316,7 @@ async function insertModificationJournal(
       serializeJson(beforePlacements.map((placement) => summarizePlacementForHistory(placement))),
       serializeJson(afterPlacements.map((placement) => summarizePlacementForHistory(placement))),
       serializeJson(simulation),
-      serializeJson({ warnings }),
+      serializeJson(buildHistoryDetails(simulation, warnings)),
     ]
   );
 

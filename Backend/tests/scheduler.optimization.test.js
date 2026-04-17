@@ -9,6 +9,7 @@
 import { describe, expect, test, jest } from "@jest/globals";
 import { ACADEMIC_WEEKDAY_TIME_SLOTS } from "../src/services/scheduler/AcademicCatalog.js";
 import { ConstraintMatrix } from "../src/services/scheduler/ConstraintMatrix.js";
+import { ResourceDayPlacementIndex } from "../src/services/scheduler/constraints/ResourceDayPlacementIndex.js";
 import { SchedulerEngine } from "../src/services/scheduler/SchedulerEngine.js";
 import { LocalSearchOptimizer } from "../src/services/scheduler/optimization/LocalSearchOptimizer.js";
 
@@ -74,6 +75,32 @@ function buildEmptyIndexes() {
     slotsParGroupeJour: new Map(),
     slotsParProfJour: new Map(),
   };
+}
+
+function reserveDayPlacementsForResources(index, placements, { professeurId, groupeId, studentIds }) {
+  for (const placement of placements) {
+    index.add({
+      resourceType: "professeur",
+      resourceId: professeurId,
+      date: placement.date,
+      placement,
+    });
+    index.add({
+      resourceType: "groupe",
+      resourceId: groupeId,
+      date: placement.date,
+      placement,
+    });
+
+    for (const studentId of studentIds) {
+      index.add({
+        resourceType: "etudiant",
+        resourceId: studentId,
+        date: placement.date,
+        placement,
+      });
+    }
+  }
 }
 
 describe("scheduler optimization modes", () => {
@@ -155,5 +182,93 @@ describe("scheduler optimization modes", () => {
     } finally {
       optimizeSpy.mockRestore();
     }
+  });
+
+  test("rejette un 3e cours consecutif sans pause dans la recherche hebdomadaire", () => {
+    const fixture = buildWeeklySearchFixture();
+    const indexes = buildEmptyIndexes();
+    const matrix = new ConstraintMatrix();
+    const resourcePlacementIndex = new ResourceDayPlacementIndex();
+    const existingPlacements = [
+      {
+        id_cours: 201,
+        id_professeur: 10,
+        id_groupe: 1,
+        date: "2026-09-07",
+        heure_debut: "08:00:00",
+        heure_fin: "11:00:00",
+      },
+      {
+        id_cours: 202,
+        id_professeur: 10,
+        id_groupe: 1,
+        date: "2026-09-07",
+        heure_debut: "11:00:00",
+        heure_fin: "14:00:00",
+      },
+      {
+        id_cours: 201,
+        id_professeur: 10,
+        id_groupe: 1,
+        date: "2026-09-14",
+        heure_debut: "08:00:00",
+        heure_fin: "11:00:00",
+      },
+      {
+        id_cours: 202,
+        id_professeur: 10,
+        id_groupe: 1,
+        date: "2026-09-14",
+        heure_debut: "11:00:00",
+        heure_fin: "14:00:00",
+      },
+    ];
+
+    for (const placement of existingPlacements) {
+      matrix.reserver(
+        1,
+        10,
+        1,
+        placement.id_cours,
+        placement.date,
+        placement.heure_debut,
+        placement.heure_fin,
+        { studentIds: [1, 2, 3] }
+      );
+    }
+    reserveDayPlacementsForResources(resourcePlacementIndex, existingPlacements, {
+      professeurId: 10,
+      groupeId: 1,
+      studentIds: [1, 2, 3],
+    });
+
+    const result = SchedulerEngine._trouverSerieHebdomadaire({
+      cours: {
+        ...fixture.cours,
+        duree: 3,
+      },
+      groupe: fixture.groupe,
+      idGroupe: 1,
+      profsCompatibles: fixture.profsCompatibles,
+      sallesCompatibles: fixture.sallesCompatibles,
+      datesParJourSemaine: new Map([[1, ["2026-09-07", "2026-09-14"]]]),
+      creneaux: [{ debut: "14:00:00", fin: "17:00:00" }],
+      matrix,
+      dispParProf: fixture.dispParProf,
+      absencesParProf: fixture.absencesParProf,
+      indispoParSalle: fixture.indispoParSalle,
+      chargeSeriesParProf: indexes.chargeSeriesParProf,
+      chargeSeriesParJour: indexes.chargeSeriesParJour,
+      chargeSeriesParGroupeJour: indexes.chargeSeriesParGroupeJour,
+      chargeSeriesParProfJour: indexes.chargeSeriesParProfJour,
+      slotsParGroupeJour: indexes.slotsParGroupeJour,
+      slotsParProfJour: indexes.slotsParProfJour,
+      resourcePlacementIndex,
+      numeroSeance: 1,
+      preferencesStabilite: fixture.preferencesStabilite,
+      optimizationMode: "equilibre",
+    });
+
+    expect(result).toBeNull();
   });
 });

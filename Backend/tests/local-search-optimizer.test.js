@@ -276,4 +276,114 @@ describe("LocalSearchOptimizer", () => {
       normalizePlacementKeys(fixture.placements)
     );
   });
+
+  test("n'introduit jamais un 3e cours consecutif sans pause", () => {
+    const students = [1, 2, 3];
+    const placements = [
+      buildPlacement({
+        id_cours: 101,
+        code_cours: "INF101",
+        date: "2026-09-07",
+        heure_debut: "08:00:00",
+        heure_fin: "11:00:00",
+      }),
+      buildPlacement({
+        id_cours: 101,
+        code_cours: "INF101",
+        date: "2026-09-14",
+        heure_debut: "08:00:00",
+        heure_fin: "11:00:00",
+      }),
+      buildPlacement({
+        id_cours: 102,
+        code_cours: "INF102",
+        nom_cours: "Algo",
+        date: "2026-09-07",
+        heure_debut: "11:00:00",
+        heure_fin: "14:00:00",
+      }),
+      buildPlacement({
+        id_cours: 102,
+        code_cours: "INF102",
+        nom_cours: "Algo",
+        date: "2026-09-14",
+        heure_debut: "11:00:00",
+        heure_fin: "14:00:00",
+      }),
+      buildPlacement({
+        id_cours: 103,
+        code_cours: "INF103",
+        nom_cours: "BDD",
+        date: "2026-09-09",
+        heure_debut: "17:00:00",
+        heure_fin: "20:00:00",
+      }),
+      buildPlacement({
+        id_cours: 103,
+        code_cours: "INF103",
+        nom_cours: "BDD",
+        date: "2026-09-16",
+        heure_debut: "17:00:00",
+        heure_fin: "20:00:00",
+      }),
+    ];
+
+    const matrix = new ConstraintMatrix();
+    for (const placement of placements) {
+      matrix.reserver(
+        placement.id_salle,
+        placement.id_professeur,
+        placement.id_groupe,
+        placement.id_cours,
+        placement.date,
+        placement.heure_debut,
+        placement.heure_fin,
+        { studentIds: students }
+      );
+    }
+
+    const result = LocalSearchOptimizer.optimize({
+      placements,
+      cours: [
+        { id_cours: 101, code: "INF101", nom: "Intro", type_salle: "Salle de cours", est_en_ligne: false },
+        { id_cours: 102, code: "INF102", nom: "Algo", type_salle: "Salle de cours", est_en_ligne: false },
+        { id_cours: 103, code: "INF103", nom: "BDD", type_salle: "Salle de cours", est_en_ligne: false },
+      ],
+      groupesFormes: [
+        {
+          id_groupe: 1,
+          nomGroupe: "G1",
+          etudiants: students,
+          effectif_regulier: students.length,
+          charge_estimee_par_cours: {},
+        },
+      ],
+      affectationsEtudiantGroupe: new Map(students.map((studentId) => [studentId, ["G1"]])),
+      affectationsReprises: [],
+      salles: [
+        { id_salle: 1, code: "S1", type: "Salle de cours", capacite: 30 },
+        { id_salle: 2, code: "S2", type: "Salle de cours", capacite: 32 },
+      ],
+      datesParJourSemaine: new Map([
+        [1, ["2026-09-07", "2026-09-14"]],
+        [3, ["2026-09-09", "2026-09-16"]],
+      ]),
+      matrix,
+      dispParProf: new Map(),
+      absencesParProf: new Map(),
+      indispoParSalle: new Map(),
+      optimizationMode: "etudiant",
+    });
+
+    const forbiddenMove = result.placementsOptimises.some(
+      (placement) =>
+        placement.id_cours === 103 &&
+        ["2026-09-07", "2026-09-14"].includes(placement.date) &&
+        placement.heure_debut === "14:00:00" &&
+        placement.heure_fin === "17:00:00"
+    );
+
+    expect(forbiddenMove).toBe(false);
+    expectScheduleToStayFeasible(result.placementsOptimises, students);
+  });
 });

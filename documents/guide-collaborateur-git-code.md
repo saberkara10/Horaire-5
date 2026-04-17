@@ -221,7 +221,7 @@ SCHEDULER_MAX_WEEKLY_SESSIONS_PER_PROFESSOR=16
 Source officielle des evolutions schema:
 
 - `Backend/Database/migration_v1.sql` a `Backend/Database/migration_v11.sql`
-- `Backend/Database/run-migrations.js`
+- `Backend/Database/apply-schema-migrations.js`
 - la table SQL `migrations`
 
 Commande standard:

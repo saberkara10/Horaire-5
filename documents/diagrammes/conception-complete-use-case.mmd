@@ -1,0 +1,50 @@
+flowchart LR
+  RA[Responsable administratif]
+  Admin[Administrateur]
+
+  subgraph H5[Systeme Horaires-5]
+    UC1((Se connecter))
+    UC2((Creer et gerer les administrateurs))
+    UC3((Gerer les profils utilisateurs))
+    UC4((Gerer les cours))
+    UC5((Gerer les salles))
+    UC6((Gerer les professeurs))
+    UC7((Affecter cours, salle, plage et professeur))
+    UC8((Lancer la generation intelligente))
+    UC9((Consulter les rapports))
+    UC10((Planifier ou deplacer manuellement))
+    UC11((Consulter un horaire))
+    UC12((Exporter PDF ou Excel))
+    UC13((Rechercher un professeur, un groupe ou un etudiant))
+    UC14((Traiter un echange de cours entre etudiants))
+    UC15((Gerer les cours echoues))
+    UC16((Simuler un scenario what-if))
+  end
+
+  RA --> UC1
+  RA --> UC2
+  RA --> UC4
+  RA --> UC5
+  RA --> UC6
+  RA --> UC7
+  RA --> UC8
+  RA --> UC9
+  RA --> UC10
+  RA --> UC11
+  RA --> UC12
+  RA --> UC13
+  RA --> UC15
+  RA --> UC16
+
+  Admin --> UC1
+  Admin --> UC3
+  Admin --> UC11
+  Admin --> UC12
+  Admin --> UC13
+  Admin --> UC14
+
+  UC8 -. inclut .-> UC7
+  UC8 -. gere .-> UC15
+  UC10 -. respecte .-> UC7
+  UC16 -. prepare .-> UC10
+  UC14 -. met a jour .-> UC11

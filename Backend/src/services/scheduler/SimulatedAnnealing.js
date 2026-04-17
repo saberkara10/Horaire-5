@@ -16,6 +16,10 @@
 
 import { ConstraintMatrix } from "./ConstraintMatrix.js";
 import { AvailabilityChecker } from "./AvailabilityChecker.js";
+import {
+  buildStartTimeCandidates,
+  getCandidateMetadataForTimeRange,
+} from "./time/StartTimeCandidates.js";
 
 export class SimulatedAnnealing {
   // Paramètres par défaut
@@ -130,7 +134,9 @@ export class SimulatedAnnealing {
     );
 
     // Essayer un nouveau créneau aléatoire (10 tentatives)
-    const creneaux = SimulatedAnnealing._CRENEAUX_POSSIBLES();
+    const creneaux = SimulatedAnnealing._CRENEAUX_POSSIBLES(
+      SimulatedAnnealing._resolveDurationHours(cible)
+    );
     for (let t = 0; t < 10; t++) {
       const jourIdx = Math.floor(Math.random() * jours.length);
       const creneauIdx = Math.floor(Math.random() * creneaux.length);
@@ -325,14 +331,21 @@ export class SimulatedAnnealing {
     return parseInt(parts[0]) * 60 + parseInt(parts[1] || "0");
   }
 
-  static _CRENEAUX_POSSIBLES() {
-    return [
-      { debut: "08:00:00", fin: "11:00:00" },
-      { debut: "11:00:00", fin: "14:00:00" },
-      { debut: "14:00:00", fin: "17:00:00" },
-      { debut: "17:00:00", fin: "20:00:00" },
-      { debut: "09:00:00", fin: "12:00:00" },
-      { debut: "13:00:00", fin: "16:00:00" },
-    ];
+  static _resolveDurationHours(placement) {
+    const metadata = getCandidateMetadataForTimeRange(
+      placement?.heure_debut,
+      placement?.heure_fin
+    );
+
+    return Number(metadata?.dureeHeures || placement?.dureeHeures || 3);
+  }
+
+  static _CRENEAUX_POSSIBLES(durationHours = 3) {
+    return buildStartTimeCandidates(durationHours).map((candidate) => ({
+      debut: candidate.heure_debut,
+      fin: candidate.heure_fin,
+      slotStartIndex: candidate.slotStartIndex,
+      slotEndIndex: candidate.slotEndIndex,
+    }));
   }
 }

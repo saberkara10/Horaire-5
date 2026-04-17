@@ -1,3 +1,4 @@
 node_modules/
 .env
 .vscode/
+Backend/Database/check_output.txt

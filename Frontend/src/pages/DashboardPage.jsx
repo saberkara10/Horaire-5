@@ -7,6 +7,10 @@ import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "../components/layout/AppShell.jsx";
 import { recupererDashboardOverview } from "../services/dashboard.api.js";
 import { usePopup } from "../components/feedback/PopupProvider.jsx";
+import {
+  readSchedulerScoringSummary,
+  selectSchedulerScoringMode,
+} from "../utils/schedulerScoring.js";
 import "../styles/DashboardPage.css";
 
 function DashboardCard({ label, value, accent, detail }) {
@@ -73,6 +77,18 @@ function formaterProgrammesProfesseur(professeur) {
   return String(professeur?.programmes_assignes || "").trim() || "Sans programme";
 }
 
+function formaterValeurScoring(value) {
+  const numericValue = Number(value);
+
+  if (!Number.isFinite(numericValue)) {
+    return "-";
+  }
+
+  return Number.isInteger(numericValue)
+    ? String(numericValue)
+    : numericValue.toFixed(2);
+}
+
 export function DashboardPage({ utilisateur, onLogout }) {
   const [overview, setOverview] = useState(null);
   const [chargement, setChargement] = useState(true);
@@ -132,6 +148,18 @@ export function DashboardPage({ utilisateur, onLogout }) {
     nb_etudiants_sans_horaire: 0,
   };
   const dernierRapport = overview?.dernier_rapport || null;
+  const dernierRapportScoring = useMemo(
+    () => readSchedulerScoringSummary(dernierRapport),
+    [dernierRapport]
+  );
+  const dernierRapportModeScoring = useMemo(
+    () =>
+      selectSchedulerScoringMode(
+        dernierRapportScoring,
+        dernierRapport?.details?.modeOptimisationUtilise || "equilibre"
+      ),
+    [dernierRapport?.details?.modeOptimisationUtilise, dernierRapportScoring]
+  );
   const coursRecents = overview?.cours_recents || [];
   const professeursRecents = overview?.professeurs_recents || [];
   const groupesSansHoraire = overview?.groupes_sans_horaire || [];
@@ -325,6 +353,17 @@ export function DashboardPage({ utilisateur, onLogout }) {
                     {dernierRapport
                       ? `${dernierRapport.nb_cours_planifies} cours planifies, ${dernierRapport.nb_cours_non_planifies} non planifies.`
                       : "Aucun rapport de generation disponible."}
+                    {dernierRapportModeScoring
+                      ? ` Scoring ${formaterValeurScoring(
+                          dernierRapportModeScoring.scoreGlobal
+                        )} global, ${formaterValeurScoring(
+                          dernierRapportModeScoring.scoreEtudiant
+                        )} etudiant, ${formaterValeurScoring(
+                          dernierRapportModeScoring.scoreProfesseur
+                        )} professeur, ${formaterValeurScoring(
+                          dernierRapportModeScoring.scoreGroupe
+                        )} groupe.`
+                      : ""}
                   </p>
                 </div>
                 <span>{dernierRapport ? formaterDate(dernierRapport.date_generation) : "-"}</span>
