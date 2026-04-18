@@ -43,7 +43,7 @@ function envoyerErreur(response, status, message) {
  * @param {string} valeur - La valeur brute du type saisie dans le formulaire
  * @returns {string} Le type normalisé
  */
-function normaliserType(valeur) {
+export function normaliserTypeSalle(valeur) {
   const trimmed = String(valeur || "").trim();
   if (!trimmed) return "";
   return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
@@ -168,7 +168,7 @@ export async function verifierSalleExiste(request, response, next) {
  */
 export async function validerCreateSalle(request, response, next) {
   const code = String(request.body?.code || "").trim();
-  const type = normaliserType(request.body?.type);
+  const type = normaliserTypeSalle(request.body?.type);
   const capacite = Number(request.body?.capacite);
 
   if (!code) {
@@ -218,7 +218,7 @@ export async function validerUpdateSalle(request, response, next) {
   }
 
   if (type !== undefined) {
-    const typeNormalise = normaliserType(type);
+    const typeNormalise = normaliserTypeSalle(type);
     if (!typeNormalise) {
       return envoyerErreur(response, 400, "Type invalide.");
     }

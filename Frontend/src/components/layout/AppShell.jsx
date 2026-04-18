@@ -1,36 +1,7 @@
-/**
- * Composant — Structure principale de l'application (App Shell).
- *
- * Ce composant fournit le gabarit de mise en page utilisé sur toutes les pages
- * authentifiées. Il est composé de deux zones principales :
- *  - Une barre latérale (sidebar) avec la navigation et le bouton de déconnexion
- *  - Une zone de contenu principale avec un entête de page et le contenu enfant
- *
- * Architecture du composant :
- * AppShell est un composant de présentation "coquille". Il reçoit ses données via
- * les props (utilisateur, titre, contenu) et ne fait aucun appel API lui-même.
- * La logique de navigation et d'authentification reste dans App.jsx.
- *
- * Affichage conditionnel selon les rôles :
- *  - "Pilotage sessions" (Scheduler) → visible pour ADMIN, RESPONSABLE, ADMIN_RESPONSABLE
- *  - "Sous-admins"                   → visible pour RESPONSABLE et ADMIN_RESPONSABLE
- *  - "Admin central"                 → visible uniquement pour ADMIN_RESPONSABLE
- *
- * @module components/layout/AppShell
- */
 import { NavLink } from "react-router-dom";
 import "../../styles/AppShell.css";
 import { utilisateurEstResponsable } from "../../utils/roles.js";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Icônes SVG du menu de navigation
-// Définies comme composants React séparés pour :
-//  - Rester légères (pas de dépendance externe pour les icônes de nav)
-//  - Être réutilisables dans le reste de l'application si besoin
-//  - Garder le rendu du composant AppShell lisible
-// ─────────────────────────────────────────────────────────────────────────────
-
-/** Icône Dashboard — vue grille de 4 rectangles */
 function IconDashboard() {
   return (
     <svg viewBox="0 0 24 24" fill="none">
@@ -42,7 +13,6 @@ function IconDashboard() {
   );
 }
 
-/** Icône Cours — représentation d'un livre ouvert */
 function IconCours() {
   return (
     <svg viewBox="0 0 24 24" fill="none">
@@ -54,7 +24,6 @@ function IconCours() {
   );
 }
 
-/** Icône Professeurs — deux silhouettes humaines */
 function IconProfesseurs() {
   return (
     <svg viewBox="0 0 24 24" fill="none">
@@ -66,7 +35,6 @@ function IconProfesseurs() {
   );
 }
 
-/** Icône Salles — rectangle avec lignes représentant une salle */
 function IconSalles() {
   return (
     <svg viewBox="0 0 24 24" fill="none">
@@ -78,7 +46,6 @@ function IconSalles() {
   );
 }
 
-/** Icône Import — flèche vers le bas sur une ligne */
 function IconImport() {
   return (
     <svg viewBox="0 0 24 24" fill="none">
@@ -89,7 +56,6 @@ function IconImport() {
   );
 }
 
-/** Icône Affectations — rectangle avec lignes de texte */
 function IconAffectations() {
   return (
     <svg viewBox="0 0 24 24" fill="none">
@@ -100,7 +66,6 @@ function IconAffectations() {
   );
 }
 
-/** Icône Disponibilités — calendrier avec lignes de planning */
 function IconDisponibilites() {
   return (
     <svg viewBox="0 0 24 24" fill="none">
@@ -114,7 +79,6 @@ function IconDisponibilites() {
   );
 }
 
-/** Icône Horaires Professeurs — silhouette + mini-calendrier */
 function IconHorairesProfesseurs() {
   return (
     <svg viewBox="0 0 24 24" fill="none">
@@ -127,7 +91,6 @@ function IconHorairesProfesseurs() {
   );
 }
 
-/** Icône Horaires Groupes — calendrier avec indicateur de groupe */
 function IconHorairesGroupes() {
   return (
     <svg viewBox="0 0 24 24" fill="none">
@@ -140,7 +103,6 @@ function IconHorairesGroupes() {
   );
 }
 
-/** Icône Horaires Étudiants — silhouette + lignes */
 function IconHorairesEtudiants() {
   return (
     <svg viewBox="0 0 24 24" fill="none">
@@ -153,7 +115,6 @@ function IconHorairesEtudiants() {
   );
 }
 
-/** Icône Occupation Salles — calendrier avec loupe */
 function IconHorairesSalles() {
   return (
     <svg viewBox="0 0 24 24" fill="none">
@@ -167,10 +128,16 @@ function IconHorairesSalles() {
   );
 }
 
-/** Icône Gestion Groupes — deux personnes groupées */
 function IconGestionGroupes() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
       <circle cx="9" cy="7" r="4" />
       <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
@@ -179,7 +146,6 @@ function IconGestionGroupes() {
   );
 }
 
-/** Icône Admins — silhouette avec croix (ajout) */
 function IconAdmins() {
   return (
     <svg viewBox="0 0 24 24" fill="none">
@@ -191,7 +157,6 @@ function IconAdmins() {
   );
 }
 
-/** Icône Scheduler — éclair (génération rapide d'horaires) */
 function IconScheduler() {
   return (
     <svg viewBox="0 0 24 24" fill="none">
@@ -200,7 +165,6 @@ function IconScheduler() {
   );
 }
 
-/** Icône Admin Central — bouclier (sécurité maximale) */
 function IconAdminCentral() {
   return (
     <svg viewBox="0 0 24 24" fill="none">
@@ -209,7 +173,16 @@ function IconAdminCentral() {
   );
 }
 
-/** Icône Déconnexion — flèche vers la sortie */
+function IconHelp() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none">
+      <path d="M8.5 9a3.5 3.5 0 1 1 5.82 2.6c-.92.8-1.82 1.43-1.82 2.4" />
+      <path d="M12 17h.01" />
+      <path d="M21 12c0 4.97-4.48 9-10 9a10.9 10.9 0 0 1-4-.73L3 21l1.1-3.3A8.7 8.7 0 0 1 2 12C2 7.03 6.48 3 12 3s10 4.03 10 9z" />
+    </svg>
+  );
+}
+
 function IconLogout() {
   return (
     <svg viewBox="0 0 24 24" fill="none">
@@ -220,7 +193,6 @@ function IconLogout() {
   );
 }
 
-/** Icône Brand — bâtiment académique stylisé */
 function IconBrand() {
   return (
     <svg viewBox="0 0 24 24" fill="none">
@@ -234,21 +206,6 @@ function IconBrand() {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Composant principal
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Structure principale de l'application — sidebar + contenu de page.
- *
- * @param {object} props
- * @param {React.ReactNode} props.children - Le contenu de la page courante
- * @param {Function} props.onLogout - Callback déclenché au clic sur "Déconnexion"
- * @param {object} props.utilisateur - L'objet utilisateur connecté (avec ses rôles)
- * @param {string} [props.title="Gestion des Horaires"] - Titre affiché dans la topbar
- * @param {string} [props.subtitle=""] - Sous-titre optionnel sous le titre
- * @returns {JSX.Element} Le gabarit complet de la page
- */
 export function AppShell({
   children,
   onLogout,
@@ -256,27 +213,19 @@ export function AppShell({
   title = "Gestion des Horaires",
   subtitle = "",
 }) {
-  // Extraire les rôles depuis l'objet utilisateur (avec fallback sur tableau vide)
   const rolesUtilisateur = Array.isArray(utilisateur?.roles) ? utilisateur.roles : [];
-
-  // Vérification rapide du rôle responsable via l'utilitaire centralisé
   const estResponsable = utilisateurEstResponsable(utilisateur);
-
-  // Le Scheduler est accessible à tous les rôles avec des droits de gestion
   const peutUtiliserScheduler =
     rolesUtilisateur.includes("ADMIN") ||
     rolesUtilisateur.includes("RESPONSABLE") ||
     rolesUtilisateur.includes("ADMIN_RESPONSABLE");
 
-  // Déterminer le rôle principal à afficher dans la carte utilisateur
-  // Priorité : ADMIN_RESPONSABLE > RESPONSABLE > premier rôle trouvé > role simple (legacy)
   const rolePrincipal = rolesUtilisateur.includes("ADMIN_RESPONSABLE")
     ? "ADMIN_RESPONSABLE"
     : rolesUtilisateur.includes("RESPONSABLE")
     ? "RESPONSABLE"
     : rolesUtilisateur[0] || utilisateur?.role || "Utilisateur";
 
-  // Construire le nom complet à afficher (fallback sur email si pas de nom)
   const nomAffiche =
     `${utilisateur?.nom || ""} ${utilisateur?.prenom || ""}`.trim() ||
     utilisateur?.email ||
@@ -284,9 +233,7 @@ export function AppShell({
 
   return (
     <div className="app-shell">
-      {/* ── Barre latérale de navigation ────────────────────────────────── */}
       <aside className="app-shell__sidebar">
-        {/* Identité de l'application */}
         <div className="app-shell__brand">
           <div className="app-shell__brand-icon">
             <IconBrand />
@@ -297,7 +244,6 @@ export function AppShell({
           </div>
         </div>
 
-        {/* Bannière informative sur la session en cours */}
         <div className="app-shell__sidebar-note">
           <span className="app-shell__sidebar-note-label">Session active</span>
           <strong>Portail campus</strong>
@@ -306,7 +252,6 @@ export function AppShell({
 
         <div className="app-shell__nav-label">Navigation campus</div>
 
-        {/* Navigation principale — NavLink gère l'état actif automatiquement */}
         <nav className="app-shell__nav" aria-label="Navigation principale">
           <NavLink
             to="/dashboard"
@@ -428,7 +373,6 @@ export function AppShell({
             <span>Gestion groupes</span>
           </NavLink>
 
-          {/* Scheduler — affiché uniquement pour les rôles avec droits de gestion */}
           {peutUtiliserScheduler ? (
             <NavLink
               to="/scheduler"
@@ -441,7 +385,6 @@ export function AppShell({
             </NavLink>
           ) : null}
 
-          {/* Gestion des sous-admins — réservée aux responsables */}
           {estResponsable ? (
             <NavLink
               to="/admins"
@@ -454,7 +397,6 @@ export function AppShell({
             </NavLink>
           ) : null}
 
-          {/* Admin central — réservé au rôle le plus élevé */}
           {rolesUtilisateur.includes("ADMIN_RESPONSABLE") ? (
             <NavLink
               to="/admin-responsable"
@@ -466,18 +408,25 @@ export function AppShell({
               <span>Admin central</span>
             </NavLink>
           ) : null}
+
+          <NavLink
+            to="/centre-aide"
+            className={({ isActive }) =>
+              `app-shell__nav-item ${isActive ? "app-shell__nav-item--active" : ""}`
+            }
+          >
+            <span className="app-shell__nav-icon"><IconHelp /></span>
+            <span>Centre d'aide</span>
+          </NavLink>
         </nav>
 
-        {/* Bouton de déconnexion en bas de la sidebar */}
         <button className="app-shell__logout" type="button" onClick={onLogout}>
           <span className="app-shell__nav-icon"><IconLogout /></span>
           <span>Deconnexion</span>
         </button>
       </aside>
 
-      {/* ── Zone de contenu principal ────────────────────────────────────── */}
       <main className="app-shell__main">
-        {/* En-tête de page avec titre, sous-titre et carte utilisateur */}
         <header className="app-shell__topbar">
           <div>
             <h1 className="app-shell__page-title">{title}</h1>
@@ -486,7 +435,6 @@ export function AppShell({
             ) : null}
           </div>
 
-          {/* Carte utilisateur : avatar (initiale), nom et rôle */}
           <div className="app-shell__user-card">
             <div className="app-shell__user-avatar">
               {nomAffiche.charAt(0).toUpperCase()}
@@ -498,7 +446,6 @@ export function AppShell({
           </div>
         </header>
 
-        {/* Contenu de la page courante injecté via {children} */}
         <div className="app-shell__content">{children}</div>
       </main>
     </div>

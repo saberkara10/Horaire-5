@@ -29,6 +29,12 @@ export function FeedbackBanner({
       color: "#1d4ed8",
       title: "Information",
     },
+    warning: {
+      border: "#b45309",
+      background: "#fffbeb",
+      color: "#b45309",
+      title: "Attention",
+    },
   };
 
   const palette = paletteParType[type] || paletteParType.info;

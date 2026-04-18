@@ -7,16 +7,22 @@
 import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "../components/layout/AppShell.jsx";
 import { usePopup } from "../components/feedback/PopupProvider.jsx";
+import { ModuleExcelImportPanel } from "../components/imports/ModuleExcelImportPanel.jsx";
+import { recupererConfigurationImportExcel } from "../config/importExcelModules.js";
 import {
   recupererProfesseurs,
   creerProfesseur,
   modifierProfesseur,
   supprimerProfesseur,
+  importerProfesseurs,
+  telechargerModeleImportProfesseurs,
 } from "../services/professeurs.api.js";
 import { recupererCours } from "../services/cours.api.js";
 import { getLibelleProgrammesProfesseur, getProgrammesProfesseur } from "../utils/professeurs.js";
 import "../styles/CrudPages.css";
 import "../styles/ProfesseursPage.css";
+
+const IMPORT_PROFESSEURS = recupererConfigurationImportExcel("professeurs");
 
 function extraireCoursIds(valeur) {
   if (Array.isArray(valeur)) {
@@ -260,6 +266,13 @@ export function ProfesseursPage({ utilisateur, onLogout }) {
             + Ajouter un professeur
           </button>
         </div>
+
+        <ModuleExcelImportPanel
+          definition={IMPORT_PROFESSEURS}
+          onImporter={importerProfesseurs}
+          onTelechargerModele={telechargerModeleImportProfesseurs}
+          onImportSuccess={() => Promise.all([chargerProfesseurs(), chargerCours()])}
+        />
 
         <div className="crud-page__toolbar">
           <input

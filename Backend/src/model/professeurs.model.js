@@ -386,10 +386,10 @@ export async function validerContrainteCoursProfesseur(coursIds = [], executor =
   return "";
 }
 
-async function recupererProfesseurParColonne(colonne, valeur) {
-  await assurerTableProfesseurCours();
+async function recupererProfesseurParColonne(colonne, valeur, executor = pool) {
+  await assurerTableProfesseurCours(executor);
 
-  const [listeProfesseurs] = await pool.query(
+  const [listeProfesseurs] = await executor.query(
     `SELECT p.id_professeur,
             p.matricule,
             p.nom,
@@ -424,10 +424,10 @@ async function recupererProfesseurParColonne(colonne, valeur) {
   return listeProfesseurs[0] || null;
 }
 
-export async function recupererTousLesProfesseurs() {
-  await assurerTableProfesseurCours();
+export async function recupererTousLesProfesseurs(executor = pool) {
+  await assurerTableProfesseurCours(executor);
 
-  const [listeProfesseurs] = await pool.query(
+  const [listeProfesseurs] = await executor.query(
     `SELECT p.id_professeur,
             p.matricule,
             p.nom,
@@ -460,16 +460,23 @@ export async function recupererTousLesProfesseurs() {
   return listeProfesseurs;
 }
 
-export async function recupererProfesseurParId(idProfesseur) {
-  return recupererProfesseurParColonne("id_professeur", idProfesseur);
+export async function recupererProfesseurParId(idProfesseur, executor = pool) {
+  return recupererProfesseurParColonne("id_professeur", idProfesseur, executor);
 }
 
-export async function recupererProfesseurParMatricule(matriculeProfesseur) {
-  return recupererProfesseurParColonne("matricule", matriculeProfesseur);
+export async function recupererProfesseurParMatricule(
+  matriculeProfesseur,
+  executor = pool
+) {
+  return recupererProfesseurParColonne("matricule", matriculeProfesseur, executor);
 }
 
-export async function recupererProfesseurParNomPrenom(nomProfesseur, prenomProfesseur) {
-  await assurerTableProfesseurCours();
+export async function recupererProfesseurParNomPrenom(
+  nomProfesseur,
+  prenomProfesseur,
+  executor = pool
+) {
+  await assurerTableProfesseurCours(executor);
 
   const nomNormalise = normaliserTexteIdentite(nomProfesseur);
   const prenomNormalise = normaliserTexteIdentite(prenomProfesseur);
@@ -478,7 +485,7 @@ export async function recupererProfesseurParNomPrenom(nomProfesseur, prenomProfe
     return null;
   }
 
-  const [listeProfesseurs] = await pool.query(
+  const [listeProfesseurs] = await executor.query(
     `SELECT p.id_professeur,
             p.matricule,
             p.nom,
@@ -515,10 +522,10 @@ export async function recupererProfesseurParNomPrenom(nomProfesseur, prenomProfe
   return listeProfesseurs[0] || null;
 }
 
-export async function recupererCoursProfesseur(idProfesseur) {
-  await assurerTableProfesseurCours();
+export async function recupererCoursProfesseur(idProfesseur, executor = pool) {
+  await assurerTableProfesseurCours(executor);
 
-  const [cours] = await pool.query(
+  const [cours] = await executor.query(
     `SELECT c.id_cours,
             c.code,
             c.nom,
@@ -1086,28 +1093,45 @@ export async function remplacerDisponibilitesProfesseur(
   }
 }
 
-export async function remplacerCoursProfesseur(idProfesseur, coursIds) {
+async function remplacerCoursProfesseurAvecExecutor(
+  executor,
+  idProfesseur,
+  coursIds
+) {
+  await assurerTableProfesseurCours(executor);
+
+  await executor.query(
+    `DELETE FROM professeur_cours
+     WHERE id_professeur = ?`,
+    [idProfesseur]
+  );
+
+  const coursNormalises = normaliserCoursIds(coursIds);
+
+  for (const idCours of coursNormalises) {
+    await executor.query(
+      `INSERT INTO professeur_cours (id_professeur, id_cours)
+       VALUES (?, ?)`,
+      [idProfesseur, idCours]
+    );
+  }
+}
+
+export async function remplacerCoursProfesseur(
+  idProfesseur,
+  coursIds,
+  executor = pool
+) {
+  if (executor !== pool) {
+    await remplacerCoursProfesseurAvecExecutor(executor, idProfesseur, coursIds);
+    return recupererCoursProfesseur(idProfesseur, executor);
+  }
+
   const connection = await pool.getConnection();
 
   try {
     await connection.beginTransaction();
-    await assurerTableProfesseurCours(connection);
-
-    await connection.query(
-      `DELETE FROM professeur_cours
-       WHERE id_professeur = ?`,
-      [idProfesseur]
-    );
-
-    const coursNormalises = normaliserCoursIds(coursIds);
-
-    for (const idCours of coursNormalises) {
-      await connection.query(
-        `INSERT INTO professeur_cours (id_professeur, id_cours)
-         VALUES (?, ?)`,
-        [idProfesseur, idCours]
-      );
-    }
+    await remplacerCoursProfesseurAvecExecutor(connection, idProfesseur, coursIds);
 
     await connection.commit();
   } catch (error) {
@@ -1120,13 +1144,13 @@ export async function remplacerCoursProfesseur(idProfesseur, coursIds) {
   return recupererCoursProfesseur(idProfesseur);
 }
 
-export async function ajouterProfesseur(nouveauProfesseur) {
+export async function ajouterProfesseur(nouveauProfesseur, executor = pool) {
   const { matricule, nom, prenom, specialite, cours_ids = [] } = nouveauProfesseur;
   const matriculeNormalise = String(matricule || "").trim();
   const nomNormalise = normaliserTexteIdentite(nom);
   const prenomNormalise = normaliserTexteIdentite(prenom);
 
-  const [resultatInsertion] = await pool.query(
+  const [resultatInsertion] = await executor.query(
     `INSERT INTO professeurs (matricule, nom, prenom, specialite)
      VALUES (?, ?, ?, ?)`,
     [
@@ -1137,16 +1161,23 @@ export async function ajouterProfesseur(nouveauProfesseur) {
     ]
   );
 
-  const professeurAjoute = await recupererProfesseurParId(resultatInsertion.insertId);
+  const professeurAjoute = await recupererProfesseurParId(
+    resultatInsertion.insertId,
+    executor
+  );
 
   if (cours_ids !== undefined) {
-    await remplacerCoursProfesseur(resultatInsertion.insertId, cours_ids);
+    await remplacerCoursProfesseur(resultatInsertion.insertId, cours_ids, executor);
   }
 
-  return recupererProfesseurParId(professeurAjoute.id_professeur);
+  return recupererProfesseurParId(professeurAjoute.id_professeur, executor);
 }
 
-export async function modifierProfesseur(idProfesseur, donneesModification) {
+export async function modifierProfesseur(
+  idProfesseur,
+  donneesModification,
+  executor = pool
+) {
   const champsAModifier = [];
   const valeurs = [];
 
@@ -1173,7 +1204,7 @@ export async function modifierProfesseur(idProfesseur, donneesModification) {
   if (champsAModifier.length > 0) {
     valeurs.push(idProfesseur);
 
-    const [resultatModification] = await pool.query(
+    const [resultatModification] = await executor.query(
       `UPDATE professeurs
        SET ${champsAModifier.join(", ")}
        WHERE id_professeur = ?
@@ -1187,10 +1218,14 @@ export async function modifierProfesseur(idProfesseur, donneesModification) {
   }
 
   if (donneesModification.cours_ids !== undefined) {
-    await remplacerCoursProfesseur(idProfesseur, donneesModification.cours_ids);
+    await remplacerCoursProfesseur(
+      idProfesseur,
+      donneesModification.cours_ids,
+      executor
+    );
   }
 
-  return recupererProfesseurParId(idProfesseur);
+  return recupererProfesseurParId(idProfesseur, executor);
 }
 
 export async function fusionnerDoublonsProfesseurs(executor = pool) {

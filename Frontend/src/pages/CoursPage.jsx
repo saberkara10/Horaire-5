@@ -7,11 +7,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "../components/layout/AppShell.jsx";
 import { usePopup } from "../components/feedback/PopupProvider.jsx";
+import { ModuleExcelImportPanel } from "../components/imports/ModuleExcelImportPanel.jsx";
+import { recupererConfigurationImportExcel } from "../config/importExcelModules.js";
 import {
   recupererCours,
   creerCours,
   modifierCours,
   supprimerCours,
+  importerCours,
+  telechargerModeleImportCours,
 } from "../services/cours.api.js";
 import { recupererProgrammes } from "../services/programmes.api.js";
 import { recupererSalles } from "../services/salles.api.js";
@@ -19,6 +23,7 @@ import "../styles/CrudPages.css";
 
 const ETAPES_DISPONIBLES = ["1", "2", "3", "4", "5", "6", "7", "8"];
 const DUREES_DISPONIBLES = ["1", "2", "3", "4"];
+const IMPORT_COURS = recupererConfigurationImportExcel("cours");
 
 function formaterDureeHeures(duree) {
   const valeur = Number(duree);
@@ -232,6 +237,15 @@ export function CoursPage({ utilisateur, onLogout }) {
             + Ajouter un cours
           </button>
         </div>
+
+        <ModuleExcelImportPanel
+          definition={IMPORT_COURS}
+          onImporter={importerCours}
+          onTelechargerModele={telechargerModeleImportCours}
+          onImportSuccess={() =>
+            Promise.all([chargerCours(), chargerProgrammes(), chargerSalles()])
+          }
+        />
 
         <div className="crud-page__toolbar">
           <input

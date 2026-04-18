@@ -13,6 +13,7 @@ import { beforeEach, describe, expect, jest, test } from "@jest/globals";
 
 const poolQueryMock = jest.fn();
 const genererGroupeMock = jest.fn();
+const analyserCompatibiliteChangementGroupePrincipalEtudiantMock = jest.fn();
 
 await jest.unstable_mockModule("../db.js", () => ({
   default: {
@@ -41,6 +42,11 @@ await jest.unstable_mockModule(
   })
 );
 
+await jest.unstable_mockModule("../src/services/etudiants/student-course-exchange.service.js", () => ({
+  analyserCompatibiliteChangementGroupePrincipalEtudiant:
+    analyserCompatibiliteChangementGroupePrincipalEtudiantMock,
+}));
+
 await jest.unstable_mockModule("../src/services/scheduler/SchedulerEngine.js", () => ({
   SchedulerEngine: {
     genererGroupe: genererGroupeMock,
@@ -59,6 +65,11 @@ function createApp() {
 describe("groupes generation routes", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    analyserCompatibiliteChangementGroupePrincipalEtudiantMock.mockResolvedValue({
+      validation_requise: false,
+      changement_autorise: true,
+      conflits: [],
+    });
   });
 
   test("PUT /api/groupes/:id/etudiants/:idEtudiant/deplacer retourne la synchronisation metier", async () => {
@@ -77,6 +88,7 @@ describe("groupes generation routes", () => {
           {
             id_groupes_etudiants: 5,
             nom_groupe: "G-INF-E1-2",
+            id_session: 8,
             programme: "INF",
             etape: "1",
             effectif: 18,
@@ -111,6 +123,86 @@ describe("groupes generation routes", () => {
       etudiants_impactes: [44],
       groupes_impactes: [3, 5],
     });
+    expect(analyserCompatibiliteChangementGroupePrincipalEtudiantMock).toHaveBeenCalledWith(
+      {
+        idEtudiant: 44,
+        idGroupeCible: 5,
+        idSession: 8,
+        nomGroupeCible: "G-INF-E1-2",
+      },
+      expect.any(Object)
+    );
+  });
+
+  test("PUT /api/groupes/:id/etudiants/:idEtudiant/deplacer refuse le changement si une reprise planifiee entre en conflit", async () => {
+    poolQueryMock
+      .mockResolvedValueOnce([
+        [
+          {
+            id_groupes_etudiants: 3,
+            programme: "INF",
+            etape: "1",
+          },
+        ],
+      ])
+      .mockResolvedValueOnce([
+        [
+          {
+            id_groupes_etudiants: 5,
+            nom_groupe: "G-INF-E1-2",
+            id_session: 8,
+            programme: "INF",
+            etape: "1",
+            effectif: 18,
+          },
+        ],
+      ])
+      .mockResolvedValueOnce([
+        [
+          {
+            id_etudiant: 44,
+            nom: "Diallo",
+            prenom: "Aya",
+          },
+        ],
+      ]);
+    analyserCompatibiliteChangementGroupePrincipalEtudiantMock.mockResolvedValueOnce({
+      validation_requise: true,
+      changement_autorise: false,
+      groupe_cible: {
+        id_groupes_etudiants: 5,
+        nom_groupe: "G-INF-E1-2",
+      },
+      conflits: [
+        {
+          code_cours_echoue: "MAT101",
+          nom_cours_echoue: "Mathematiques",
+          code_cours_groupe: "WEB201",
+          nom_cours_groupe: "Developpement Web",
+          date: "2026-01-14",
+          heure_debut_conflit: "08:00:00",
+          heure_fin_conflit: "11:00:00",
+        },
+      ],
+    });
+
+    const response = await request(createApp())
+      .put("/api/groupes/3/etudiants/44/deplacer")
+      .send({
+        id_groupe_cible: 5,
+      });
+
+    expect(response.status).toBe(409);
+    expect(response.body.code).toBe("GROUP_CHANGE_FAILED_COURSE_CONFLICT");
+    expect(response.body.message).toContain(
+      "Changement de groupe refuse : conflit avec cours echoue planifie"
+    );
+    expect(response.body.details).toHaveLength(1);
+    expect(
+      poolQueryMock.mock.calls.some(([sql]) =>
+        String(sql).includes("UPDATE etudiants SET id_groupes_etudiants = ? WHERE id_etudiant = ?")
+      )
+    ).toBe(false);
   });
 
   test("POST /api/groupes/generer-cible relaie le mode d'optimisation", async () => {

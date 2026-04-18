@@ -62,8 +62,8 @@ async function recupererSalleParId(idSalle, executor = pool) {
  *
  * @returns {Promise<object[]>} La liste complète des cours avec détails de salle
  */
-export async function recupererTousLesCours() {
-  const [listeCours] = await pool.query(
+export async function recupererTousLesCours(executor = pool) {
+  const [listeCours] = await executor.query(
     `SELECT c.id_cours,
             c.code,
             c.nom,
@@ -91,8 +91,8 @@ export async function recupererTousLesCours() {
  * @param {number} idCours - L'identifiant du cours à récupérer
  * @returns {Promise<object|null>} Le cours avec ses détails de salle, ou null
  */
-export async function recupererCoursParId(idCours) {
-  const [coursTrouve] = await pool.query(
+export async function recupererCoursParId(idCours, executor = pool) {
+  const [coursTrouve] = await executor.query(
     `SELECT c.id_cours,
             c.code,
             c.nom,
@@ -143,8 +143,8 @@ export async function recupererTypesSalleDisponibles() {
  * @param {string} codeCours - Le code du cours à rechercher
  * @returns {Promise<object|null>} Le cours trouvé ou null si aucun résultat
  */
-export async function recupererCoursParCode(codeCours) {
-  const [coursTrouve] = await pool.query(
+export async function recupererCoursParCode(codeCours, executor = pool) {
+  const [coursTrouve] = await executor.query(
     `SELECT c.id_cours,
             c.code,
             c.nom,
@@ -185,22 +185,22 @@ export async function recupererCoursParCode(codeCours) {
  * @returns {Promise<object>} Le cours créé avec ses données complètes
  * @throws {Error} Si la salle de référence n'existe pas
  */
-export async function ajouterCours(nouveauCours) {
+export async function ajouterCours(nouveauCours, executor = pool) {
   const { code, nom, duree, programme, etape_etude, id_salle_reference } =
     nouveauCours;
 
   // Valider que la salle existe avant d'insérer
-  const salleReference = await recupererSalleParId(id_salle_reference);
+  const salleReference = await recupererSalleParId(id_salle_reference, executor);
   const codeNormalise = normaliserCodeCours(code);
 
   // Assurer l'existence du programme dans programmes_reference et récupérer son nom officiel
-  const programmeNormalise = await assurerProgrammeReference(programme);
+  const programmeNormalise = await assurerProgrammeReference(programme, executor);
 
   if (!salleReference) {
     throw new Error("Salle de reference introuvable.");
   }
 
-  const [resultatInsertion] = await pool.query(
+  const [resultatInsertion] = await executor.query(
     `INSERT INTO cours (
       code,
       nom,
@@ -224,7 +224,7 @@ export async function ajouterCours(nouveauCours) {
   );
 
   // Relire le cours créé pour retourner les données complètes avec jointures
-  return recupererCoursParId(resultatInsertion.insertId);
+  return recupererCoursParId(resultatInsertion.insertId, executor);
 }
 
 /**
@@ -242,7 +242,7 @@ export async function ajouterCours(nouveauCours) {
  * @returns {Promise<object|null>} Le cours mis à jour, ou null si non trouvé
  * @throws {Error} Si la salle de référence fournie n'existe pas
  */
-export async function modifierCours(idCours, donneesModification) {
+export async function modifierCours(idCours, donneesModification, executor = pool) {
   // Construction dynamique de la requête SQL selon les champs fournis
   const champsAModifier = [];
   const valeurs = [];
@@ -264,7 +264,8 @@ export async function modifierCours(idCours, donneesModification) {
 
   if (donneesModification.programme !== undefined) {
     const programmeNormalise = await assurerProgrammeReference(
-      donneesModification.programme
+      donneesModification.programme,
+      executor
     );
     champsAModifier.push("programme = ?");
     valeurs.push(
@@ -280,7 +281,8 @@ export async function modifierCours(idCours, donneesModification) {
 
   if (donneesModification.id_salle_reference !== undefined) {
     const salleReference = await recupererSalleParId(
-      donneesModification.id_salle_reference
+      donneesModification.id_salle_reference,
+      executor
     );
 
     if (!salleReference) {
@@ -295,12 +297,12 @@ export async function modifierCours(idCours, donneesModification) {
 
   // Si aucun champ n'a été fourni → retourner l'état actuel sans modifier
   if (champsAModifier.length === 0) {
-    return recupererCoursParId(idCours);
+    return recupererCoursParId(idCours, executor);
   }
 
   valeurs.push(idCours); // L'ID va dans le WHERE
 
-  const [resultatModification] = await pool.query(
+  const [resultatModification] = await executor.query(
     `UPDATE cours
      SET ${champsAModifier.join(", ")}
      WHERE id_cours = ?
@@ -312,7 +314,7 @@ export async function modifierCours(idCours, donneesModification) {
     return null; // Le cours n'existait pas
   }
 
-  return recupererCoursParId(idCours);
+  return recupererCoursParId(idCours, executor);
 }
 
 /**
@@ -366,7 +368,7 @@ export async function supprimerCours(idCours) {
  * @param {number} idSalle - L'identifiant de la salle à vérifier
  * @returns {Promise<boolean>} true si la salle existe
  */
-export async function salleExisteParId(idSalle) {
-  const salle = await recupererSalleParId(idSalle);
+export async function salleExisteParId(idSalle, executor = pool) {
+  const salle = await recupererSalleParId(idSalle, executor);
   return Boolean(salle);
 }

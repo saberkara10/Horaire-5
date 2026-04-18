@@ -52,6 +52,7 @@ const DEFAULT_MAX_GROUPS_PER_PROFESSOR = 16;
  * @type {number}
  */
 const DEFAULT_MAX_WEEKLY_SESSIONS_PER_PROFESSOR = 16;
+const DEFAULT_FAILED_COURSE_RECOVERY_GROUP_THRESHOLD = 10;
 
 /**
  * Lit une variable d'environnement comme entier strictement positif.
@@ -177,5 +178,20 @@ export function getSchedulerMaxWeeklySessionsPerProfessor() {
   return readPositiveInteger(
     process.env.SCHEDULER_MAX_WEEKLY_SESSIONS_PER_PROFESSOR,
     DEFAULT_MAX_WEEKLY_SESSIONS_PER_PROFESSOR
+  );
+}
+
+/**
+ * Retourne le seuil minimal d'etudiants avant d'ouvrir automatiquement
+ * un groupe de reprise dedie.
+ *
+ * Configurable via FAILED_COURSE_RECOVERY_GROUP_THRESHOLD.
+ *
+ * @returns {number} Le nombre minimal d'etudiants pour creer un groupe de reprise
+ */
+export function getFailedCourseRecoveryGroupThreshold() {
+  return readPositiveInteger(
+    process.env.FAILED_COURSE_RECOVERY_GROUP_THRESHOLD,
+    DEFAULT_FAILED_COURSE_RECOVERY_GROUP_THRESHOLD
   );
 }

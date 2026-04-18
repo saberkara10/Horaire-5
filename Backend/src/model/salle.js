@@ -714,8 +714,8 @@ async function recupererLignesOccupationSalle(idSalle, idSession, executor = poo
  *
  * @returns {Promise<Array<Object>>} La liste triee des salles.
  */
-export async function getAllSalles() {
-  const [salles] = await pool.query(
+export async function getAllSalles(executor = pool) {
+  const [salles] = await executor.query(
     `SELECT id_salle, code, type, capacite
      FROM salles
      ORDER BY code;`
@@ -750,8 +750,8 @@ export async function getTypesSalles() {
  * @param {number} idSalle Identifiant de la salle.
  * @returns {Promise<Object|undefined>} Salle trouvee ou undefined.
  */
-export async function getSalleById(idSalle) {
-  const [salles] = await pool.query(
+export async function getSalleById(idSalle, executor = pool) {
+  const [salles] = await executor.query(
     `SELECT id_salle, code, type, capacite
      FROM salles
      WHERE id_salle = ?;`,
@@ -767,8 +767,8 @@ export async function getSalleById(idSalle) {
  * @param {string} codeSalle Code unique de la salle.
  * @returns {Promise<Object|undefined>} Salle trouvee ou undefined.
  */
-export async function getSalleByCode(codeSalle) {
-  const [salles] = await pool.query(
+export async function getSalleByCode(codeSalle, executor = pool) {
+  const [salles] = await executor.query(
     `SELECT id_salle, code, type, capacite
      FROM salles
      WHERE code = ?;`,
@@ -786,8 +786,8 @@ export async function getSalleByCode(codeSalle) {
  * @param {number} capacite Capacite maximale de la salle.
  * @returns {Promise<Object>} Resultat SQL.
  */
-export async function addSalle(code, type, capacite) {
-  const [result] = await pool.query(
+export async function addSalle(code, type, capacite, executor = pool) {
+  const [result] = await executor.query(
     `INSERT INTO salles (code, type, capacite)
      VALUES (?, ?, ?);`,
     [code, type, capacite]
@@ -804,8 +804,8 @@ export async function addSalle(code, type, capacite) {
  * @param {number} capacite Nouvelle capacite.
  * @returns {Promise<Object>} Resultat SQL.
  */
-export async function modifySalle(idSalle, type, capacite) {
-  const [result] = await pool.query(
+export async function modifySalle(idSalle, type, capacite, executor = pool) {
+  const [result] = await executor.query(
     `UPDATE salles
      SET type = ?, capacite = ?
      WHERE id_salle = ?;`,

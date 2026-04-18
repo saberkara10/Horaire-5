@@ -26,6 +26,7 @@ import { HorairesSallesPage } from "./pages/HorairesSallesPage.jsx";
 import { EtudiantsPage } from "./pages/EtudiantsPage.jsx";
 import { GestionGroupesPage } from "./pages/GestionGroupesPage.jsx";
 import { AdminsPage } from "./pages/AdminsPage.jsx";
+import { CentreAidePage } from "./pages/CentreAidePage.jsx";
 import { utilisateurEstResponsable } from "./utils/roles.js";
 import { PopupProvider } from "./components/feedback/PopupProvider.jsx";
 
@@ -233,6 +234,28 @@ export default function App() {
                 ) : (
                   <Navigate to="/dashboard" replace />
                 )
+              ) : (
+                <Navigate to="/login" replace />
+              )
+            }
+          />
+
+          <Route
+            path="/centre-aide"
+            element={
+              utilisateur ? (
+                <CentreAidePage utilisateur={utilisateur} onLogout={handleLogout} />
+              ) : (
+                <Navigate to="/login" replace />
+              )
+            }
+          />
+
+          <Route
+            path="/help"
+            element={
+              utilisateur ? (
+                <Navigate to="/centre-aide" replace />
               ) : (
                 <Navigate to="/login" replace />
               )

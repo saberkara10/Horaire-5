@@ -328,4 +328,131 @@ describe("student-course-exchange.service", () => {
       )
     ).toBe(true);
   });
+
+  test("analyserCompatibiliteChangementGroupePrincipalEtudiant n'applique aucun controle si aucune reprise n'est planifiee", async () => {
+    queryMock.mockImplementation(async (sql) => {
+      const requete = String(sql);
+
+      if (requete.includes("FROM sessions") && requete.includes("WHERE id_session = ?")) {
+        return [[{ id_session: 8, nom: "Hiver" }]];
+      }
+
+      if (requete.includes("FROM affectation_etudiants ae") && requete.includes("ae.source_type IN")) {
+        return [[]];
+      }
+
+      throw new Error(`Requete non mockee: ${requete}`);
+    });
+
+    const resultat = await service.analyserCompatibiliteChangementGroupePrincipalEtudiant(
+      {
+        idEtudiant: 1,
+        idGroupeCible: 22,
+        idSession: 8,
+        nomGroupeCible: "GPI-E4-1",
+      },
+      { query: queryMock }
+    );
+
+    expect(resultat.validation_requise).toBe(false);
+    expect(resultat.changement_autorise).toBe(true);
+    expect(resultat.conflits).toEqual([]);
+    expect(resultat.reprises_planifiees).toEqual([]);
+    expect(
+      queryMock.mock.calls.some(([sql]) =>
+        String(sql).includes("WHERE ge.id_groupes_etudiants = ?") &&
+        String(sql).includes("ae_override.id_etudiant = ?")
+      )
+    ).toBe(false);
+  });
+
+  test("analyserCompatibiliteChangementGroupePrincipalEtudiant bloque le groupe cible si une reprise planifiee chevauche son horaire", async () => {
+    queryMock.mockImplementation(async (sql) => {
+      const requete = String(sql);
+
+      if (requete.includes("FROM sessions") && requete.includes("WHERE id_session = ?")) {
+        return [[{ id_session: 8, nom: "Hiver" }]];
+      }
+
+      if (requete.includes("FROM affectation_etudiants ae") && requete.includes("ae.source_type IN")) {
+        return [[
+          {
+            id_affectation_cours: 903,
+            id_cours: 6,
+            code_cours: "MAT101",
+            nom_cours: "Mathematiques",
+            date: "2026-01-14",
+            heure_debut: "08:00:00",
+            heure_fin: "11:00:00",
+            groupe_source: "REP-MAT",
+            id_groupe_source: 33,
+            groupe_principal: "GPI-E4-2",
+            id_groupe_principal: 11,
+            source_horaire: "reprise",
+            est_reprise: 1,
+            est_exception_individuelle: 0,
+            id_cours_echoue: 777,
+            statut_reprise: "planifie",
+          },
+        ]];
+      }
+
+      if (
+        requete.includes("FROM groupes_etudiants ge") &&
+        requete.includes("WHERE ge.id_groupes_etudiants = ?") &&
+        requete.includes("ae_override.id_etudiant = ?")
+      ) {
+        return [[
+          creerReponseSeance({
+            idAffectation: 904,
+            idCours: 8,
+            codeCours: "WEB201",
+            nomCours: "Developpement Web",
+            date: "2026-01-14",
+            heureDebut: "09:00:00",
+            heureFin: "12:00:00",
+            groupe: "GPI-E4-1",
+            idGroupe: 22,
+          }),
+        ]];
+      }
+
+      throw new Error(`Requete non mockee: ${requete}`);
+    });
+
+    const resultat = await service.analyserCompatibiliteChangementGroupePrincipalEtudiant(
+      {
+        idEtudiant: 1,
+        idGroupeCible: 22,
+        idSession: 8,
+        nomGroupeCible: "GPI-E4-1",
+      },
+      { query: queryMock }
+    );
+
+    expect(resultat.validation_requise).toBe(true);
+    expect(resultat.changement_autorise).toBe(false);
+    expect(resultat.reprises_planifiees).toEqual([
+      {
+        id_cours: 6,
+        code_cours: "MAT101",
+        nom_cours: "Mathematiques",
+        groupe_reprise: "REP-MAT",
+        id_groupe_reprise: 33,
+      },
+    ]);
+    expect(resultat.conflits).toHaveLength(1);
+    expect(resultat.conflits[0]).toMatchObject({
+      code_cours_echoue: "MAT101",
+      nom_cours_echoue: "Mathematiques",
+      code_cours_groupe: "WEB201",
+      nom_cours_groupe: "Developpement Web",
+      groupe_demande: "GPI-E4-1",
+      date: "2026-01-14",
+      heure_debut: "09:00:00",
+      heure_fin: "12:00:00",
+      heure_debut_conflit: "08:00:00",
+      heure_fin_conflit: "11:00:00",
+    });
+  });
 });

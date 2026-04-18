@@ -1,81 +1,136 @@
-# Conception du module de gestion des cours
+# Conception - Module Cours
 
-## 1. Objectif du module
+## 1. Objectif
 
-Le module Cours gere le catalogue academique utilise dans la planification :
+Le module Cours doit rester le referentiel principal du catalogue pedagogique, exploitable :
 
-- creation ;
-- consultation ;
-- modification ;
-- suppression sous contrainte metier.
+- par le CRUD manuel ;
+- par la planification ;
+- par les affectations ;
+- par un import Excel/CSV integre a la page existante.
 
-Ce document est aligne avec :
+La contrainte principale etait de ne pas casser les dependances du systeme autour des cours.
 
-- `Backend/routes/cours.routes.js`
-- `Backend/src/validations/cours.validations.js`
-- `Backend/src/model/cours.model.js`
-- `Backend/Database/GDH5.sql`
+## 2. Principe d'integration
 
-## Statut actuel dans le projet
+L'import n'introduit pas de nouvelle page. Il est integre a `Frontend/src/pages/CoursPage.jsx` via un composant mutualise :
 
-Le module Cours est effectivement actif dans le backend principal lance par defaut, via `Backend/src/app.js`.
+- `Frontend/src/components/imports/ModuleExcelImportPanel.jsx`
 
-La dependance avec `affectation_cours` existe deja dans le schema SQL, meme si la planification complete n'est pas encore branchee dans le meme point d'entree.
+Ce composant est utilise tel quel pour les modules Professeurs, Salles et Cours afin de conserver une UX et une maintenance homogenes.
 
----
+## 3. Architecture backend
 
-## 2. Diagramme UML de classes
+L'architecture retenue est la suivante :
 
-![Diagramme UML de classes du module cours](diagrammes/cours-class.svg)
+- route : `Backend/routes/cours.routes.js`
+- service metier d'import : `Backend/src/services/import-cours.service.js`
+- service partage : `Backend/src/services/import-excel.shared.js`
+- definition de contrat : `Backend/src/services/import-excel.definitions.js`
+- persistance : `Backend/src/model/cours.model.js`
 
-### Lecture du schema
+Le service d'import transforme les donnees Excel vers le meme modele metier que le CRUD manuel.
 
-- `Cours` contient les donnees de reference du catalogue ;
-- `AffectationCours` reutilise un cours lors de la planification ;
-- la relation explique la contrainte sur la suppression d'un cours deja planifie.
+## 4. Reutilisation et factorisation
 
----
+Le service `import-cours.service.js` reutilise directement :
 
-## 3. Diagramme UML de sequence de creation
+- `recupererCoursParCode()`
+- `ajouterCours()`
+- `modifierCours()`
+- `getSalleByCode()`
 
-![Diagramme UML de sequence de creation d un cours](diagrammes/cours-sequence.svg)
+Le modele `cours.model.js` accepte maintenant un `executor` optionnel afin de fonctionner dans une transaction d'import sans dupliquer les requetes SQL existantes.
 
-### Lecture du schema
+## 5. Resolution d'une ligne de cours
 
-- la route declenche les validations metier ;
-- le backend verifie l'unicite du code ;
-- le type de salle demande est valide ;
-- le cours est insere seulement si les controles reussissent.
+Chaque ligne est resolue selon ce flux :
 
----
+1. validation des champs locaux ;
+2. recherche de la salle de reference par `salle_reference_code` ;
+3. verification optionnelle de `type_salle` ;
+4. recherche d'un cours existant par `code` ;
+5. creation, mise a jour ou ignore selon l'etat actuel.
 
-## 4. Structure de donnees
+Le `code` reste l'identifiant metier principal de synchronisation.
 
-### Table `cours`
+## 6. Raisons du controle sur la duree
 
-| Champ | Type | Contraintes | Description |
-|--------|--------|------------|------------|
-| `id_cours` | INT | PK, AUTO_INCREMENT | Identifiant technique |
-| `code` | VARCHAR(50) | NOT NULL, UNIQUE | Code du cours |
-| `nom` | VARCHAR(150) | NOT NULL | Intitule |
-| `duree` | INT | NOT NULL | Duree |
-| `programme` | VARCHAR(150) | NOT NULL | Programme cible |
-| `etape_etude` | VARCHAR(50) | NOT NULL | Etape d'etude |
-| `type_salle` | VARCHAR(50) | NOT NULL | Type de salle requis |
-| `archive` | TINYINT(1) | NOT NULL, DEFAULT 0 | Indicateur d'archivage |
+L'import limite `duree` a `1..4` heures.
 
----
+Ce choix n'est pas arbitraire. Il garantit que :
 
-## 5. Regles metier
+- les cours importes restent coherents avec le select manuel de `CoursPage.jsx` ;
+- l'utilisateur peut corriger ensuite un cours importe depuis l'interface standard ;
+- aucune divergence fonctionnelle n'apparait entre saisie manuelle et import.
 
-- le `code` est unique ;
-- `nom`, `programme` et `type_salle` sont obligatoires ;
-- `duree` doit etre strictement positive ;
-- `etape_etude` est controlee par les validations backend ;
-- un cours deja present dans `affectation_cours` ne doit pas etre supprime.
+## 7. Gestion de la salle de reference
 
----
+Le cours n'importe pas un `id_salle_reference` brut. Il importe un `salle_reference_code`.
 
-## 6. Conclusion
+Avantages :
 
-Le module Cours fournit les donnees de reference de la planification. Les diagrammes montrent que la gestion CRUD n'est pas isolee : elle depend directement de l'usage reel du cours dans les affectations.
+- format plus naturel pour l'utilisateur ;
+- independance vis-a-vis des identifiants techniques ;
+- alignement avec le role metier du code salle ;
+- meilleure portabilite des fichiers Excel.
+
+Le `type_salle` importe, s'il est present, joue uniquement un role de controle de coherence.
+
+## 8. Strategie transactionnelle
+
+Le lot est traite dans une transaction globale avec `SAVEPOINT` par ligne.
+
+Cette strategie permet :
+
+- d'importer les lignes valides ;
+- de rejeter les lignes invalides ;
+- d'eviter l'arret complet du lot ;
+- de conserver la securite transactionnelle sur chaque ligne.
+
+## 9. Experience utilisateur
+
+L'utilisateur final voit :
+
+- les colonnes attendues ;
+- la strategie de traitement ;
+- un telechargement du modele ;
+- une confirmation avant import ;
+- un resume numerique ;
+- les erreurs ligne par ligne.
+
+Le modal manuel existant reste disponible en parallele.
+
+## 10. Non-regression
+
+Risques principaux identifies :
+
+- casser l'affichage des salles de reference ;
+- introduire des cours impossibles a re-editer ;
+- diverger du modele de validation manuel ;
+- casser la planification qui depend des cours.
+
+Mesures prises :
+
+- reutilisation du modele SQL existant ;
+- limitation volontaire de la duree aux valeurs deja supportees par l'UI ;
+- verification stricte de la salle de reference ;
+- rechargement des cours, programmes et salles apres import.
+
+## 11. Validation
+
+Tests associes :
+
+- `Backend/tests/import-cours.service.test.js`
+- `Backend/tests/cours.import.test.js`
+
+Ils verifient le contrat de route, les erreurs de lecture et le comportement general du service.
+
+## 12. Decision finale
+
+Le module Cours conserve une architecture simple :
+
+- meme page pour le CRUD et l'import ;
+- meme coeur de persistance pour manuel et import ;
+- meme structure metier pour la planification ;
+- documentation et format de fichier explicites pour l'utilisateur.
