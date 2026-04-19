@@ -13,7 +13,6 @@ import {
 } from "react";
 import { AssignmentModificationSimulationPanel } from "../components/affectations/AssignmentModificationSimulationPanel.jsx";
 import { RepriseStudentSearchField } from "../components/affectations/RepriseStudentSearchField.jsx";
-import { AppShell } from "../components/layout/AppShell.jsx";
 import { usePopup } from "../components/feedback/PopupProvider.jsx";
 import { recupererCours } from "../services/cours.api.js";
 import { recupererEtudiants } from "../services/etudiantsService.js";
@@ -2352,13 +2351,7 @@ export function AffectationsPage({ utilisateur, onLogout }) {
   }, []);
 
   return (
-    <AppShell
-      utilisateur={utilisateur}
-      onLogout={onLogout}
-      title="Generer"
-      subtitle="Travaillez sur la session active, filtrez une cohorte et corrigez les seances manuellement."
-    >
-      <div className="affectations-page">
+    <div className="affectations-page">
         <section className="affectations-page__hero">
           <div className="affectations-page__hero-card">
             <span className="affectations-page__eyebrow">Session active unifiee</span>
@@ -2996,9 +2989,6 @@ export function AffectationsPage({ utilisateur, onLogout }) {
                         value={salle.id_salle}
                         disabled={!salle.disponible}
                       >
-                        {salle.statut === "AVAILABLE" ? "✅" :
-                         salle.statut === "OCCUPIED" ? "🔴" :
-                         salle.statut === "INCOMPATIBLE_TYPE" ? "🟠" : "⚫"}{" "}
                         {salle.code} ({salle.type} — {salle.capacite}p)
                       </option>
                     ))}
@@ -3255,7 +3245,7 @@ export function AffectationsPage({ utilisateur, onLogout }) {
                           </span>
                           <small className="affectations-page__room-reason">{salle.raison}</small>
                           {isSelected && (
-                            <span className="affectations-page__room-selected-indicator">✓ Sélectionnée</span>
+                            <span className="affectations-page__room-selected-indicator">Selectionnee</span>
                           )}
                         </button>
                       );
@@ -3516,6 +3506,5 @@ export function AffectationsPage({ utilisateur, onLogout }) {
           )}
         </section>
       </div>
-    </AppShell>
   );
 }

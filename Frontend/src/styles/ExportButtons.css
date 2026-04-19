@@ -63,25 +63,25 @@
 
 /* ── PDF ──────────────────────────────────────────────────────────────────────── */
 .export-btn--pdf {
-  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+  background: #8b1e1e;
   color: #fff;
-  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.28);
+  box-shadow: 0 2px 8px rgba(139, 30, 30, 0.22);
 }
 
 .export-btn--pdf:not(:disabled):hover {
-  box-shadow: 0 4px 14px rgba(220, 38, 38, 0.38);
+  box-shadow: 0 4px 14px rgba(139, 30, 30, 0.28);
   transform: translateY(-1px);
 }
 
 /* ── Excel ────────────────────────────────────────────────────────────────────── */
 .export-btn--excel {
-  background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+  background: #2f5f89;
   color: #fff;
-  box-shadow: 0 2px 8px rgba(22, 163, 74, 0.28);
+  box-shadow: 0 2px 8px rgba(47, 95, 137, 0.22);
 }
 
 .export-btn--excel:not(:disabled):hover {
-  box-shadow: 0 4px 14px rgba(22, 163, 74, 0.38);
+  box-shadow: 0 4px 14px rgba(47, 95, 137, 0.28);
   transform: translateY(-1px);
 }
 

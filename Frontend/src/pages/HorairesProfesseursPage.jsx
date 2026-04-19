@@ -6,7 +6,6 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { AppShell } from "../components/layout/AppShell.jsx";
 import { ExportButtons } from "../components/export/ExportButtons.jsx";
 import {
   recupererProfesseurs,
@@ -208,13 +207,7 @@ export function HorairesProfesseursPage({ utilisateur, onLogout }) {
   );
 
   return (
-    <AppShell
-      utilisateur={utilisateur}
-      onLogout={onLogout}
-      title="Horaires professeurs"
-      subtitle="Recherchez un enseignant puis consultez son planning de travail."
-    >
-      <motion.div
+    <motion.div
         className="horaires-professeurs-page"
         initial={{ opacity: 0, y: 18 }}
         animate={{ opacity: 1, y: 0 }}
@@ -459,6 +452,5 @@ export function HorairesProfesseursPage({ utilisateur, onLogout }) {
           </motion.section>
         </section>
       </motion.div>
-    </AppShell>
   );
 }

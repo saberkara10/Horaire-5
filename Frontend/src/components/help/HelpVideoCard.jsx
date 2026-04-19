@@ -1,4 +1,4 @@
-import { Clapperboard, PlayCircle, Sparkles } from "lucide-react";
+import { Clapperboard, Layers3, PlayCircle } from "lucide-react";
 
 export function HelpVideoCard({ video, onOpen }) {
   function handleOpen() {
@@ -53,7 +53,7 @@ export function HelpVideoCard({ video, onOpen }) {
           {video.categoryName ? <span>{video.categoryName}</span> : null}
           {video.levelLabel ? (
             <span className="help-video-card__eyebrow-tag">
-              <Sparkles size={14} />
+              <Layers3 size={14} />
               {video.levelLabel}
             </span>
           ) : null}

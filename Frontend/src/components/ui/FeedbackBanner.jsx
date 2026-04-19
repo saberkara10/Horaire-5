@@ -12,10 +12,10 @@ export function FeedbackBanner({
 
   const paletteParType = {
     success: {
-      border: "#14532d",
-      background: "#ecfdf3",
-      color: "#14532d",
-      title: "Succes",
+      border: "#1e3a5f",
+      background: "#eef4fb",
+      color: "#1e3a5f",
+      title: "Information",
     },
     error: {
       border: "#991b1b",

@@ -13,7 +13,6 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { AppShell } from "../components/layout/AppShell.jsx";
 import { ExportButtons } from "../components/export/ExportButtons.jsx";
 import {
   recupererGroupes,
@@ -285,13 +284,7 @@ export function HorairesGroupesPage({ utilisateur, onLogout }) {
   }
 
   return (
-    <AppShell
-      utilisateur={utilisateur}
-      onLogout={onLogout}
-      title="Horaires groupes"
-      subtitle="Filtrez par programme et étape, puis consultez l'horaire exact de chaque groupe."
-    >
-      <motion.div
+    <motion.div
         className="planning-container"
         initial={{ opacity: 0, y: 18 }}
         animate={{ opacity: 1, y: 0 }}
@@ -582,6 +575,5 @@ export function HorairesGroupesPage({ utilisateur, onLogout }) {
           </>
         )}
       </motion.div>
-    </AppShell>
   );
 }

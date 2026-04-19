@@ -3,9 +3,9 @@ import {
   CircleHelp,
   Clapperboard,
   FileText,
+  Layers3,
   Lightbulb,
   PlayCircle,
-  Sparkles,
 } from "lucide-react";
 
 const TYPE_CONFIG = {
@@ -142,7 +142,7 @@ export function GuideCard({ item, onOpen, variant = "default" }) {
       <div className="help-card__meta">
         {item.levelLabel ? (
           <span className="help-card__meta-item">
-            <Sparkles size={15} />
+            <Layers3 size={15} />
             {item.levelLabel}
           </span>
         ) : null}

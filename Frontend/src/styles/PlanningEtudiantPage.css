@@ -169,9 +169,9 @@
 }
 
 .cal-nav-aujourd-hui {
-  background: linear-gradient(135deg, #0ea5e9 0%, #6b6cf6 100%);
+  background: var(--blue);
   color: #ffffff;
-  box-shadow: 0 16px 28px rgba(107, 108, 246, 0.2);
+  box-shadow: 0 16px 28px rgba(47, 95, 137, 0.2);
 }
 
 .cal-nav-titre {
@@ -261,10 +261,10 @@
   gap: 0.12rem;
   padding: 0.45rem 0.55rem;
   border-radius: 12px;
-  background: linear-gradient(135deg, #0ea5e9, #6b6cf6);
+  background: linear-gradient(135deg, #53718a, #2f5f89);
   color: #ffffff;
   overflow: hidden;
-  box-shadow: 0 12px 24px rgba(77, 111, 229, 0.24);
+  box-shadow: 0 12px 24px rgba(47, 95, 137, 0.18);
 }
 
 .cal-seance-code {

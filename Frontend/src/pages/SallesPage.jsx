@@ -8,7 +8,6 @@
  *  - possibilite d'ajouter un nouveau type via un champ texte dedie.
  */
 import { useEffect, useMemo, useState } from "react";
-import { AppShell } from "../components/layout/AppShell.jsx";
 import { usePopup } from "../components/feedback/PopupProvider.jsx";
 import { ModuleExcelImportPanel } from "../components/imports/ModuleExcelImportPanel.jsx";
 import { recupererConfigurationImportExcel } from "../config/importExcelModules.js";
@@ -328,13 +327,7 @@ export function SallesPage({ utilisateur, onLogout }) {
 
   /* ─────────────── Rendu ─────────────── */
   return (
-    <AppShell
-      utilisateur={utilisateur}
-      onLogout={onLogout}
-      title="Salles"
-      subtitle="Gérez les salles disponibles dans l'établissement."
-    >
-      <div className="crud-page">
+    <div className="crud-page">
         {/* En-tête */}
         <div className="crud-page__header">
           <button
@@ -507,6 +500,5 @@ export function SallesPage({ utilisateur, onLogout }) {
           </div>
         )}
       </div>
-    </AppShell>
   );
 }

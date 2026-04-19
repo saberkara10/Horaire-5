@@ -102,8 +102,6 @@ export function LoginPage({ onLogin }) {
   return (
     <main className="login-page">
       <div className="login-page__background" />
-      <div className="login-page__glow login-page__glow--left" />
-      <div className="login-page__glow login-page__glow--right" />
 
       <section className="login-page__content">
         <section className="login-page__hero">
@@ -132,18 +130,6 @@ export function LoginPage({ onLogin }) {
               <span>Organisation pedagogique</span>
               <span>Coordination des enseignants</span>
               <span>Suivi des groupes</span>
-            </div>
-
-            <div className="login-page__hero-motion" aria-hidden="true">
-              <div className="login-page__hero-motion-surface" />
-              <div className="login-page__hero-motion-orbit login-page__hero-motion-orbit--one" />
-              <div className="login-page__hero-motion-orbit login-page__hero-motion-orbit--two" />
-              <div className="login-page__hero-motion-card login-page__hero-motion-card--top">
-                Session active
-              </div>
-              <div className="login-page__hero-motion-card login-page__hero-motion-card--bottom">
-                Cohortes organisees
-              </div>
             </div>
           </div>
         </section>

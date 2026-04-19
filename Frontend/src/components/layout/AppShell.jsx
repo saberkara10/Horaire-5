@@ -165,14 +165,6 @@ function IconScheduler() {
   );
 }
 
-function IconAdminCentral() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none">
-      <path d="M12 3L4 7v5c0 4.4 3.4 8.5 8 9.5 4.6-1 8-5.1 8-9.5V7l-8-4z" />
-    </svg>
-  );
-}
-
 function IconHelp() {
   return (
     <svg viewBox="0 0 24 24" fill="none">
@@ -394,18 +386,6 @@ export function AppShell({
             >
               <span className="app-shell__nav-icon"><IconAdmins /></span>
               <span>Sous-admins</span>
-            </NavLink>
-          ) : null}
-
-          {rolesUtilisateur.includes("ADMIN_RESPONSABLE") ? (
-            <NavLink
-              to="/admin-responsable"
-              className={({ isActive }) =>
-                `app-shell__nav-item ${isActive ? "app-shell__nav-item--active" : ""}`
-              }
-            >
-              <span className="app-shell__nav-icon"><IconAdminCentral /></span>
-              <span>Admin central</span>
             </NavLink>
           ) : null}
 

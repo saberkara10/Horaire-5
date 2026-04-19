@@ -1,11 +1,11 @@
 .centre-aide {
-  --help-accent: #0ea5e9;
-  --help-indigo: #6b6cf6;
-  --help-teal: #14b8a6;
-  --help-ink: #143452;
-  --help-muted: #667f97;
-  --help-panel: rgba(255, 255, 255, 0.88);
-  --help-panel-strong: rgba(255, 255, 255, 0.95);
+  --help-accent: #2f5f89;
+  --help-indigo: #4d6f8a;
+  --help-teal: #6a7f90;
+  --help-ink: #223445;
+  --help-muted: #647382;
+  --help-panel: rgba(255, 255, 255, 0.96);
+  --help-panel-strong: rgba(255, 255, 255, 0.98);
   display: grid;
   gap: 1.35rem;
   padding-bottom: 1rem;
@@ -67,22 +67,12 @@
   grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.75fr);
   gap: 1.2rem;
   padding: 1.7rem;
-  border-radius: 34px;
-  background:
-    radial-gradient(circle at top left, rgba(20, 184, 166, 0.16), transparent 28%),
-    radial-gradient(circle at bottom right, rgba(107, 108, 246, 0.16), transparent 34%),
-    linear-gradient(140deg, rgba(255, 255, 255, 0.98), rgba(241, 247, 255, 0.92));
+  border-radius: 26px;
+  background: rgba(255, 255, 255, 0.98);
 }
 
 .centre-aide__hero::after {
-  content: "";
-  position: absolute;
-  inset: auto -10% -18% auto;
-  width: 280px;
-  height: 280px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(14, 165, 233, 0.12), transparent 68%);
-  pointer-events: none;
+  display: none;
 }
 
 .centre-aide__hero-main,
@@ -98,8 +88,8 @@
   gap: 0.5rem;
   padding: 0.5rem 0.8rem;
   border-radius: 999px;
-  background: rgba(14, 165, 233, 0.12);
-  color: #0b78af;
+  background: rgba(47, 95, 137, 0.1);
+  color: #2f5f89;
   font-size: 0.8rem;
   font-weight: 800;
   letter-spacing: 0.07em;
@@ -130,7 +120,7 @@
   border: 1px solid rgba(167, 191, 220, 0.42);
   border-radius: 22px;
   background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 18px 34px rgba(128, 159, 198, 0.12);
+  box-shadow: 0 10px 24px rgba(129, 144, 158, 0.12);
 }
 
 .centre-aide__search-icon {
@@ -296,9 +286,9 @@
   width: fit-content;
   padding: 0 1rem;
   border: none;
-  background: linear-gradient(135deg, var(--help-accent), var(--help-indigo));
+  background: #2f5f89;
   color: #ffffff;
-  box-shadow: 0 18px 30px rgba(79, 115, 255, 0.22);
+  box-shadow: 0 10px 22px rgba(47, 95, 137, 0.18);
 }
 
 .centre-aide__grid,
@@ -346,7 +336,7 @@
 .help-video-card:hover,
 .help-category-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 24px 40px rgba(114, 142, 177, 0.2);
+  box-shadow: 0 12px 24px rgba(129, 144, 158, 0.14);
 }
 
 .help-learning-path__index {
@@ -355,7 +345,7 @@
   display: grid;
   place-items: center;
   border-radius: 14px;
-  background: linear-gradient(135deg, rgba(14, 165, 233, 0.16), rgba(107, 108, 246, 0.18));
+  background: rgba(232, 239, 245, 0.98);
   color: var(--help-ink);
   font-weight: 800;
 }
@@ -681,7 +671,7 @@
 }
 
 .help-card__action {
-  color: #0c71a3;
+  color: #2f5f89;
 }
 
 .help-card__resource-summary {
@@ -700,9 +690,7 @@
   position: relative;
   aspect-ratio: 16 / 9;
   overflow: hidden;
-  background:
-    radial-gradient(circle at top left, rgba(14, 165, 233, 0.16), transparent 26%),
-    linear-gradient(135deg, rgba(226, 238, 251, 0.96), rgba(246, 251, 255, 1));
+  background: linear-gradient(180deg, rgba(238, 243, 247, 0.98), rgba(247, 249, 251, 1));
 }
 
 .help-video-card__image {

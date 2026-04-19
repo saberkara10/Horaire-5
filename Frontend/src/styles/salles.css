@@ -831,7 +831,18 @@
 }
 
 .import-dropzone-icon {
-  font-size: 3rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 72px;
+  min-height: 72px;
+  border-radius: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(255, 255, 255, 0.94);
+  color: #2f5f89;
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
   margin-bottom: 1rem;
 }
 

@@ -4,7 +4,6 @@
  * Tableau de bord de pilotage academique.
  */
 import { useEffect, useMemo, useState } from "react";
-import { AppShell } from "../components/layout/AppShell.jsx";
 import { recupererDashboardOverview } from "../services/dashboard.api.js";
 import { usePopup } from "../components/feedback/PopupProvider.jsx";
 import {
@@ -206,13 +205,7 @@ export function DashboardPage({ utilisateur, onLogout }) {
   const scoreRapport = dernierRapport ? `${dernierRapport.score_qualite}/100` : "-";
 
   return (
-    <AppShell
-      utilisateur={utilisateur}
-      onLogout={onLogout}
-      title="Dashboard"
-      subtitle="Vue de pilotage academique."
-    >
-      <div className="dashboard-page">
+    <div className="dashboard-page">
         <section className="dashboard-hero">
           <div className="dashboard-hero__main">
             <span className="dashboard-hero__eyebrow">Pilotage</span>
@@ -485,6 +478,5 @@ export function DashboardPage({ utilisateur, onLogout }) {
           </div>
         </section>
       </div>
-    </AppShell>
   );
 }

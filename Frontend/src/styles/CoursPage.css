@@ -28,7 +28,7 @@
 .page-cours__primary-button {
   border: none;
   border-radius: 14px;
-  background: linear-gradient(135deg, #0ea5e9 0%, #6b6cf6 100%);
+  background: var(--blue);
   color: #ffffff;
   font-weight: 700;
   cursor: pointer;

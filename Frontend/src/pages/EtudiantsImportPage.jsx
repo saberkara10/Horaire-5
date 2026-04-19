@@ -5,7 +5,6 @@
  * et le traitement des etudiants.
  */
 import { useEffect, useMemo, useState } from "react";
-import { AppShell } from "../components/layout/AppShell.jsx";
 import { usePopup } from "../components/feedback/PopupProvider.jsx";
 import {
   recupererEtudiants,
@@ -119,13 +118,7 @@ export function EtudiantsImportPage({ utilisateur, onLogout }) {
   }
 
   return (
-    <AppShell
-      utilisateur={utilisateur}
-      onLogout={onLogout}
-      title="Import etudiants"
-      subtitle="Importez un fichier melangeant plusieurs etapes. Les groupes sont crees automatiquement par cohorte."
-    >
-      <div className="import-page">
+    <div className="import-page">
         <section className="import-page__card import-page__card--upload">
           <div className="import-page__header">
             <div>
@@ -263,6 +256,5 @@ export function EtudiantsImportPage({ utilisateur, onLogout }) {
           )}
         </section>
       </div>
-    </AppShell>
   );
 }

@@ -14,9 +14,7 @@ import {
   Filter,
   Layers3,
   Search,
-  WandSparkles,
 } from "lucide-react";
-import { AppShell } from "../components/layout/AppShell.jsx";
 import { GuideCard } from "../components/help/GuideCard.jsx";
 import { GuideDetailModal } from "../components/help/GuideDetailModal.jsx";
 import { HelpVideoCard } from "../components/help/HelpVideoCard.jsx";
@@ -356,34 +354,22 @@ export function CentreAidePage({ utilisateur, onLogout }) {
 
   if (isLoading) {
     return (
-      <AppShell
-        utilisateur={utilisateur}
-        onLogout={onLogout}
-        title="Centre d'aide"
-        subtitle="Guides, videos et documentation pour accompagner chaque module"
-      >
-        <div className="centre-aide__loading">
-          <div className="centre-aide__loading-card">
-            <div className="centre-aide__spinner" />
-            <p>Chargement du catalogue d'assistance...</p>
-          </div>
+      <div className="centre-aide__loading">
+        <div className="centre-aide__loading-card">
+          <div className="centre-aide__spinner" />
+          <p>Chargement du catalogue d'assistance...</p>
         </div>
-      </AppShell>
+      </div>
     );
   }
 
   return (
-    <AppShell
-      utilisateur={utilisateur}
-      onLogout={onLogout}
-      title="Centre d'aide"
-      subtitle="Un centre d'aide produit, structure pour la demonstration et pret a recevoir vos videos et vos guides markdown"
-    >
+    <>
       <div className="centre-aide">
         <section className="centre-aide__hero">
           <div className="centre-aide__hero-main">
             <span className="centre-aide__hero-pill">
-              <WandSparkles size={16} />
+              <Layers3 size={16} />
               Support produit premium
             </span>
 
@@ -823,6 +809,6 @@ export function CentreAidePage({ utilisateur, onLogout }) {
           onOpenContent={handleOpenContentById}
         />
       </Suspense>
-    </AppShell>
+    </>
   );
 }

@@ -99,7 +99,7 @@ export function ImportExcelPage({ moduleActif, onChangerModule }) {
               id="file-upload"
             />
             <label htmlFor="file-upload">
-              <div className="import-dropzone-icon">📊</div>
+              <div className="import-dropzone-icon" aria-hidden="true">XLS</div>
               <p className="import-dropzone-text">Cliquez pour sélectionner un fichier Excel</p>
               <p className="import-dropzone-hint">Formats acceptés: .xlsx, .xls, .csv</p>
             </label>

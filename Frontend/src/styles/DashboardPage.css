@@ -328,13 +328,13 @@
 }
 
 .dashboard-notice--ok {
-  border-color: rgba(34, 197, 94, 0.18);
-  background: rgba(240, 253, 244, 0.96);
+  border-color: rgba(47, 95, 137, 0.18);
+  background: rgba(236, 245, 255, 0.96);
 }
 
 .dashboard-notice--ok .dashboard-notice__head span {
-  background: rgba(34, 197, 94, 0.14);
-  color: #166534;
+  background: rgba(47, 95, 137, 0.12);
+  color: var(--blue);
 }
 
 .dashboard-admins__content {
@@ -404,9 +404,9 @@
 }
 
 .dashboard-admins__feedback--success {
-  border: 1px solid rgba(34, 197, 94, 0.18);
-  background: rgba(240, 253, 244, 0.96);
-  color: #166534;
+  border: 1px solid rgba(47, 95, 137, 0.18);
+  background: rgba(236, 245, 255, 0.96);
+  color: var(--blue);
 }
 
 .dashboard-admins__actions {
@@ -438,7 +438,7 @@
 .dashboard-admins__primary {
   padding: 0.8rem 1rem;
   border-radius: 14px;
-  background: linear-gradient(135deg, #0ea5e9, #6b6cf6);
+  background: var(--blue);
   color: #ffffff;
   font-weight: 700;
 }

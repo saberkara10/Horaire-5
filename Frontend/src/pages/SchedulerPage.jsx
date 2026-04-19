@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from "react";
-import { AppShell } from "../components/layout/AppShell.jsx";
 import { construireQueryGenerationScheduler } from "../services/scheduler.api.js";
 import {
   OPTIMIZATION_MODE_OPTIONS,
@@ -34,14 +33,14 @@ async function apiGet(url) {
 }
 
 const PHASES = [
-  { id: "PHASE_1", label: "Chargement du contexte",    icon: "🔍", pct: 5  },
-  { id: "PHASE_2", label: "Formation des groupes",     icon: "👥", pct: 15 },
-  { id: "PHASE_3", label: "Matrices de contraintes",   icon: "🔢", pct: 25 },
-  { id: "PHASE_4", label: "Génération greedy initiale",icon: "⚡", pct: 35 },
-  { id: "PHASE_5", label: "Cours échoués (cascade)",   icon: "🔄", pct: 55 },
-  { id: "PHASE_6", label: "Optimisation SA",           icon: "🧠", pct: 75 },
-  { id: "PHASE_7", label: "Persistance BD",            icon: "💾", pct: 90 },
-  { id: "DONE",    label: "Terminé",                   icon: "✅", pct: 100},
+  { id: "PHASE_1", label: "Chargement du contexte", icon: "01", pct: 5 },
+  { id: "PHASE_2", label: "Formation des groupes", icon: "02", pct: 15 },
+  { id: "PHASE_3", label: "Matrices de contraintes", icon: "03", pct: 25 },
+  { id: "PHASE_4", label: "Generation greedy initiale", icon: "04", pct: 35 },
+  { id: "PHASE_5", label: "Cours echoues (cascade)", icon: "05", pct: 55 },
+  { id: "PHASE_6", label: "Optimisation SA", icon: "06", pct: 75 },
+  { id: "PHASE_7", label: "Persistance BD", icon: "07", pct: 90 },
+  { id: "DONE", label: "Termine", icon: "OK", pct: 100 },
 ];
 
 const SCORING_SCORE_ITEMS = [
@@ -271,11 +270,11 @@ export function SchedulerPage({ utilisateur, onLogout }) {
       setBootstrapMsg({
         type: "success",
         text: total > 0
-          ? `✅ Bootstrap OK — ${details.join(" • ")}`
-          : "✅ Données déjà opérationnelles, aucune création nécessaire.",
+          ? `Initialisation terminee - ${details.join(" | ")}`
+          : "Donnees deja operationnelles, aucune creation necessaire.",
       });
     } catch (err) {
-      setBootstrapMsg({ type: "error", text: `❌ ${err.message}` });
+      setBootstrapMsg({ type: "error", text: `Erreur: ${err.message}` });
     } finally {
       setBootstrapping(false);
     }
@@ -311,7 +310,6 @@ export function SchedulerPage({ utilisateur, onLogout }) {
         } else if (data.type === "done") {
           setPct(100);
           setPhase("DONE");
-          setPhaseMsg("Génération terminée avec succès !");
           setPhaseMsg(
             `Generation terminee en mode ${formaterLibelleModeOptimisation(
               data?.rapport?.details?.modeOptimisationUtilise || optimizationMode
@@ -366,16 +364,10 @@ export function SchedulerPage({ utilisateur, onLogout }) {
   const phaseIndex    = PHASES.findIndex((p) => p.id === phase);
 
   return (
-    <AppShell
-      utilisateur={utilisateur}
-      onLogout={onLogout}
-      title="Pilotage sessions"
-      subtitle="Administrez les sessions, le bootstrap et l'historique du moteur avance."
-    >
-      <div className="scheduler-page">
+    <div className="scheduler-page">
         <div className="scheduler-header">
           <div>
-            <h1 className="scheduler-title">⚡ Générateur d'Horaires</h1>
+            <h1 className="scheduler-title">Generateur d'horaires</h1>
             <p className="scheduler-subtitle">
               Semaine type stable du lundi au vendredi, 7 cours par programme et 3 a 4 jours d'etudes par groupe.
             </p>
@@ -396,9 +388,9 @@ export function SchedulerPage({ utilisateur, onLogout }) {
               className={`scheduler-tab ${onglet === t ? "active" : ""}`}
               onClick={() => setOnglet(t)}
             >
-              {t === "generation" && "🎯 Génération"}
-              {t === "sessions"   && "📅 Sessions"}
-              {t === "historique" && "📊 Historique"}
+              {t === "generation" && "Generation"}
+              {t === "sessions" && "Sessions"}
+              {t === "historique" && "Historique"}
             </button>
           ))}
         </div>
@@ -409,7 +401,7 @@ export function SchedulerPage({ utilisateur, onLogout }) {
             <div className="scheduler-grid">
               {/* Panel gauche : paramètres */}
               <div className="scheduler-panel">
-                <h2 className="panel-title">⚙️ Paramètres</h2>
+                <h2 className="panel-title">Parametres</h2>
 
                 {/* Bootstrap */}
                 <div className="bootstrap-section">
@@ -422,7 +414,7 @@ export function SchedulerPage({ utilisateur, onLogout }) {
                     onClick={handleBootstrap}
                     disabled={bootstrapping || generating}
                   >
-                    {bootstrapping ? "⏳ Bootstrap…" : "🚀 Préparer les données"}
+                    {bootstrapping ? "Preparation..." : "Preparer les donnees"}
                   </button>
                   {bootstrapMsg && (
                     <div className={`alert-${bootstrapMsg.type === "success" ? "success" : "error"} bootstrap-alert`}>
@@ -441,7 +433,8 @@ export function SchedulerPage({ utilisateur, onLogout }) {
                     <option value="">Session active ({sessionActive?.nom || "Aucune"})</option>
                     {sessions.map((s) => (
                       <option key={s.id_session} value={s.id_session}>
-                        {s.nom} {s.active ? "✅" : ""}
+                        {s.nom}
+                        {s.active ? " (active)" : ""}
                       </option>
                     ))}
                   </select>
@@ -471,7 +464,9 @@ export function SchedulerPage({ utilisateur, onLogout }) {
                       className="toggle-btn off"
                       disabled
                     >
-                      {inclureWeekend ? "✅ Sam/Dim inclus" : "❌ Lun–Ven seulement"}
+                      {inclureWeekend
+                        ? "Samedi et dimanche inclus"
+                        : "Lundi au vendredi uniquement"}
                     </button>
                   </div>
                 </div>
@@ -493,7 +488,7 @@ export function SchedulerPage({ utilisateur, onLogout }) {
                 </div>
 
                 <div className="algo-info">
-                  <h3>🧠 Algorithme 7 phases</h3>
+                  <h3>Algorithme en 7 phases</h3>
                   <div className="phases-list">
                     {PHASES.slice(0, -1).map((ph, i) => (
                       <div
@@ -503,7 +498,7 @@ export function SchedulerPage({ utilisateur, onLogout }) {
                         }`}
                       >
                         <span className="phase-icon">
-                          {phaseIndex > i ? "✅" : phaseIndex === i ? "⚙️" : ph.icon}
+                          {phaseIndex > i ? "OK" : phaseIndex === i ? "EN" : ph.icon}
                         </span>
                         <span>{ph.label}</span>
                       </div>
@@ -521,7 +516,7 @@ export function SchedulerPage({ utilisateur, onLogout }) {
                       <span className="spinner" /> Génération en cours…
                     </span>
                   ) : (
-                    "🚀 Lancer la génération"
+                    "Lancer la generation"
                   )}
                 </button>
               </div>
@@ -554,14 +549,14 @@ export function SchedulerPage({ utilisateur, onLogout }) {
 
                 {erreur && (
                   <div className="alert-error">
-                    <span>❌</span> {erreur}
+                    {erreur}
                   </div>
                 )}
 
                 {rapport && !generating && (
                   <div className="rapport-card">
                     <div className="rapport-header">
-                      <h2>✅ Génération réussie</h2>
+                      <h2>Generation terminee</h2>
                       <div className="score-badge">
                         <span
                           className={`score-num ${
@@ -620,14 +615,14 @@ export function SchedulerPage({ utilisateur, onLogout }) {
                     />
 
                     <div className="rapport-meta">
-                      <span>🔁 Itérations SA : {rapport.iterations_sa?.toLocaleString()}</span>
-                      <span>📌 Session : {rapport.session?.nom}</span>
-                      <span>📈 Score initial : {rapport.score_initial}</span>
+                      <span>Iterations SA : {rapport.iterations_sa?.toLocaleString()}</span>
+                      <span>Session : {rapport.session?.nom}</span>
+                      <span>Score initial : {rapport.score_initial}</span>
                     </div>
 
                     {rapport.groupes_crees?.length > 0 && (
                       <div className="rapport-section">
-                        <h3>👥 Groupes formés ({rapport.groupes_crees.length})</h3>
+                        <h3>Groupes formes ({rapport.groupes_crees.length})</h3>
                         <div className="groupes-list">
                           {rapport.groupes_crees.map((g) => (
                             <span key={g.nom} className="groupe-tag">
@@ -640,7 +635,7 @@ export function SchedulerPage({ utilisateur, onLogout }) {
 
                     {rapport.non_planifies?.length > 0 && (
                       <div className="rapport-section warning">
-                        <h3>⚠️ Cours non planifiés ({rapport.non_planifies.length})</h3>
+                        <h3>Cours non planifies ({rapport.non_planifies.length})</h3>
                         {rapport.non_planifies.map((c, i) => (
                           <div key={i} className="non-planifie-item">
                             <strong>{c.code}</strong> — {c.raison}
@@ -651,7 +646,7 @@ export function SchedulerPage({ utilisateur, onLogout }) {
 
                     {rapport.resolutions_manuelles?.length > 0 && (
                       <div className="rapport-section error">
-                        <h3>🛑 Résolutions manuelles ({rapport.resolutions_manuelles.length})</h3>
+                        <h3>Resolutions manuelles ({rapport.resolutions_manuelles.length})</h3>
                         {rapport.resolutions_manuelles.map((c, i) => (
                           <div key={i} className="non-planifie-item">
                             <strong>{c.code_cours || c.cours?.code || "REPRISE"}</strong> : {c.etudiants?.length || 1} étudiant(s) — {c.raison}
@@ -665,13 +660,13 @@ export function SchedulerPage({ utilisateur, onLogout }) {
                         className="btn-secondary"
                         onClick={() => window.open("/horaires-groupes", "_blank")}
                       >
-                        📅 Voir les horaires groupes
+                        Voir les horaires groupes
                       </button>
                       <button
                         className="btn-secondary"
                         onClick={() => window.open("/horaires-professeurs", "_blank")}
                       >
-                        👨‍🏫 Voir les horaires profs
+                        Voir les horaires profs
                       </button>
                     </div>
                   </div>
@@ -679,13 +674,12 @@ export function SchedulerPage({ utilisateur, onLogout }) {
 
                 {!rapport && !generating && !erreur && (
                   <div className="empty-state">
-                    <div className="empty-icon">🎓</div>
-                    <h3>Prêt à générer</h3>
+                    <h3>Pret a generer</h3>
                     <p>Configurez les paramètres et lancez la génération optimisée.</p>
                     <ul className="empty-tips">
-                      <li>✅ Assurez-vous d'avoir une session active</li>
-                      <li>✅ Importez vos étudiants avant de générer</li>
-                      <li>✅ Vérifiez les disponibilités des professeurs</li>
+                      <li>Assurez-vous d'avoir une session active</li>
+                      <li>Importez vos etudiants avant de generer</li>
+                      <li>Verifiez les disponibilites des professeurs</li>
                     </ul>
                   </div>
                 )}
@@ -698,9 +692,9 @@ export function SchedulerPage({ utilisateur, onLogout }) {
         {onglet === "sessions" && (
           <div className="scheduler-content">
             <div className="sessions-header">
-              <h2>Gestion des Sessions</h2>
+              <h2>Gestion des sessions</h2>
               <button className="btn-add" onClick={() => setShowSessionForm(true)}>
-                + Nouvelle session
+                Nouvelle session
               </button>
             </div>
 
@@ -831,8 +825,7 @@ export function SchedulerPage({ utilisateur, onLogout }) {
               <div className="historique-detail">
                 {!rapportHistoriqueDetail && !rapportHistoriqueLoading && (
                   <div className="empty-state">
-                    <div className="empty-icon">📑</div>
-                    <h3>Sélectionnez un rapport</h3>
+                    <h3>Selectionnez un rapport</h3>
                     <p>Le détail métier persistant apparaîtra ici.</p>
                   </div>
                 )}
@@ -1095,6 +1088,5 @@ export function SchedulerPage({ utilisateur, onLogout }) {
           </div>
         )}
       </div>
-    </AppShell>
   );
 }

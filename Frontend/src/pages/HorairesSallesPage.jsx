@@ -11,7 +11,6 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { AppShell } from "../components/layout/AppShell.jsx";
 import { FeedbackBanner } from "../components/ui/FeedbackBanner.jsx";
 import { SalleOccupationBoard } from "../components/salles/SalleOccupationBoard.jsx";
 import { useSalles } from "../hooks/useSalles.js";
@@ -275,13 +274,7 @@ export function HorairesSallesPage({ utilisateur, onLogout }) {
     etatOccupation === "loading" || etatOccupation === "refreshing";
 
   return (
-    <AppShell
-      utilisateur={utilisateur}
-      onLogout={onLogout}
-      title="Occupation des salles"
-      subtitle="Selectionnez une salle et consultez son occupation hebdomadaire, ses disponibilites et son etat actuel."
-    >
-      <motion.div
+    <motion.div
         className="horaires-salles-page"
         initial={{ opacity: 0, y: 18 }}
         animate={{ opacity: 1, y: 0 }}
@@ -528,6 +521,5 @@ export function HorairesSallesPage({ utilisateur, onLogout }) {
           </motion.section>
         </section>
       </motion.div>
-    </AppShell>
   );
 }

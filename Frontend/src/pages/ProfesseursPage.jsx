@@ -5,7 +5,6 @@
  * et la maintenance des professeurs.
  */
 import { useEffect, useMemo, useState } from "react";
-import { AppShell } from "../components/layout/AppShell.jsx";
 import { usePopup } from "../components/feedback/PopupProvider.jsx";
 import { ModuleExcelImportPanel } from "../components/imports/ModuleExcelImportPanel.jsx";
 import { recupererConfigurationImportExcel } from "../config/importExcelModules.js";
@@ -250,13 +249,7 @@ export function ProfesseursPage({ utilisateur, onLogout }) {
   }
 
   return (
-    <AppShell
-      utilisateur={utilisateur}
-      onLogout={onLogout}
-      title="Professeurs"
-      subtitle="Rattachez chaque enseignant a ses cours autorises. Les programmes sont deduits automatiquement."
-    >
-      <div className="crud-page">
+    <div className="crud-page">
         <div className="crud-page__header">
           <button
             type="button"
@@ -504,6 +497,5 @@ export function ProfesseursPage({ utilisateur, onLogout }) {
           </div>
         ) : null}
       </div>
-    </AppShell>
   );
 }

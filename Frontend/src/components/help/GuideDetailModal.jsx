@@ -5,9 +5,9 @@ import {
   CircleHelp,
   Clock3,
   FileText,
+  Layers3,
   Lightbulb,
   PlayCircle,
-  Sparkles,
   X,
 } from "lucide-react";
 
@@ -102,7 +102,7 @@ export function GuideDetailModal({
             ) : null}
             {item.levelLabel ? (
               <span className="help-modal__badge help-modal__badge--soft">
-                <Sparkles size={14} />
+                <Layers3 size={14} />
                 {item.levelLabel}
               </span>
             ) : null}
@@ -249,7 +249,7 @@ export function GuideDetailModal({
             {practicalTips.length > 0 ? (
               <section className="help-modal__section">
                 <div className="help-modal__section-head">
-                  <Sparkles size={18} />
+                  <BookOpen size={18} />
                   <h3>Conseils pratiques</h3>
                 </div>
                 <ul className="help-modal__list">
@@ -329,7 +329,7 @@ export function GuideDetailModal({
             {Array.isArray(item.tags) && item.tags.length > 0 ? (
               <section className="help-modal__aside-card">
                 <div className="help-modal__section-head">
-                  <Sparkles size={18} />
+                  <Layers3 size={18} />
                   <h3>Mots-cles</h3>
                 </div>
                 <div className="help-modal__chip-list">
