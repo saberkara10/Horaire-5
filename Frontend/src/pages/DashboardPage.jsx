@@ -210,17 +210,12 @@ export function DashboardPage({ utilisateur, onLogout }) {
       utilisateur={utilisateur}
       onLogout={onLogout}
       title="Dashboard"
-      subtitle="Vue de pilotage academique."
     >
       <div className="dashboard-page">
         <section className="dashboard-hero">
           <div className="dashboard-hero__main">
             <span className="dashboard-hero__eyebrow">Pilotage</span>
             <h2>Tableau de bord clair sur les groupes, les etudiants et les horaires</h2>
-            <p>
-              Le dashboard distingue les volumes globaux, la couverture reelle de la
-              session active et les cas particuliers qui demandent une action metier.
-            </p>
 
             <div className="dashboard-hero__chips">
               <span>

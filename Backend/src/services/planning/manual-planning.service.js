@@ -2015,11 +2015,7 @@ export async function listerCoursEchouesEtudiant(idEtudiant, executor = pool) {
 
   const session = await recupererSessionActive(executor);
   if (!session?.id_session) {
-    throw creerErreurPlanification(
-      "Aucune session active n'est disponible.",
-      409,
-      "ACTIVE_SESSION_MISSING"
-    );
+    return [];
   }
 
   const [rows] = await executor.query(
@@ -2069,11 +2065,7 @@ export async function listerEtudiantsPourPlanificationReprise(executor = pool) {
 
   const session = await recupererSessionActive(executor);
   if (!session?.id_session) {
-    throw creerErreurPlanification(
-      "Aucune session active n'est disponible.",
-      409,
-      "ACTIVE_SESSION_MISSING"
-    );
+    return [];
   }
 
   const [rows] = await executor.query(

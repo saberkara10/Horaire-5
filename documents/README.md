@@ -43,7 +43,6 @@ Chaque lien ci-dessous est cliquable et redirige directement vers le fichier cib
 - Pour consulter la conception du tableau de bord et de la supervision operationnelle : [Conception du dashboard](conception-dashboard.md)
 - Pour voir la logique des exports PDF et Excel : [Conception des exports](conception-export.md)
 - Pour consulter l'organisation logique de la base de donnees : [Conception de la base de donnees](conception-base-de-donnees.md)
-- Pour comprendre la strategie de migration et d'evolution du schema : [Conception des migrations](conception-migrations.md)
 
 ## 3. Documentation technique detaillee
 
@@ -80,10 +79,6 @@ Chaque lien ci-dessous est cliquable et redirige directement vers le fichier cib
 - Pour consulter la documentation de l'interface React et de ses flux : [Documentation du frontend](documentation-frontend.md)
 - Pour consulter la documentation du tableau de bord : [Documentation du dashboard](documentation-dashboard.md)
 - Pour consulter la documentation des exports PDF et Excel : [Documentation des exports](documentation-export.md)
-
-### Donnees et schema
-
-- Pour consulter la documentation de la gestion des migrations : [Documentation des migrations](documentation-migrations.md)
 
 ## 4. Diagrammes UML et modeles
 

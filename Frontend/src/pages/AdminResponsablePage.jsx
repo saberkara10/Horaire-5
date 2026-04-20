@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { AppShell } from "../components/layout/AppShell.jsx";
+import { getLibelleRoleFrontend } from "../utils/roles.js";
 import "../styles/SchedulerPage.css";
 
 async function apiGet(url) {
@@ -11,7 +12,8 @@ async function apiGet(url) {
 
 async function apiPost(url, body) {
   const res = await fetch(url, {
-    method: "POST", credentials: "include",
+    method: "POST",
+    credentials: "include",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
@@ -22,17 +24,11 @@ async function apiPost(url, body) {
 
 async function apiPut(url, body) {
   const res = await fetch(url, {
-    method: "PUT", credentials: "include",
+    method: "PUT",
+    credentials: "include",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.message || "Erreur serveur.");
-  return data;
-}
-
-async function apiDelete(url) {
-  const res = await fetch(url, { method: "DELETE", credentials: "include" });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.message || "Erreur serveur.");
   return data;
@@ -43,265 +39,360 @@ export function AdminResponsablePage({ utilisateur, onLogout }) {
   const [utilisateurs, setUtilisateurs] = useState([]);
   const [onglet, setOnglet] = useState("stats");
   const [message, setMessage] = useState({ type: "", text: "" });
-
-  // Formulaire nouvel utilisateur
   const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState({ nom: "", prenom: "", email: "", motdepasse: "", role: "ADMIN" });
+  const [formData, setFormData] = useState({
+    nom: "",
+    prenom: "",
+    email: "",
+    motdepasse: "",
+    role: "ADMIN",
+  });
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    charger();
+    void charger();
   }, []);
 
   async function charger() {
     try {
-      const [s, u] = await Promise.allSettled([
+      const [statistiques, comptes] = await Promise.allSettled([
         apiGet("/api/admin/statistiques"),
         apiGet("/api/admin/utilisateurs"),
       ]);
-      if (s.status === "fulfilled") setStats(s.value);
-      if (u.status === "fulfilled") setUtilisateurs(u.value);
-    } catch {}
+
+      if (statistiques.status === "fulfilled") {
+        setStats(statistiques.value);
+      }
+
+      if (comptes.status === "fulfilled") {
+        setUtilisateurs(comptes.value);
+      }
+    } catch {
+      // ignore
+    }
   }
 
-  async function handleCreer(e) {
-    e.preventDefault();
+  async function handleCreer(event) {
+    event.preventDefault();
     setSubmitting(true);
+
     try {
       await apiPost("/api/admin/utilisateurs", formData);
-      setMessage({ type: "success", text: `Administrateur ${formData.nom} créé avec succès.` });
+      setMessage({
+        type: "success",
+        text: `Compte cree pour ${formData.prenom} ${formData.nom}.`,
+      });
       setShowForm(false);
-      setFormData({ nom: "", prenom: "", email: "", motdepasse: "", role: "ADMIN" });
+      setFormData({
+        nom: "",
+        prenom: "",
+        email: "",
+        motdepasse: "",
+        role: "ADMIN",
+      });
       await charger();
-    } catch (err) {
-      setMessage({ type: "error", text: err.message });
+    } catch (error) {
+      setMessage({ type: "error", text: error.message });
     } finally {
       setSubmitting(false);
     }
   }
 
-  async function handleToggleActif(u) {
+  async function handleToggleActif(utilisateurItem) {
     try {
-      await apiPut(`/api/admin/utilisateurs/${u.id_utilisateur}`, { actif: !u.actif });
-      setMessage({ type: "success", text: `Utilisateur ${u.nom} ${!u.actif ? "activé" : "désactivé"}.` });
+      await apiPut(`/api/admin/utilisateurs/${utilisateurItem.id_utilisateur}`, {
+        actif: !utilisateurItem.actif,
+      });
+      setMessage({
+        type: "success",
+        text: `Compte ${!utilisateurItem.actif ? "active" : "desactive"} pour ${utilisateurItem.nom}.`,
+      });
       await charger();
-    } catch (err) {
-      setMessage({ type: "error", text: err.message });
+    } catch (error) {
+      setMessage({ type: "error", text: error.message });
     }
   }
 
-  async function handleSupprimer(u) {
-    if (!window.confirm(`Désactiver ${u.prenom} ${u.nom} ?`)) return;
-    try {
-      await apiDelete(`/api/admin/utilisateurs/${u.id_utilisateur}`);
-      setMessage({ type: "success", text: "Utilisateur désactivé." });
-      await charger();
-    } catch (err) {
-      setMessage({ type: "error", text: err.message });
+  function renderRoleBadge(role) {
+    if (role === "ADMIN_RESPONSABLE") {
+      return <span className="badge-responsable">Administrateur principal</span>;
     }
-  }
 
-  const roleBadge = (role) => {
-    if (role === "ADMIN_RESPONSABLE") return <span className="badge-responsable">Responsable</span>;
-    if (role === "ADMIN") return <span className="badge-admin">Admin</span>;
-    return <span className="badge-user">Utilisateur</span>;
-  };
+    if (role === "ADMIN" || role === "RESPONSABLE") {
+      return <span className="badge-admin">{getLibelleRoleFrontend(role)}</span>;
+    }
+
+    return <span className="badge-user">{getLibelleRoleFrontend(role)}</span>;
+  }
 
   return (
     <AppShell
       utilisateur={utilisateur}
       onLogout={onLogout}
-      title="Admin central"
-      subtitle="Supervision globale des acces et des indicateurs academiques."
+      title="Administration"
     >
       <div className="admin-page">
         <div className="admin-header">
           <div>
-            <h1 className="admin-title">🛡️ Dashboard Admin Responsable</h1>
-            <p className="admin-subtitle">Gestion des accès et supervision globale</p>
+            <h1 className="admin-title">Administration generale</h1>
+            <p className="admin-subtitle">
+              Gestion des acces et supervision globale.
+            </p>
           </div>
         </div>
 
-        {message.text && (
-          <div className={`alert-${message.type}`} onClick={() => setMessage({ type: "", text: "" })}>
-            {message.type === "success" ? "✅" : "❌"} {message.text}
+        {message.text ? (
+          <div
+            className={`alert-${message.type}`}
+            onClick={() => setMessage({ type: "", text: "" })}
+          >
+            {message.text}
           </div>
-        )}
+        ) : null}
 
-        {/* Onglets */}
         <div className="scheduler-tabs">
-          {["stats", "utilisateurs"].map((t) => (
+          {[
+            { id: "stats", label: "Statistiques" },
+            { id: "utilisateurs", label: "Comptes" },
+          ].map((item) => (
             <button
-              key={t}
-              className={`scheduler-tab ${onglet === t ? "active" : ""}`}
-              onClick={() => setOnglet(t)}
+              key={item.id}
+              className={`scheduler-tab ${onglet === item.id ? "active" : ""}`}
+              onClick={() => setOnglet(item.id)}
             >
-              {t === "stats" && "📊 Statistiques"}
-              {t === "utilisateurs" && "👥 Administrateurs"}
+              {item.label}
             </button>
           ))}
         </div>
 
-        {/* ── Statistiques ─────────────────────────────────────────── */}
-        {onglet === "stats" && stats && (
+        {onglet === "stats" && stats ? (
           <div className="admin-stats-grid">
-            {/* Carte Utilisateurs */}
             <div className="admin-stat-card blue">
-              <div className="stat-card-icon">👥</div>
               <div className="stat-card-content">
                 <h3>Utilisateurs</h3>
                 <div className="stat-card-nums">
-                  <div><span className="big-num">{stats.utilisateurs.total}</span> Total</div>
-                  <div><span className="med-num">{stats.utilisateurs.admins}</span> Admins</div>
-                  <div><span className="med-num">{stats.utilisateurs.responsables}</span> Resp.</div>
+                  <div>
+                    <span className="big-num">{stats.utilisateurs.total}</span>
+                    Total
+                  </div>
+                  <div>
+                    <span className="med-num">{stats.utilisateurs.admins}</span>
+                    Admins
+                  </div>
+                  <div>
+                    <span className="med-num">{stats.utilisateurs.responsables}</span>
+                    Resp.
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Carte Académique */}
             <div className="admin-stat-card purple">
-              <div className="stat-card-icon">🎓</div>
               <div className="stat-card-content">
-                <h3>Données académiques</h3>
+                <h3>Donnees academiques</h3>
                 <div className="stat-card-list">
                   <div>{stats.global.nb_cours} cours actifs</div>
                   <div>{stats.global.nb_professeurs} professeurs</div>
-                  <div>{stats.global.nb_etudiants} étudiants</div>
+                  <div>{stats.global.nb_etudiants} etudiants</div>
                   <div>{stats.global.nb_salles} salles</div>
                   <div>{stats.global.nb_groupes} groupes</div>
                 </div>
               </div>
             </div>
 
-            {/* Carte Horaires */}
             <div className="admin-stat-card green">
-              <div className="stat-card-icon">📅</div>
               <div className="stat-card-content">
                 <h3>Horaires</h3>
-                <div><span className="big-num">{stats.global.nb_affectations}</span>
+                <div>
+                  <span className="big-num">{stats.global.nb_affectations}</span>
                   <span className="stat-label"> affectations actives</span>
                 </div>
-                {stats.dernier_rapport && (
+                {stats.dernier_rapport ? (
                   <div className="last-gen">
                     <span>Dernier score : </span>
-                    <span className={`score-inline ${stats.dernier_rapport.score_qualite >= 70 ? "green" : "orange"}`}>
+                    <span
+                      className={`score-inline ${
+                        stats.dernier_rapport.score_qualite >= 70
+                          ? "green"
+                          : "orange"
+                      }`}
+                    >
                       {stats.dernier_rapport.score_qualite}/100
                     </span>
                   </div>
-                )}
+                ) : null}
               </div>
             </div>
 
-            {/* Carte Alertes */}
             <div className="admin-stat-card red">
-              <div className="stat-card-icon">⚠️</div>
               <div className="stat-card-content">
-                <h3>À traiter</h3>
+                <h3>A traiter</h3>
                 <div>
-                  <span className="big-num">{stats.global.cours_echoues_en_attente}</span>
-                  <span className="stat-label"> cours échoués en attente</span>
+                  <span className="big-num">
+                    {stats.global.cours_echoues_en_attente}
+                  </span>
+                  <span className="stat-label"> cours echoues en attente</span>
                 </div>
-                {stats.global.cours_echoues_en_attente > 0 && (
+                {stats.global.cours_echoues_en_attente > 0 ? (
                   <div className="alert-hint">
-                    Régénérez l'horaire pour les traiter automatiquement.
+                    Regenerez l'horaire pour les traiter automatiquement.
                   </div>
-                )}
+                ) : null}
               </div>
             </div>
           </div>
-        )}
+        ) : null}
 
-        {/* ── Gestion des administrateurs ─────────────────────────── */}
-        {onglet === "utilisateurs" && (
+        {onglet === "utilisateurs" ? (
           <div className="admin-content">
             <div className="admin-users-header">
-              <h2>Administrateurs ({utilisateurs.length})</h2>
+              <h2>Comptes ({utilisateurs.length})</h2>
               <button className="btn-primary" onClick={() => setShowForm(true)}>
-                + Nouvel administrateur
+                + Nouveau compte
               </button>
             </div>
 
-            {/* Formulaire de création */}
-            {showForm && (
+            {showForm ? (
               <form className="admin-user-form" onSubmit={handleCreer}>
-                <h3>Créer un administrateur</h3>
+                <h3>Creer un compte</h3>
+
                 <div className="form-grid-2">
                   <div className="form-group">
                     <label>Nom</label>
-                    <input required type="text" className="form-input"
+                    <input
+                      required
+                      type="text"
+                      className="form-input"
                       value={formData.nom}
-                      onChange={(e) => setFormData({ ...formData, nom: e.target.value })} />
+                      onChange={(event) =>
+                        setFormData({ ...formData, nom: event.target.value })
+                      }
+                    />
                   </div>
+
                   <div className="form-group">
-                    <label>Prénom</label>
-                    <input required type="text" className="form-input"
+                    <label>Prenom</label>
+                    <input
+                      required
+                      type="text"
+                      className="form-input"
                       value={formData.prenom}
-                      onChange={(e) => setFormData({ ...formData, prenom: e.target.value })} />
+                      onChange={(event) =>
+                        setFormData({ ...formData, prenom: event.target.value })
+                      }
+                    />
                   </div>
+
                   <div className="form-group">
                     <label>Email</label>
-                    <input required type="email" className="form-input"
+                    <input
+                      required
+                      type="email"
+                      className="form-input"
                       value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
+                      onChange={(event) =>
+                        setFormData({ ...formData, email: event.target.value })
+                      }
+                    />
                   </div>
+
                   <div className="form-group">
                     <label>Mot de passe</label>
-                    <input required type="password" className="form-input"
+                    <input
+                      required
+                      type="password"
+                      className="form-input"
                       value={formData.motdepasse}
-                      onChange={(e) => setFormData({ ...formData, motdepasse: e.target.value })} />
+                      onChange={(event) =>
+                        setFormData({
+                          ...formData,
+                          motdepasse: event.target.value,
+                        })
+                      }
+                    />
                   </div>
+
                   <div className="form-group">
-                    <label>Rôle</label>
-                    <select className="form-select"
+                    <label>Profil</label>
+                    <select
+                      className="form-select"
                       value={formData.role}
-                      onChange={(e) => setFormData({ ...formData, role: e.target.value })}>
-                      <option value="ADMIN">Admin</option>
-                      <option value="ADMIN_RESPONSABLE">Admin Responsable</option>
+                      onChange={(event) =>
+                        setFormData({ ...formData, role: event.target.value })
+                      }
+                    >
+                      <option value="ADMIN">Administrateur</option>
+                      <option value="ADMIN_RESPONSABLE">
+                        Administrateur principal
+                      </option>
                     </select>
                   </div>
                 </div>
+
                 <div className="form-actions">
-                  <button type="submit" className="btn-primary" disabled={submitting}>
-                    {submitting ? "Création…" : "Créer"}
+                  <button
+                    type="submit"
+                    className="btn-primary"
+                    disabled={submitting}
+                  >
+                    {submitting ? "Creation..." : "Creer"}
                   </button>
-                  <button type="button" className="btn-secondary" onClick={() => setShowForm(false)}>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => setShowForm(false)}
+                  >
                     Annuler
                   </button>
                 </div>
               </form>
-            )}
+            ) : null}
 
-            {/* Table des utilisateurs */}
             <div className="admin-users-table">
               <table>
                 <thead>
                   <tr>
                     <th>Nom</th>
                     <th>Email</th>
-                    <th>Rôle</th>
+                    <th>Profil</th>
                     <th>Statut</th>
-                    <th>Créé par</th>
+                    <th>Cree par</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {utilisateurs.map((u) => (
-                    <tr key={u.id_utilisateur} className={!u.actif ? "inactive-row" : ""}>
-                      <td>{u.prenom} {u.nom}</td>
-                      <td>{u.email}</td>
-                      <td>{roleBadge(u.role)}</td>
+                  {utilisateurs.map((utilisateurItem) => (
+                    <tr
+                      key={utilisateurItem.id_utilisateur}
+                      className={!utilisateurItem.actif ? "inactive-row" : ""}
+                    >
                       <td>
-                        <span className={`badge-statut ${u.actif ? "actif" : "inactif"}`}>
-                          {u.actif ? "Actif" : "Inactif"}
+                        {utilisateurItem.prenom} {utilisateurItem.nom}
+                      </td>
+                      <td>{utilisateurItem.email}</td>
+                      <td>{renderRoleBadge(utilisateurItem.role)}</td>
+                      <td>
+                        <span
+                          className={`badge-statut ${
+                            utilisateurItem.actif ? "actif" : "inactif"
+                          }`}
+                        >
+                          {utilisateurItem.actif ? "Actif" : "Inactif"}
                         </span>
                       </td>
-                      <td>{u.cree_par_prenom ? `${u.cree_par_prenom} ${u.cree_par_nom}` : "—"}</td>
+                      <td>
+                        {utilisateurItem.cree_par_prenom
+                          ? `${utilisateurItem.cree_par_prenom} ${utilisateurItem.cree_par_nom}`
+                          : "-"}
+                      </td>
                       <td className="action-cell">
                         <button
-                          className={`btn-sm ${u.actif ? "btn-warning" : "btn-success"}`}
-                          onClick={() => handleToggleActif(u)}
+                          className={`btn-sm ${
+                            utilisateurItem.actif ? "btn-warning" : "btn-success"
+                          }`}
+                          onClick={() => handleToggleActif(utilisateurItem)}
                         >
-                          {u.actif ? "Désactiver" : "Activer"}
+                          {utilisateurItem.actif ? "Desactiver" : "Activer"}
                         </button>
                       </td>
                     </tr>
@@ -310,7 +401,7 @@ export function AdminResponsablePage({ utilisateur, onLogout }) {
               </table>
             </div>
           </div>
-        )}
+        ) : null}
       </div>
     </AppShell>
   );

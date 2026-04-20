@@ -3,10 +3,12 @@
   "version": "1.0.0",
   "description": "Gestion des horaires project",
   "scripts": {
-    "backend": "cd Backend && npm run dev",
-    "frontend": "cd Frontend && npm run dev",
-    "dev": "concurrently \"npm run backend\" \"npm run frontend\"",
-    "migrate": "npm --prefix Backend run migrate"
+    "backend": "npm --prefix Backend run dev",
+    "frontend": "npm --prefix Frontend run dev",
+    "dev": "node scripts/start-dev.mjs",
+    "migrate": "npm --prefix Backend run migrate",
+    "test": "npm --prefix Backend test -- --runInBand",
+    "test:coverage": "npm --prefix Backend run test:coverage"
   },
   "dependencies": {
     "cors": "^2.8.6",

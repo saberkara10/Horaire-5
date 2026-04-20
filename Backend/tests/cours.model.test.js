@@ -68,6 +68,7 @@ describe("Model cours", () => {
 
   test("modifierCours met a jour la salle de reference", async () => {
     queryMock
+      .mockResolvedValueOnce([[{ id_cours: 1, id_salle_reference: 4, type_salle: "Salle de cours" }]])
       .mockResolvedValueOnce([[{ id_salle: 8, code: "A101", type: "Salle de cours" }]])
       .mockResolvedValueOnce([{ affectedRows: 1 }])
       .mockResolvedValueOnce([[{ id_cours: 1, id_salle_reference: 8 }]]);

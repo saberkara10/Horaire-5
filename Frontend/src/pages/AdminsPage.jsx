@@ -19,8 +19,7 @@ export function AdminsPage({ utilisateur, onLogout }) {
     <AppShell
       utilisateur={utilisateur}
       onLogout={onLogout}
-      title="Sous-admins"
-      subtitle="Creation, modification et suivi des comptes admin."
+      title="Sous-admin"
     >
       <div className="dashboard-page">
         <AdminManagementPanel />

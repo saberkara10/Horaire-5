@@ -12,6 +12,13 @@
  */
 import pool from "../../db.js";
 
+export const TYPES_INDISPONIBILITE_SALLE = [
+  "Maintenance",
+  "Probleme technique",
+  "Reservation",
+  "Indisponibilite exceptionnelle",
+];
+
 const HEURE_DEBUT_JOURNEE = "08:00:00";
 const HEURE_FIN_JOURNEE = "23:00:00";
 
@@ -45,6 +52,28 @@ function creerErreurSalle(message, statusCode = 400) {
   const erreur = new Error(message);
   erreur.statusCode = statusCode;
   return erreur;
+}
+
+function normaliserDate(dateValeur) {
+  return String(dateValeur || "").trim().slice(0, 10);
+}
+
+async function assurerTableIndisponibilitesSalles(executor = pool) {
+  await executor.query(
+    `CREATE TABLE IF NOT EXISTS indisponibilites_salles (
+      id_indisponibilite_salle INT NOT NULL AUTO_INCREMENT,
+      id_salle INT NOT NULL,
+      date_debut DATE NOT NULL,
+      date_fin DATE NOT NULL,
+      type_indisponibilite VARCHAR(80) NOT NULL,
+      motif VARCHAR(255) NULL,
+      PRIMARY KEY (id_indisponibilite_salle),
+      UNIQUE KEY uniq_indisponibilite_salle_periode (id_salle, date_debut, date_fin),
+      CONSTRAINT fk_indisponibilite_salle
+        FOREIGN KEY (id_salle) REFERENCES salles (id_salle)
+        ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
+  );
 }
 
 function normaliserHeure(heure) {
@@ -847,6 +876,97 @@ export async function salleEstDejaAffectee(idSalle) {
   );
 
   return lignes.length > 0;
+}
+
+export async function recupererIndisponibilitesSalle(idSalle) {
+  await assurerTableIndisponibilitesSalles();
+
+  const [indisponibilites] = await pool.query(
+    `SELECT id_indisponibilite_salle,
+            id_salle,
+            date_debut,
+            date_fin,
+            type_indisponibilite,
+            motif
+     FROM indisponibilites_salles
+     WHERE id_salle = ?
+     ORDER BY date_debut ASC, date_fin ASC;`,
+    [idSalle]
+  );
+
+  return indisponibilites;
+}
+
+export async function recupererIndisponibilitesSalles(executor = pool) {
+  await assurerTableIndisponibilitesSalles(executor);
+
+  const [indisponibilites] = await executor.query(
+    `SELECT id_salle, date_debut, date_fin, type_indisponibilite, motif
+     FROM indisponibilites_salles
+     ORDER BY id_salle ASC, date_debut ASC, date_fin ASC;`
+  );
+
+  const indisponibilitesParSalle = new Map();
+
+  indisponibilites.forEach((indisponibilite) => {
+    const indisponibilitesActuelles =
+      indisponibilitesParSalle.get(indisponibilite.id_salle) || [];
+    indisponibilitesActuelles.push({
+      ...indisponibilite,
+      date_debut: normaliserDate(indisponibilite.date_debut),
+      date_fin: normaliserDate(indisponibilite.date_fin),
+    });
+    indisponibilitesParSalle.set(
+      indisponibilite.id_salle,
+      indisponibilitesActuelles
+    );
+  });
+
+  return indisponibilitesParSalle;
+}
+
+export async function remplacerIndisponibilitesSalle(idSalle, indisponibilites = []) {
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+    await assurerTableIndisponibilitesSalles(connection);
+
+    await connection.query(
+      `DELETE FROM indisponibilites_salles
+       WHERE id_salle = ?`,
+      [idSalle]
+    );
+
+    for (const indisponibilite of indisponibilites) {
+      await connection.query(
+        `INSERT INTO indisponibilites_salles (
+          id_salle,
+          date_debut,
+          date_fin,
+          type_indisponibilite,
+          motif
+        )
+        VALUES (?, ?, ?, ?, ?)`,
+        [
+          idSalle,
+          normaliserDate(indisponibilite.date_debut),
+          normaliserDate(indisponibilite.date_fin),
+          indisponibilite.type_indisponibilite,
+          String(indisponibilite.motif || "").trim() || null,
+        ]
+      );
+    }
+
+    await connection.commit();
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+
+  return recupererIndisponibilitesSalle(idSalle);
 }
 
 /**

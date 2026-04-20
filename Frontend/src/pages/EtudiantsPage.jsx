@@ -4,7 +4,6 @@ import {
   useEffect,
   useEffectEvent,
   useMemo,
-  useRef,
   useState,
 } from "react";
 import { AppShell } from "../components/layout/AppShell.jsx";
@@ -31,7 +30,6 @@ import "../styles/PlanningEtudiantPage.css";
  * Page principale de gestion des etudiants.
  *
  * Cette page orchestre trois usages complementaires :
- * - importer un fichier d'etudiants ;
  * - parcourir et filtrer la liste ;
  * - consulter la fiche et l'horaire reconstitue d'un etudiant.
  */
@@ -45,7 +43,6 @@ export function EtudiantsPage({ utilisateur, onLogout }) {
     actionEnCours,
     recharger,
     consulter,
-    importer,
     invaliderConsultations,
   } = useEtudiants();
 
@@ -56,8 +53,6 @@ export function EtudiantsPage({ utilisateur, onLogout }) {
   const [etapeSelectionnee, setEtapeSelectionnee] = useState("toutes");
   const [etudiantSelectionneId, setEtudiantSelectionneId] = useState(null);
   const [vueActive, setVueActive] = useState("liste");
-  const [messageSucces, setMessageSucces] = useState("");
-  const inputImportRef = useRef(null);
 
   const rechercheDifferee = useDeferredValue(recherche);
   const groupes = useMemo(() => extraireGroupes(etudiants), [etudiants]);
@@ -165,61 +160,10 @@ export function EtudiantsPage({ utilisateur, onLogout }) {
       }
     : null;
 
-  function ouvrirImport() {
-    setMessageSucces("");
-    inputImportRef.current?.click();
-  }
-
-  async function gererSelectionFichier(event) {
-    const fichier = event.target.files?.[0];
-
-    if (!fichier) {
-      return;
-    }
-
-    try {
-      const resultat = await importer(fichier);
-      const segments = [resultat.message];
-      const nombreImportes = Number(resultat.nombre_importes || 0);
-      const nombreMisAJour = Number(resultat.nombre_mis_a_jour || 0);
-      const nombreCoursEchoues = Number(resultat.nombre_cours_echoues_importes || 0);
-
-      if (nombreImportes > 0) {
-        segments.push(`${nombreImportes} etudiant(s) ajoute(s).`);
-      }
-
-      if (nombreMisAJour > 0) {
-        segments.push(`${nombreMisAJour} etudiant(s) mis a jour.`);
-      }
-
-      if (nombreCoursEchoues > 0) {
-        segments.push(`${nombreCoursEchoues} cours echoue(s) importes.`);
-      }
-
-      const nombreEtudiantsIgnores = Number(resultat.nombre_etudiants_ignores || 0);
-      const nombreCohortesIgnorees = Number(resultat.nombre_cohortes_ignorees || 0);
-
-      if (nombreEtudiantsIgnores > 0) {
-        segments.push(`${nombreEtudiantsIgnores} etudiant(s) non utilisable(s) ignore(s).`);
-      }
-
-      if (nombreCohortesIgnorees > 0) {
-        segments.push(`${nombreCohortesIgnorees} cohorte(s) non exploitable(s) ignoree(s).`);
-      }
-
-      setEtudiantSelectionneId(null);
-      setVueActive("liste");
-      setMessageSucces(segments.join(" "));
-    } finally {
-      event.target.value = "";
-    }
-  }
-
   function selectionnerEtudiant(idEtudiant) {
     startTransition(() => {
       setEtudiantSelectionneId(idEtudiant);
       setVueActive("detail");
-      setMessageSucces("");
     });
   }
 
@@ -238,24 +182,9 @@ export function EtudiantsPage({ utilisateur, onLogout }) {
   const afficherVueDetail = vueActive === "detail" && Boolean(etudiantSelectionneId);
 
   return (
-    <AppShell utilisateur={utilisateur} onLogout={onLogout} title="Horaires etudiants" subtitle="Consultez le groupe principal, les reprises et les exceptions individuelles de suivi dans un horaire fusionne.">
+    <AppShell utilisateur={utilisateur} onLogout={onLogout} title="Horaires etudiants">
       <div className="page-layout">
-        <input
-          ref={inputImportRef}
-          type="file"
-          accept=".xlsx,.xls,.csv"
-          hidden
-          onChange={gererSelectionFichier}
-        />
-
-        <EtudiantsHero
-          statistiques={statistiques}
-          onImporter={ouvrirImport}
-          importEnCours={actionEnCours === "import"}
-          surChargement={etatChargement === "loading"}
-        />
-
-        <FeedbackBanner type="success" message={messageSucces} />
+        <EtudiantsHero statistiques={statistiques} />
         <FeedbackBanner
           type="error"
           message={messageErreur}

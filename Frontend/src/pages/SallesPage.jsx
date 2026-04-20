@@ -326,7 +326,6 @@ export function SallesPage({ utilisateur, onLogout }) {
       utilisateur={utilisateur}
       onLogout={onLogout}
       title="Salles"
-      subtitle="Gérez les salles disponibles dans l'établissement."
     >
       <div className="crud-page">
         {/* En-tête */}

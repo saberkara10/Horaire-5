@@ -248,7 +248,6 @@ export function ProfesseursPage({ utilisateur, onLogout }) {
       utilisateur={utilisateur}
       onLogout={onLogout}
       title="Professeurs"
-      subtitle="Rattachez chaque enseignant a ses cours autorises. Les programmes sont deduits automatiquement."
     >
       <div className="crud-page">
         <div className="crud-page__header">

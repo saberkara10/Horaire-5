@@ -81,7 +81,7 @@
 }
 
 .popup-feedback__button--primary {
-  background: linear-gradient(135deg, #0ea5e9 0%, #6b6cf6 100%);
+  background: linear-gradient(135deg, var(--brand) 0%, var(--brand-dark) 100%);
 }
 
 .popup-feedback__stack {
@@ -108,7 +108,7 @@
 }
 
 .popup-feedback__toast--success {
-  border-color: rgba(34, 197, 94, 0.22);
+  border-color: rgba(16, 167, 96, 0.22);
 }
 
 .popup-feedback__toast--error {

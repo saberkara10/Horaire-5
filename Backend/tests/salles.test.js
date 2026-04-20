@@ -9,9 +9,19 @@ import request from "supertest";
 import { jest } from "@jest/globals";
 
 const sallesModelMock = {
+  TYPES_INDISPONIBILITE_SALLE: [
+    "Maintenance",
+    "Probleme technique",
+    "Reservation",
+    "Indisponibilite exceptionnelle",
+  ],
   getAllSalles: jest.fn(),
   getSalleById: jest.fn(),
   getSalleByCode: jest.fn(),
+  getTypesSalles: jest.fn(),
+  recupererIndisponibilitesSalle: jest.fn(),
+  recupererIndisponibilitesSalles: jest.fn(),
+  remplacerIndisponibilitesSalle: jest.fn(),
   addSalle: jest.fn(),
   modifySalle: jest.fn(),
   deleteSalle: jest.fn(),
@@ -60,7 +70,7 @@ describe("Tests routes Salles", () => {
       {
         id_salle: 1,
         code: "B201",
-        type: "Classe",
+        type: "Salle standard",
         capacite: 30,
       },
     ]);
@@ -83,7 +93,7 @@ describe("Tests routes Salles", () => {
     const salle = {
       id_salle: 1,
       code: "B201",
-      type: "Classe",
+      type: "Salle standard",
       capacite: 30,
     };
 
@@ -207,7 +217,7 @@ describe("Tests routes Salles", () => {
     const salleAjoutee = {
       id_salle: 3,
       code: "LAB-01",
-      type: "Laboratoire",
+      type: "Laboratoire informatique",
       capacite: 24,
     };
 
@@ -218,7 +228,7 @@ describe("Tests routes Salles", () => {
 
     const response = await request(app).post("/api/salles").send({
       code: "LAB-01",
-      type: "Laboratoire",
+      type: "Laboratoire informatique",
       capacite: 24,
     });
 
@@ -226,7 +236,7 @@ describe("Tests routes Salles", () => {
     expect(response.body).toEqual(salleAjoutee);
     expect(sallesModelMock.addSalle).toHaveBeenCalledWith(
       "LAB-01",
-      "Laboratoire",
+      "Laboratoire informatique",
       24
     );
   });
@@ -235,14 +245,14 @@ describe("Tests routes Salles", () => {
     sallesModelMock.getSalleByCode.mockResolvedValue({
       id_salle: 1,
       code: "B201",
-      type: "Classe",
+      type: "Salle standard",
       capacite: 30,
     });
 
     const response = await request(app).post("/api/salles").send({
       code: "B201",
-      type: "Classe",
-      capacite: 40,
+      type: "Salle standard",
+      capacite: 30,
     });
 
     expect(response.statusCode).toBe(409);
@@ -254,28 +264,28 @@ describe("Tests routes Salles", () => {
       .mockResolvedValueOnce({
         id_salle: 1,
         code: "B201",
-        type: "Classe",
+        type: "Salle standard",
         capacite: 30,
       })
       .mockResolvedValueOnce({
         id_salle: 1,
         code: "B201",
-        type: "Laboratoire",
-        capacite: 32,
+        type: "Laboratoire informatique",
+        capacite: 30,
       });
     sallesModelMock.modifySalle.mockResolvedValue(true);
 
     const response = await request(app).put("/api/salles/1").send({
-      type: "Laboratoire",
-      capacite: 32,
+      type: "Laboratoire informatique",
+      capacite: 30,
     });
 
     expect(response.statusCode).toBe(200);
     expect(response.body).toEqual({
       id_salle: 1,
       code: "B201",
-      type: "Laboratoire",
-      capacite: 32,
+      type: "Laboratoire informatique",
+      capacite: 30,
     });
   });
 
@@ -283,7 +293,7 @@ describe("Tests routes Salles", () => {
     sallesModelMock.getSalleById.mockResolvedValue({
       id_salle: 1,
       code: "B201",
-      type: "Classe",
+      type: "Salle standard",
       capacite: 30,
     });
 
@@ -293,11 +303,26 @@ describe("Tests routes Salles", () => {
     expect(response.body).toEqual({ message: "Aucun champ a modifier." });
   });
 
+  test("POST /api/salles retourne 400 si la capacite depasse le plafond du type", async () => {
+    sallesModelMock.getSalleByCode.mockResolvedValue(null);
+
+    const response = await request(app).post("/api/salles").send({
+      code: "A500",
+      type: "Salle standard",
+      capacite: 31,
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.body).toEqual({
+      message: "Capacite invalide pour ce type de salle (maximum 30).",
+    });
+  });
+
   test("DELETE /api/salles/1 retourne 400 si la salle est deja affectee", async () => {
     sallesModelMock.getSalleById.mockResolvedValue({
       id_salle: 1,
       code: "B201",
-      type: "Classe",
+      type: "Salle standard",
       capacite: 30,
     });
     sallesModelMock.salleEstDejaAffectee.mockResolvedValue(true);
@@ -314,7 +339,7 @@ describe("Tests routes Salles", () => {
     sallesModelMock.getSalleById.mockResolvedValue({
       id_salle: 1,
       code: "B201",
-      type: "Classe",
+      type: "Salle standard",
       capacite: 30,
     });
     sallesModelMock.salleEstDejaAffectee.mockResolvedValue(false);
@@ -326,10 +351,136 @@ describe("Tests routes Salles", () => {
     expect(response.body).toEqual({ message: "Salle supprimee." });
     expect(sallesModelMock.deleteSalle).toHaveBeenCalledWith(1);
   });
+
+  test("GET /api/salles/1/indisponibilites retourne les periodes de blocage", async () => {
+    sallesModelMock.getSalleById.mockResolvedValue({
+      id_salle: 1,
+      code: "B201",
+      type: "Salle standard",
+      capacite: 30,
+    });
+    sallesModelMock.recupererIndisponibilitesSalle.mockResolvedValue([
+      {
+        date_debut: "2026-06-01",
+        date_fin: "2026-06-03",
+        type_indisponibilite: "Maintenance",
+        motif: "Travaux",
+      },
+    ]);
+
+    const response = await request(app).get("/api/salles/1/indisponibilites");
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toHaveLength(1);
+  });
+
+  test("PUT /api/salles/1/indisponibilites retourne 200 avec une periode valide", async () => {
+    sallesModelMock.getSalleById.mockResolvedValue({
+      id_salle: 1,
+      code: "B201",
+      type: "Salle standard",
+      capacite: 30,
+    });
+    sallesModelMock.remplacerIndisponibilitesSalle.mockResolvedValue([
+      {
+        date_debut: "2026-06-01",
+        date_fin: "2026-06-03",
+        type_indisponibilite: "Maintenance",
+        motif: "Travaux",
+      },
+    ]);
+
+    const response = await request(app)
+      .put("/api/salles/1/indisponibilites")
+      .send({
+        indisponibilites: [
+          {
+            date_debut: "2026-06-01",
+            date_fin: "2026-06-03",
+            type_indisponibilite: "Maintenance",
+            motif: "Travaux",
+          },
+        ],
+      });
+
+    expect(response.statusCode).toBe(200);
+    expect(sallesModelMock.remplacerIndisponibilitesSalle).toHaveBeenCalledWith(1, [
+      {
+        date_debut: "2026-06-01",
+        date_fin: "2026-06-03",
+        type_indisponibilite: "Maintenance",
+        motif: "Travaux",
+      },
+    ]);
+  });
+
+  test("PUT /api/salles/1/indisponibilites retourne 400 si le tableau est absent", async () => {
+    sallesModelMock.getSalleById.mockResolvedValue({
+      id_salle: 1,
+      code: "B201",
+      type: "Salle standard",
+      capacite: 30,
+    });
+
+    const response = await request(app).put("/api/salles/1/indisponibilites").send({});
+
+    expect(response.statusCode).toBe(400);
+    expect(response.body).toEqual({
+      message: "Le champ indisponibilites doit etre un tableau.",
+    });
+  });
+
+  test("PUT /api/salles/1/indisponibilites retourne 400 si la periode est invalide", async () => {
+    sallesModelMock.getSalleById.mockResolvedValue({
+      id_salle: 1,
+      code: "B201",
+      type: "Salle standard",
+      capacite: 30,
+    });
+
+    const response = await request(app)
+      .put("/api/salles/1/indisponibilites")
+      .send({
+        indisponibilites: [
+          {
+            date_debut: "2026-06-03",
+            date_fin: "2026-06-01",
+            type_indisponibilite: "Maintenance",
+            motif: "",
+          },
+        ],
+      });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.body).toEqual({
+      message: "La date de fin doit etre apres ou egale a la date de debut.",
+    });
+  });
+
+  test("PUT /api/salles/1/indisponibilites retourne 400 si le type est invalide", async () => {
+    sallesModelMock.getSalleById.mockResolvedValue({
+      id_salle: 1,
+      code: "B201",
+      type: "Salle standard",
+      capacite: 30,
+    });
+
+    const response = await request(app)
+      .put("/api/salles/1/indisponibilites")
+      .send({
+        indisponibilites: [
+          {
+            date_debut: "2026-06-01",
+            date_fin: "2026-06-01",
+            type_indisponibilite: "Occupation",
+            motif: "",
+          },
+        ],
+      });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.body).toEqual({
+      message: "Le type d'indisponibilite est invalide.",
+    });
+  });
 });
-/**
- * TESTS - Routes Salles
- *
- * Ce fichier couvre les principaux cas
- * des routes de gestion des salles.
- */

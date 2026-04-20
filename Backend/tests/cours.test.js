@@ -15,6 +15,8 @@ import {
 } from "@jest/globals";
 
 const coursModelMock = {
+  DUREE_COURS_FIXE: 3,
+  MODES_COURS: ["Presentiel", "En ligne"],
   recupererTousLesCours: jest.fn(),
   recupererTypesSalleDisponibles: jest.fn(),
   recupererCoursParId: jest.fn(),
@@ -129,6 +131,7 @@ describe("Tests routes Cours", () => {
       code: "INF101",
       nom: "Cours Test",
       duree: 2,
+      mode_cours: "Presentiel",
       programme: "Programmation informatique",
       etape_etude: 1,
       id_salle_reference: 5,
@@ -156,6 +159,7 @@ describe("Tests routes Cours", () => {
       code: "TEST101",
       nom: "Cours Test",
       duree: 2,
+      mode_cours: "Presentiel",
       programme: "Programmation informatique",
       etape_etude: 1,
       id_salle_reference: 5,
@@ -170,6 +174,7 @@ describe("Tests routes Cours", () => {
       code: "TEST101",
       nom: "Cours Test",
       duree: 2,
+      mode_cours: "Presentiel",
       programme: "Programmation informatique",
       etape_etude: 1,
     });
@@ -186,6 +191,7 @@ describe("Tests routes Cours", () => {
       code: "TEST101",
       nom: "Cours Test",
       duree: 2,
+      mode_cours: "Presentiel",
       programme: "Programmation informatique",
       etape_etude: 1,
       id_salle_reference: 5,
@@ -219,8 +225,10 @@ describe("Tests routes Cours", () => {
       code: "INF101",
       nom: "Programmation",
       duree: 2,
+      mode_cours: "Presentiel",
       programme: "Programmation informatique",
       etape_etude: 1,
+      type_salle: "Laboratoire",
       id_salle_reference: 3,
     });
 
@@ -235,8 +243,10 @@ describe("Tests routes Cours", () => {
       code: "INF101",
       nom: "Programmation",
       duree: 2,
+      mode_cours: "Presentiel",
       programme: "Programmation informatique",
       etape_etude: 1,
+      type_salle: "Laboratoire",
       id_salle_reference: 3,
     });
     coursModelMock.recupererCoursParCode.mockResolvedValue(null);
@@ -260,8 +270,10 @@ describe("Tests routes Cours", () => {
       code: "INF101",
       nom: "Programmation",
       duree: 2,
+      mode_cours: "Presentiel",
       programme: "Programmation informatique",
       etape_etude: 1,
+      type_salle: "Laboratoire",
       id_salle_reference: 3,
     });
     coursModelMock.recupererCoursParCode.mockResolvedValue(null);

@@ -28,9 +28,31 @@
   color: var(--text);
 }
 
-.import-page__text {
+.import-page__notice {
+  display: grid;
+  gap: 0.45rem;
   margin: 0 0 1rem;
-  color: var(--muted);
+  padding: 1rem 1.1rem;
+  border-radius: 18px;
+  border: 1px solid rgba(245, 158, 11, 0.28);
+  background: linear-gradient(135deg, rgba(255, 248, 235, 0.96) 0%, rgba(255, 243, 214, 0.98) 100%);
+  color: #7c4a03;
+}
+
+.import-page__notice strong {
+  font-size: 0.98rem;
+}
+
+.import-page__notice p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.import-page__notice-columns {
+  display: block;
+  margin-top: 0.35rem;
+  font-weight: 800;
+  color: #5b3a00;
 }
 
 .import-page__form {
@@ -105,4 +127,26 @@
   .import-page__danger-button {
     width: 100%;
   }
+}
+
+/* Login-driven visual alignment */
+.import-page__card {
+  border-color: var(--line);
+  background: var(--surface-strong);
+}
+
+.import-page__upload input,
+.import-page__summary,
+.import-page__file {
+  border-color: var(--line-strong);
+  background: rgba(250, 251, 249, 0.96);
+}
+
+.import-page__upload span {
+  color: var(--muted-strong);
+}
+
+.import-page__primary-button {
+  background: linear-gradient(135deg, var(--brand) 0%, var(--brand-dark) 100%);
+  box-shadow: 0 18px 34px rgba(16, 167, 96, 0.2);
 }

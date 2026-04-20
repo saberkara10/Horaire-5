@@ -279,7 +279,6 @@ export function HorairesSallesPage({ utilisateur, onLogout }) {
       utilisateur={utilisateur}
       onLogout={onLogout}
       title="Occupation des salles"
-      subtitle="Selectionnez une salle et consultez son occupation hebdomadaire, ses disponibilites et son etat actuel."
     >
       <motion.div
         className="horaires-salles-page"
@@ -296,7 +295,6 @@ export function HorairesSallesPage({ utilisateur, onLogout }) {
           >
             <div className="horaires-professeurs-page__sidebar-header">
               <h2>Recherche salle</h2>
-              <p>Filtrez la liste par code, type ou capacite.</p>
             </div>
 
             <input
@@ -362,11 +360,6 @@ export function HorairesSallesPage({ utilisateur, onLogout }) {
               {!salleActive ? (
                 <div className="detail-card">
                   <h2>Selectionnez une salle</h2>
-                  <p className="detail-card__subtitle">
-                    Le panneau de droite affichera l'occupation de la salle,
-                    les creneaux libres, la synthese hebdomadaire et le statut
-                    dynamique "maintenant / prochain cours".
-                  </p>
                 </div>
               ) : (
                 <div className="detail-card">

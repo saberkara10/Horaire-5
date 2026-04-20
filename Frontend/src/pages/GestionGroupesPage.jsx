@@ -1,4 +1,4 @@
-/**
+﻿/**
  * PAGE - Gestion des Groupes (Production-ready)
  *
  * Module complet de pilotage des groupes d'étudiants :
@@ -467,7 +467,7 @@ export function GestionGroupesPage({ utilisateur, onLogout }) {
   // ─── RENDU ────────────────────────────────────────────────────────────────
   return (
     <AppShell utilisateur={utilisateur} onLogout={onLogout}
-      title="Gestion des Groupes" subtitle="Pilotez vos groupes, gérez les étudiants et générez les horaires ciblés.">
+      title="Gestion des Groupes">
       <div className="gg-page">
 
         {/* ── Stats ── */}
@@ -575,7 +575,6 @@ export function GestionGroupesPage({ utilisateur, onLogout }) {
               <div className="gg-no-selection">
                 <div className="gg-no-sel-icon">👥</div>
                 <h3>Sélectionnez un groupe</h3>
-                <p>Consultez ses membres, ajoutez des étudiants ou générez son horaire.</p>
               </div>
             ) : (
               <>
@@ -651,7 +650,6 @@ export function GestionGroupesPage({ utilisateur, onLogout }) {
                       <div className="gg-alert gg-alert--warning">⚠️ Ce groupe est complet ({CAPACITE_MAX}/{CAPACITE_MAX}).</div>
                     ) : (
                       <>
-                        <p className="gg-muted">Assigner un étudiant existant ({etudiantsHorsGroupe.length} disponibles) :</p>
                         <div className="gg-etudiants-list">
                           {etudiantsHorsGroupe.slice(0, 100).map((e) => (
                             <div key={e.id_etudiant} className="gg-etudiant-row gg-etudiant-row--available">
@@ -663,7 +661,7 @@ export function GestionGroupesPage({ utilisateur, onLogout }) {
                               <button className="gg-btn-sm gg-btn-sm--add" onClick={() => handleAjouterExistant(e.id_etudiant)}>+</button>
                             </div>
                           ))}
-                          {etudiantsHorsGroupe.length > 100 && <p className="gg-muted">…et {etudiantsHorsGroupe.length - 100} autres.</p>}
+                          {etudiantsHorsGroupe.length > 100 && <p className="gg-muted">{etudiantsHorsGroupe.length - 100} autres</p>}
                         </div>
                       </>
                     )}
@@ -675,11 +673,6 @@ export function GestionGroupesPage({ utilisateur, onLogout }) {
                   <div className="gg-tab-content gg-gen-section">
                     <div className="gg-gen-card gg-gen-card--mode">
                       <h4>Mode d'optimisation</h4>
-                      <p className="gg-muted">
-                        Le meme profil de scoring pilote la generation d'un
-                        groupe et la generation ciblee. `Legacy` reste le
-                        fallback sur pour les appels anciens.
-                      </p>
                       <div className="gg-form-row">
                         <div className="gg-form-group">
                           <label>Mode</label>
@@ -704,7 +697,6 @@ export function GestionGroupesPage({ utilisateur, onLogout }) {
 
                     <div className="gg-gen-card">
                       <h4>⚡ Générer l'horaire de ce groupe</h4>
-                      <p className="gg-muted">Régénère l'horaire uniquement pour <strong>{groupeSelectionne?.nom_groupe}</strong>. Les autres groupes restent intacts.</p>
                       {etudiantsGroupe.length === 0 && (
                         <div className="gg-alert gg-alert--warning">⚠️ Ajoutez des étudiants avant de générer.</div>
                       )}
@@ -715,7 +707,6 @@ export function GestionGroupesPage({ utilisateur, onLogout }) {
 
                     <div className="gg-gen-card">
                       <h4>🎯 Génération ciblée (programme / étape)</h4>
-                      <p className="gg-muted">Génère les horaires de tous les groupes correspondant aux critères.</p>
                       <form className="gg-gen-form" onSubmit={handleGenererCible}>
                         <div className="gg-form-row">
                           <div className="gg-form-group">
@@ -882,7 +873,6 @@ export function GestionGroupesPage({ utilisateur, onLogout }) {
       <Modal open={showDeplacer !== null} onClose={() => { setShowDeplacer(null); setDeplaceVers(""); }}
         title={`Déplacer ${etudiantADeplacer?.prenom || ""} ${etudiantADeplacer?.nom || ""}`}>
         <div className="gg-form">
-          <p className="gg-muted">Uniquement les groupes du même programme et de la même étape, non complets.</p>
           {groupesCompatibles.length === 0
             ? <div className="gg-alert gg-alert--warning">⚠️ Aucun groupe compatible disponible.</div>
             : (

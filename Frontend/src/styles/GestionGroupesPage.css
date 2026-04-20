@@ -666,3 +666,76 @@
   .gg-col-left { max-height: 40vh; }
   .gg-col-right { min-height: 500px; }
 }
+
+/* Login-driven visual alignment */
+.gg-col-left,
+.gg-col-right,
+.gg-stats-bar,
+.gg-modal,
+.gg-gen-card,
+.gg-gen-rapport {
+  border-color: var(--line);
+  background: var(--surface-strong);
+}
+
+.gg-search:focus,
+.gg-select:focus,
+.gg-input:focus {
+  border-color: var(--brand);
+  box-shadow: var(--shadow-focus);
+}
+
+.gg-groupe-card:hover,
+.gg-groupe-card--selected,
+.gg-etudiant-row:hover {
+  border-color: rgba(16, 167, 96, 0.24);
+}
+
+.gg-groupe-card--selected {
+  background: rgba(235, 249, 241, 0.94);
+  box-shadow: 0 4px 16px rgba(16, 167, 96, 0.12);
+}
+
+.gg-tag,
+.gg-tag--etape {
+  background: var(--brand-soft);
+  color: var(--brand-dark);
+}
+
+.gg-tab--active {
+  color: var(--brand-dark);
+  border-bottom-color: var(--brand);
+}
+
+.gg-etudiant-avatar,
+.gg-btn-primary,
+.gg-btn-generate {
+  background: linear-gradient(135deg, var(--brand), var(--brand-dark));
+  box-shadow: 0 10px 24px rgba(16, 167, 96, 0.2);
+}
+
+.gg-btn-outline:hover {
+  border-color: rgba(16, 167, 96, 0.24);
+  color: var(--brand-dark);
+}
+
+.gg-btn-sm--move {
+  background: rgba(16, 167, 96, 0.1);
+  color: var(--brand-dark);
+  border-color: rgba(16, 167, 96, 0.18);
+}
+
+.gg-btn-sm--move:hover {
+  background: var(--brand);
+}
+
+.gg-mode-note {
+  border-color: rgba(16, 167, 96, 0.16);
+  background: rgba(235, 249, 241, 0.9);
+  color: var(--muted-strong);
+}
+
+.gg-spinner {
+  border-color: rgba(16, 167, 96, 0.16);
+  border-top-color: var(--brand);
+}

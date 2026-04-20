@@ -212,7 +212,6 @@ export function HorairesProfesseursPage({ utilisateur, onLogout }) {
       utilisateur={utilisateur}
       onLogout={onLogout}
       title="Horaires professeurs"
-      subtitle="Recherchez un enseignant puis consultez son planning de travail."
     >
       <motion.div
         className="horaires-professeurs-page"
@@ -229,7 +228,6 @@ export function HorairesProfesseursPage({ utilisateur, onLogout }) {
           >
             <div className="horaires-professeurs-page__sidebar-header">
               <h2>Recherche professeur</h2>
-              <p>Filtrez par nom, matricule ou programme.</p>
             </div>
 
             <input
@@ -394,7 +392,11 @@ export function HorairesProfesseursPage({ utilisateur, onLogout }) {
                                         <strong>{seance.code_cours}</strong>
                                         <span>{seance.nom_cours}</span>
                                         <small>{seance.groupes || "Aucun groupe"}</small>
-                                        <small>{seance.code_salle}</small>
+                                        <small>
+                                          {seance.mode_cours === "En ligne"
+                                            ? "En ligne"
+                                            : seance.code_salle || "-"}
+                                        </small>
                                         <small>
                                           {normaliserHeure(seance.heure_debut)} -{" "}
                                           {normaliserHeure(seance.heure_fin)}
@@ -439,7 +441,11 @@ export function HorairesProfesseursPage({ utilisateur, onLogout }) {
                                       {seance.code_cours} - {seance.nom_cours}
                                     </td>
                                     <td>{seance.groupes || "-"}</td>
-                                    <td>{seance.code_salle}</td>
+                                    <td>
+                                      {seance.mode_cours === "En ligne"
+                                        ? "En ligne"
+                                        : seance.code_salle || "-"}
+                                    </td>
                                   </tr>
                                 ))}
                               </tbody>

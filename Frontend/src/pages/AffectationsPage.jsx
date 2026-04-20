@@ -2356,19 +2356,12 @@ export function AffectationsPage({ utilisateur, onLogout }) {
       utilisateur={utilisateur}
       onLogout={onLogout}
       title="Generer"
-      subtitle="Travaillez sur la session active, filtrez une cohorte et corrigez les seances manuellement."
     >
       <div className="affectations-page">
         <section className="affectations-page__hero">
           <div className="affectations-page__hero-card">
             <span className="affectations-page__eyebrow">Session active unifiee</span>
             <h2>Generation, controle et correction sur la meme session</h2>
-            <p>
-              Cette page travaille sur les memes donnees que les horaires groupes,
-              les horaires professeurs et les disponibilites. La generation reconstruit
-              toute la session active, puis les filtres ci-dessous servent a cibler
-              une cohorte pour l'analyse et la planification manuelle.
-            </p>
           </div>
           <div className="affectations-page__stats">
             <div className="affectations-page__stat-card">
@@ -2395,10 +2388,6 @@ export function AffectationsPage({ utilisateur, onLogout }) {
             <div className="affectations-page__panel-header">
               <div>
                 <h2>Filtres de cohorte</h2>
-                <p>
-                  Session active: {sessionActive?.nom || "Aucune"}. Les filtres servent a
-                  cibler la cohorte a inspecter, puis la planification manuelle.
-                </p>
               </div>
             </div>
 
@@ -2560,11 +2549,6 @@ export function AffectationsPage({ utilisateur, onLogout }) {
             <div className="affectations-page__panel-header">
               <div>
                 <h2>Lecture de la cohorte</h2>
-                <p>
-                  {groupesFiltres.length > 0
-                    ? "Groupes deja disponibles dans la session active pour cette selection."
-                    : "Apercu estime si la cohorte n'a pas encore de groupes persistants."}
-                </p>
               </div>
             </div>
 
@@ -3338,7 +3322,6 @@ export function AffectationsPage({ utilisateur, onLogout }) {
           <div className="affectations-page__panel-header">
             <div>
               <h2>Affectations planifiees</h2>
-              <p>Chaque ligne correspond au planning exact d'un groupe, genere ou ajoute manuellement.</p>
             </div>
             <span className="affectations-page__count">
               {horairesFiltres.length} / {horaires.length} affectation(s)

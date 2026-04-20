@@ -121,6 +121,33 @@ async function trouverIndexUniqueNomGroupeGlobal(executor) {
   return null;
 }
 
+async function assurerSessionScopeGroupesEtudiants(executor) {
+  await ajouterColonneSiAbsente(
+    executor,
+    "groupes_etudiants",
+    "id_session",
+    "INT NULL AFTER etape"
+  );
+
+  await creerIndexSiAbsent(
+    executor,
+    "groupes_etudiants",
+    "idx_groupes_id_session",
+    `CREATE INDEX idx_groupes_id_session
+     ON groupes_etudiants (id_session)`
+  );
+
+  await creerContrainteSiAbsente(
+    executor,
+    "groupes_etudiants",
+    "fk_groupes_session",
+    `ALTER TABLE groupes_etudiants
+     ADD CONSTRAINT fk_groupes_session
+     FOREIGN KEY (id_session) REFERENCES sessions (id_session)
+     ON DELETE SET NULL`
+  );
+}
+
 async function assurerIndexGroupesParSession(executor) {
   const indexGlobal = await trouverIndexUniqueNomGroupeGlobal(executor);
   if (indexGlobal) {
@@ -398,6 +425,7 @@ async function assurerJournalModificationsAffectationsScheduler(executor) {
 }
 
 async function assurerSchema(executor) {
+  await assurerSessionScopeGroupesEtudiants(executor);
   await assurerTableAffectationEtudiants(executor);
   await assurerEchangesCoursEtudiants(executor);
   await assurerCoursEchouesEvolution(executor);

@@ -123,19 +123,12 @@ export function EtudiantsImportPage({ utilisateur, onLogout }) {
       utilisateur={utilisateur}
       onLogout={onLogout}
       title="Import etudiants"
-      subtitle="Importez un fichier melangeant plusieurs etapes. Les groupes sont crees automatiquement par cohorte."
     >
       <div className="import-page">
         <section className="import-page__card import-page__card--upload">
           <div className="import-page__header">
             <div>
               <h2>Importer un fichier</h2>
-              <p className="import-page__text">
-                Colonnes attendues : matricule, nom, prenom, programme, etape.
-              </p>
-              <p className="import-page__text">
-                La session reste optionnelle dans le fichier. Les groupes sont generes automatiquement par programme, etape et session avec une repartition equilibree.
-              </p>
             </div>
 
             <button

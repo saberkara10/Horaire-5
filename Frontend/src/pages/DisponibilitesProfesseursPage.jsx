@@ -823,7 +823,6 @@ export function DisponibilitesProfesseursPage({ utilisateur, onLogout }) {
       utilisateur={utilisateur}
       onLogout={onLogout}
       title="Disponibilites professeurs"
-      subtitle="Appliquez une disponibilite standard ou temporaire, replanifiez localement les seances impactees et conservez un historique metier complet."
     >
       <div className="crud-page">
         <section className="professeurs-page__workspace professeurs-page__workspace--full">

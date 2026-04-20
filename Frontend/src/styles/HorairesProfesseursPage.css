@@ -81,3 +81,22 @@
     max-height: none;
   }
 }
+
+/* Login-driven visual alignment */
+.horaires-professeurs-page__sidebar,
+.horaires-professeurs-page__content {
+  border-color: var(--line);
+  background: var(--surface-strong);
+}
+
+.horaires-professeurs-page__teacher-card {
+  border-color: var(--line-strong);
+  background: rgba(250, 251, 249, 0.96);
+  color: var(--muted-strong);
+}
+
+.horaires-professeurs-page__teacher-card--active {
+  border-color: rgba(16, 167, 96, 0.22);
+  background: linear-gradient(135deg, rgba(235, 249, 241, 0.98), rgba(250, 251, 249, 0.96));
+  box-shadow: 0 18px 36px rgba(16, 167, 96, 0.14);
+}

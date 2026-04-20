@@ -48,11 +48,16 @@ import pool from "../db.js";
 
 // Charger les variables d'environnement (certains modules les lisent via dotenv.config()
 // dans leur propre fichier, mais on le rappelle ici par sécurité)
-dotenv.config();
+dotenv.config({ quiet: true });
 
 // Si SESSION_SECRET n'est pas défini, on utilise une valeur de dev.
 // En production, cette variable DOIT être définie dans .env avec une valeur longue et aléatoire.
 const SESSION_SECRET = process.env.SESSION_SECRET || "gdh_secret_dev";
+const isProduction = process.env.NODE_ENV === "production";
+const configuredOrigins = new Set(
+  [process.env.CORS_ORIGIN, "http://localhost:5173", "http://127.0.0.1:5173"].filter(Boolean)
+);
+const localhostDevOriginPattern = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
 
 const app = express();
 
@@ -77,7 +82,22 @@ app.use(express.json());
 // En production, remplacer par l'URL réelle du frontend dans CORS_ORIGIN.
 app.use(
   cors({
-    origin: process.env.CORS_ORIGIN || "http://localhost:5173",
+    origin(origin, callback) {
+      if (!origin) {
+        callback(null, true);
+        return;
+      }
+
+      if (
+        configuredOrigins.has(origin) ||
+        (!isProduction && localhostDevOriginPattern.test(origin))
+      ) {
+        callback(null, true);
+        return;
+      }
+
+      callback(new Error("Origine CORS non autorisee."));
+    },
     credentials: true, // obligatoire pour que les cookies de session passent
   })
 );

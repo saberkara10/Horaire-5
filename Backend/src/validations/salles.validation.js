@@ -19,6 +19,10 @@ import {
   getSalleById,
   salleEstDejaAffectee,
 } from "../model/salle.js";
+import {
+  capaciteSalleValidePourType,
+  messageCapaciteSalle,
+} from "../utils/salles.js";
 
 /**
  * Envoie une réponse d'erreur HTTP avec le statut et message donnés.
@@ -183,6 +187,10 @@ export async function validerCreateSalle(request, response, next) {
     return envoyerErreur(response, 400, "Capacite invalide (> 0).");
   }
 
+  if (!capaciteSalleValidePourType(type, capacite)) {
+    return envoyerErreur(response, 400, messageCapaciteSalle(type));
+  }
+
   // Vérifier l'unicité du code → éviter un ER_DUP_ENTRY plus tard
   const salleExistante = await getSalleByCode(code);
   if (salleExistante) {
@@ -232,6 +240,13 @@ export async function validerUpdateSalle(request, response, next) {
     if (!Number.isInteger(capaciteNumerique) || capaciteNumerique <= 0) {
       return envoyerErreur(response, 400, "Capacite invalide (> 0).");
     }
+  }
+
+  const typeFinal = request.body.type ?? request.salle?.type;
+  const capaciteFinal = request.body.capacite ?? request.salle?.capacite;
+
+  if (!capaciteSalleValidePourType(typeFinal, capaciteFinal)) {
+    return envoyerErreur(response, 400, messageCapaciteSalle(typeFinal));
   }
 
   next();

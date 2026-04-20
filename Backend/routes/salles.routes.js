@@ -20,6 +20,7 @@
  * @module routes/salles
  */
 import {
+  TYPES_INDISPONIBILITE_SALLE,
   addSalle,
   deleteSalle,
   getAllSalles,
@@ -27,7 +28,9 @@ import {
   getSalleById,
   getTypesSalles,
   modifySalle,
+  recupererIndisponibilitesSalle,
   recupererOccupationSalle,
+  remplacerIndisponibilitesSalle,
 } from "../src/model/salle.js";
 import {
   validerCreateSalle,
@@ -46,6 +49,52 @@ import { userAdmin, userAdminOrResponsable, userAuth } from "../middlewares/auth
  */
 function dateReferenceValide(dateReference) {
   return /^\d{4}-\d{2}-\d{2}$/.test(String(dateReference || "").trim());
+}
+
+function dateIndisponibiliteValide(dateValeur) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(dateValeur || "").trim());
+}
+
+function validerIndisponibilitesPayload(indisponibilites) {
+  if (!Array.isArray(indisponibilites)) {
+    return "Le champ indisponibilites doit etre un tableau.";
+  }
+
+  const periodesVues = new Set();
+
+  for (const indisponibilite of indisponibilites) {
+    const dateDebut = String(indisponibilite?.date_debut || "").trim();
+    const dateFin = String(indisponibilite?.date_fin || "").trim();
+    const typeIndisponibilite = String(
+      indisponibilite?.type_indisponibilite || ""
+    ).trim();
+
+    if (!dateIndisponibiliteValide(dateDebut) || !dateIndisponibiliteValide(dateFin)) {
+      return "Chaque indisponibilite doit avoir une date de debut et une date de fin valides.";
+    }
+
+    if (dateDebut > dateFin) {
+      return "La date de fin doit etre apres ou egale a la date de debut.";
+    }
+
+    if (!typeIndisponibilite) {
+      return "Chaque indisponibilite doit avoir un type.";
+    }
+
+    if (!TYPES_INDISPONIBILITE_SALLE.includes(typeIndisponibilite)) {
+      return "Le type d'indisponibilite est invalide.";
+    }
+
+    const cle = `${dateDebut}-${dateFin}`;
+
+    if (periodesVues.has(cle)) {
+      return "Les indisponibilites dupliquees sur la meme periode ne sont pas autorisees.";
+    }
+
+    periodesVues.add(cle);
+  }
+
+  return "";
 }
 
 /**
@@ -177,6 +226,51 @@ export default function sallesRoutes(app) {
         return response
           .status(error.statusCode || 500)
           .json({ message: error.message || "Erreur serveur." });
+      }
+    }
+  );
+
+  app.get(
+    "/api/salles/:id/indisponibilites",
+    ...accesLectureSalles,
+    validerIdSalle,
+    verifierSalleExiste,
+    async (request, response) => {
+      try {
+        const indisponibilites = await recupererIndisponibilitesSalle(
+          Number(request.params.id)
+        );
+
+        response.status(200).json(indisponibilites);
+      } catch (error) {
+        response.status(500).json({ message: "Erreur serveur." });
+      }
+    }
+  );
+
+  app.put(
+    "/api/salles/:id/indisponibilites",
+    ...accesGestionSalles,
+    validerIdSalle,
+    verifierSalleExiste,
+    async (request, response) => {
+      try {
+        const messageErreur = validerIndisponibilitesPayload(
+          request.body?.indisponibilites
+        );
+
+        if (messageErreur) {
+          return response.status(400).json({ message: messageErreur });
+        }
+
+        const indisponibilites = await remplacerIndisponibilitesSalle(
+          Number(request.params.id),
+          request.body.indisponibilites
+        );
+
+        return response.status(200).json(indisponibilites);
+      } catch (error) {
+        return response.status(500).json({ message: "Erreur serveur." });
       }
     }
   );

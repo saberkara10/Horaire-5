@@ -289,7 +289,6 @@ export function HorairesGroupesPage({ utilisateur, onLogout }) {
       utilisateur={utilisateur}
       onLogout={onLogout}
       title="Horaires groupes"
-      subtitle="Filtrez par programme et étape, puis consultez l'horaire exact de chaque groupe."
     >
       <motion.div
         className="planning-container"
@@ -431,7 +430,7 @@ export function HorairesGroupesPage({ utilisateur, onLogout }) {
               style={{
                 background: "none",
                 border: "none",
-                color: "#0ea5e9",
+                color: "var(--brand-dark)",
                 cursor: "pointer",
                 fontWeight: 700,
                 textDecoration: "underline",

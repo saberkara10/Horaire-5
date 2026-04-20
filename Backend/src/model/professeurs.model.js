@@ -29,6 +29,13 @@ import {
   normaliserDateIso,
 } from "../services/professeurs/availability-temporal.js";
 
+export const TYPES_ABSENCE_PROFESSEUR = [
+  "maladie",
+  "vacances",
+  "formation",
+  "autre",
+];
+
 function normaliserHeure(heure) {
   const valeur = String(heure || "").trim();
 
@@ -106,6 +113,28 @@ async function mettreAJourAbsencesProfesseur(idSource, idCible, executor = pool)
       throw error;
     }
   }
+}
+
+async function assurerTableAbsencesProfesseurs(executor = pool) {
+  await executor.query(
+    `CREATE TABLE IF NOT EXISTS absences_professeurs (
+      id INT NOT NULL AUTO_INCREMENT,
+      id_professeur INT NOT NULL,
+      date_debut DATE NOT NULL,
+      date_fin DATE NOT NULL,
+      type VARCHAR(20) NOT NULL DEFAULT 'autre',
+      commentaire TEXT NULL,
+      approuve_par INT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      CONSTRAINT fk_abs_prof
+        FOREIGN KEY (id_professeur) REFERENCES professeurs (id_professeur)
+        ON DELETE CASCADE,
+      CONSTRAINT fk_abs_user
+        FOREIGN KEY (approuve_par) REFERENCES utilisateurs (id_utilisateur)
+        ON DELETE SET NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
+  );
 }
 
 async function assurerTableDisponibilites(executor = pool) {
@@ -808,6 +837,32 @@ export async function recupererJournalDisponibilitesProfesseur(
   );
 }
 
+export async function recupererAbsencesProfesseur(idProfesseur) {
+  await assurerTableAbsencesProfesseurs();
+
+  const [rows] = await pool.query(
+    `SELECT id,
+            id_professeur,
+            DATE_FORMAT(date_debut, '%Y-%m-%d') AS date_debut,
+            DATE_FORMAT(date_fin, '%Y-%m-%d') AS date_fin,
+            type AS type_absence,
+            commentaire,
+            approuve_par,
+            DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s') AS created_at
+     FROM absences_professeurs
+     WHERE id_professeur = ?
+     ORDER BY date_debut ASC, date_fin ASC, id ASC`,
+    [Number(idProfesseur)]
+  );
+
+  return rows.map((row) => ({
+    ...row,
+    id: Number(row.id),
+    id_professeur: Number(row.id_professeur),
+    approuve_par: Number(row.approuve_par) || null,
+  }));
+}
+
 async function insererDisponibilitesProfesseurDansFenetre(
   executor,
   idProfesseur,
@@ -1084,6 +1139,56 @@ export async function remplacerDisponibilitesProfesseur(
   } finally {
     connection.release();
   }
+}
+
+export async function remplacerAbsencesProfesseur(idProfesseur, absences = []) {
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+    await assurerTableAbsencesProfesseurs(connection);
+
+    await connection.query(
+      `DELETE FROM absences_professeurs
+       WHERE id_professeur = ?`,
+      [Number(idProfesseur)]
+    );
+
+    for (const absence of Array.isArray(absences) ? absences : []) {
+      const typeAbsence =
+        String(absence?.type_absence || "").trim().toLowerCase() || "autre";
+      const typeNormalise = TYPES_ABSENCE_PROFESSEUR.includes(typeAbsence)
+        ? typeAbsence
+        : "autre";
+
+      await connection.query(
+        `INSERT INTO absences_professeurs (
+           id_professeur,
+           date_debut,
+           date_fin,
+           type,
+           commentaire
+         )
+         VALUES (?, ?, ?, ?, ?)`,
+        [
+          Number(idProfesseur),
+          String(absence?.date_debut || "").trim(),
+          String(absence?.date_fin || "").trim(),
+          typeNormalise,
+          normaliserTexteOptionnel(absence?.commentaire),
+        ]
+      );
+    }
+
+    await connection.commit();
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+
+  return recupererAbsencesProfesseur(idProfesseur);
 }
 
 export async function remplacerCoursProfesseur(idProfesseur, coursIds) {
