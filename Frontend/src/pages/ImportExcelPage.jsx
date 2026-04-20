@@ -13,9 +13,9 @@ export function ImportExcelPage({ moduleActif, onChangerModule }) {
   const [message, setMessage] = useState("");
 
   const API_URLS = {
-    professeurs: "http://localhost:3000/api/professeurs",
-    cours: "http://localhost:3000/api/cours",
-    salles: "http://localhost:3000/api/salles",
+    professeurs: "/api/professeurs",
+    cours: "/api/cours",
+    salles: "/api/salles",
   };
 
   const handleFileUpload = async (e) => {
@@ -69,7 +69,7 @@ export function ImportExcelPage({ moduleActif, onChangerModule }) {
 
   const formats = {
     professeurs: ["matricule, nom, prenom, specialite"],
-    cours: ["code, nom, duree, programme, etape_etude, type_salle"],
+    cours: ["code, nom, programme, etape_etude, mode_cours, type_salle (si presentiel)"],
     salles: ["code, type, capacite"],
   };
 
@@ -99,7 +99,7 @@ export function ImportExcelPage({ moduleActif, onChangerModule }) {
               id="file-upload"
             />
             <label htmlFor="file-upload">
-              <div className="import-dropzone-icon" aria-hidden="true">XLS</div>
+              <div className="import-dropzone-icon">📊</div>
               <p className="import-dropzone-text">Cliquez pour sélectionner un fichier Excel</p>
               <p className="import-dropzone-hint">Formats acceptés: .xlsx, .xls, .csv</p>
             </label>

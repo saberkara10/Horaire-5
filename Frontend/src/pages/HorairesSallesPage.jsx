@@ -11,6 +11,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
+import { AppShell } from "../components/layout/AppShell.jsx";
 import { FeedbackBanner } from "../components/ui/FeedbackBanner.jsx";
 import { SalleOccupationBoard } from "../components/salles/SalleOccupationBoard.jsx";
 import { useSalles } from "../hooks/useSalles.js";
@@ -274,7 +275,12 @@ export function HorairesSallesPage({ utilisateur, onLogout }) {
     etatOccupation === "loading" || etatOccupation === "refreshing";
 
   return (
-    <motion.div
+    <AppShell
+      utilisateur={utilisateur}
+      onLogout={onLogout}
+      title="Occupation des salles"
+    >
+      <motion.div
         className="horaires-salles-page"
         initial={{ opacity: 0, y: 18 }}
         animate={{ opacity: 1, y: 0 }}
@@ -289,7 +295,6 @@ export function HorairesSallesPage({ utilisateur, onLogout }) {
           >
             <div className="horaires-professeurs-page__sidebar-header">
               <h2>Recherche salle</h2>
-              <p>Filtrez la liste par code, type ou capacite.</p>
             </div>
 
             <input
@@ -355,11 +360,6 @@ export function HorairesSallesPage({ utilisateur, onLogout }) {
               {!salleActive ? (
                 <div className="detail-card">
                   <h2>Selectionnez une salle</h2>
-                  <p className="detail-card__subtitle">
-                    Le panneau de droite affichera l'occupation de la salle,
-                    les creneaux libres, la synthese hebdomadaire et le statut
-                    dynamique "maintenant / prochain cours".
-                  </p>
                 </div>
               ) : (
                 <div className="detail-card">
@@ -521,5 +521,6 @@ export function HorairesSallesPage({ utilisateur, onLogout }) {
           </motion.section>
         </section>
       </motion.div>
+    </AppShell>
   );
 }

@@ -7,20 +7,9 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { loginUtilisateur } from "../services/auth.api.js";
+import laciteCampus from "../assets/1733872234400.jpg";
+import laciteLogo from "../assets/lacite-logo.png";
 import "../styles/LoginPage.css";
-
-function ClockIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none">
-      <path d="M3 9L12 4L21 9" />
-      <path d="M5 10V18" />
-      <path d="M9 10V18" />
-      <path d="M15 10V18" />
-      <path d="M19 10V18" />
-      <path d="M3 20H21" />
-    </svg>
-  );
-}
 
 function MailIcon() {
   return (
@@ -63,7 +52,6 @@ function EyeOffIcon() {
 export function LoginPage({ onLogin }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -90,7 +78,7 @@ export function LoginPage({ onLogin }) {
         password: motDePasseNettoye,
       });
 
-      onLogin?.(utilisateur || { email: emailNettoye, rememberMe });
+      onLogin?.(utilisateur || { email: emailNettoye });
       navigate("/dashboard", { replace: true });
     } catch (erreur) {
       setError(erreur.message || "Impossible de se connecter.");
@@ -101,44 +89,27 @@ export function LoginPage({ onLogin }) {
 
   return (
     <main className="login-page">
-      <div className="login-page__background" />
+      <div className="login-page__background" aria-hidden="true">
+        <img
+          className="login-page__background-image"
+          src={laciteCampus}
+          alt=""
+        />
+      </div>
 
       <section className="login-page__content">
-        <section className="login-page__hero">
-          <header className="login-page__brand">
-            <div className="login-page__logo" aria-hidden="true">
-              <ClockIcon />
-            </div>
-
-            <div>
-              <h1 className="login-page__title">College Horaires</h1>
-              <p className="login-page__subtitle">
-                Portail de coordination academique
-              </p>
-            </div>
-          </header>
-
-          <div className="login-page__hero-card">
-            <span className="login-page__hero-badge">Campus numerique</span>
-            <h2>Planification, salles et cohortes sur une seule plateforme</h2>
-            <p>
-              Suivi des cours, disponibilites et affectations dans un espace
-              pense pour un college.
-            </p>
-
-            <div className="login-page__hero-points">
-              <span>Organisation pedagogique</span>
-              <span>Coordination des enseignants</span>
-              <span>Suivi des groupes</span>
-            </div>
-          </div>
-        </section>
-
         <div className="login-card">
+          <div className="login-card__brand">
+            <img
+              className="login-page__logo"
+              src={laciteLogo}
+              alt="Logo La Cite"
+            />
+          </div>
+
           <div className="login-card__header">
-            <span className="login-card__eyebrow">Connexion securisee</span>
-            <h2>Espace de connexion</h2>
-            <p>Identifiez-vous pour acceder au tableau de bord.</p>
+            <h1 className="login-page__title">Connexion</h1>
+            <p>Accedez a votre espace de gestion.</p>
           </div>
 
           <form className="login-form" onSubmit={handleSubmit}>
@@ -201,35 +172,11 @@ export function LoginPage({ onLogin }) {
               </div>
             </div>
 
-            <div className="login-form__options">
-              <label className="login-checkbox">
-                <input
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={(event) => setRememberMe(event.target.checked)}
-                />
-                <span>Se souvenir de moi</span>
-              </label>
-
-              <button
-                type="button"
-                className="login-form__link"
-                onClick={() => setError("Fonctionnalite bientot disponible.")}
-              >
-                Mot de passe oublie ?
-              </button>
-            </div>
-
             <button className="login-form__submit" type="submit" disabled={loading}>
               {loading ? "Connexion..." : "Se connecter"}
             </button>
 
             {error ? <p className="login-form__error">{error}</p> : null}
-
-            <p className="login-form__hint">
-              Utilisez votre compte administrateur ou responsable pour acceder
-              au portail.
-            </p>
           </form>
         </div>
       </section>

@@ -31,27 +31,6 @@ export function ExportButtons({ type, id, nom = "", disabled = false, compact = 
   const [loading, setLoading] = useState(null); // "pdf" | "excel" | null
   const [succes, setSucces] = useState(null);   // "pdf" | "excel" | null
 
-  function renderFileIcon(format) {
-    if (format === "excel") {
-      return (
-        <span className="export-icon">
-          <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15">
-            <path d="M4 2h8l4 4v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm8 0v4h4" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
-            <path d="M7 13l1.5-2m0 0L10 13m-1.5-2V9m3 4l1.5-2m0 0L14 13m-1.5-2V9" stroke="currentColor" strokeWidth="1.3" fill="none" strokeLinecap="round"/>
-          </svg>
-        </span>
-      );
-    }
-
-    return (
-      <span className="export-icon">
-        <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15">
-          <path d="M4 18a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8l4 4v10a2 2 0 0 1-2 2H4zm8-14v3h3M7 11h6M7 14h4" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
-        </svg>
-      </span>
-    );
-  }
-
   async function handleExport(format) {
     if (!id || loading) return;
     const fn = HANDLERS[type]?.[format];
@@ -85,8 +64,14 @@ export function ExportButtons({ type, id, nom = "", disabled = false, compact = 
       >
         {loading === "pdf" ? (
           <span className="export-spinner" />
+        ) : succes === "pdf" ? (
+          <span className="export-icon">✓</span>
         ) : (
-          renderFileIcon("pdf")
+          <span className="export-icon">
+            <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15">
+              <path d="M4 18a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8l4 4v10a2 2 0 0 1-2 2H4zm8-14v3h3M7 11h6M7 14h4" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+            </svg>
+          </span>
         )}
         <span>{compact ? "PDF" : "Télécharger PDF"}</span>
       </button>
@@ -100,8 +85,15 @@ export function ExportButtons({ type, id, nom = "", disabled = false, compact = 
       >
         {loading === "excel" ? (
           <span className="export-spinner" />
+        ) : succes === "excel" ? (
+          <span className="export-icon">✓</span>
         ) : (
-          renderFileIcon("excel")
+          <span className="export-icon">
+            <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15">
+              <path d="M4 2h8l4 4v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm8 0v4h4" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+              <path d="M7 13l1.5-2m0 0L10 13m-1.5-2V9m3 4l1.5-2m0 0L14 13m-1.5-2V9" stroke="currentColor" strokeWidth="1.3" fill="none" strokeLinecap="round"/>
+            </svg>
+          </span>
         )}
         <span>{compact ? "Excel" : "Télécharger Excel"}</span>
       </button>

@@ -9,7 +9,7 @@
  * @module services/cours.api
  */
 
-import { apiRequest, telechargerFichier } from "./api.js";
+import { apiRequest } from "./api.js";
 
 /**
  * URL de base pour toutes les routes des cours.
@@ -27,37 +27,6 @@ const BASE_URL = "/api/cours";
  */
 export async function recupererCours() {
   return apiRequest(BASE_URL);
-}
-
-/**
- * Importe un fichier Excel/CSV de cours.
- *
- * Les codes de salle references doivent deja exister dans le module Salles.
- *
- * @param {File} fichier - Fichier .xlsx, .xls ou .csv
- * @returns {Promise<object>} Resume complet de l'import
- */
-export async function importerCours(fichier) {
-  const formData = new FormData();
-  formData.append("fichier", fichier);
-
-  return apiRequest(`${BASE_URL}/import`, {
-    method: "POST",
-    body: formData,
-  });
-}
-
-/**
- * Telecharge le modele officiel d'import du module Cours.
- *
- * @returns {Promise<{ filename: string }>} Nom de fichier telecharge
- */
-export async function telechargerModeleImportCours() {
-  return telechargerFichier(
-    `${BASE_URL}/import/template`,
-    {},
-    "modele-import-cours.xlsx"
-  );
 }
 
 /**

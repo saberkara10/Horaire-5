@@ -7,7 +7,7 @@
 .planning-retour {
   background: none;
   border: none;
-  color: var(--primary);
+  color: #5962d9;
   cursor: pointer;
   font-size: 0.95rem;
   padding: 0;
@@ -60,7 +60,7 @@
 
 .planning-label {
   font-size: 0.75rem;
-  color: var(--muted);
+  color: #7890a8;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin-bottom: 4px;
@@ -89,7 +89,7 @@
 }
 
 .planning-table thead tr {
-  background: rgba(234, 247, 239, 0.9);
+  background: rgba(236, 245, 255, 0.9);
 }
 
 .planning-table th,
@@ -105,7 +105,7 @@
 .planning-code {
   display: block;
   font-size: 0.75rem;
-  color: var(--primary);
+  color: #5962d9;
   font-weight: 700;
 }
 
@@ -163,15 +163,15 @@
 }
 
 .cal-nav-btn {
-  background: rgba(247, 249, 248, 0.98);
-  color: var(--ink-700);
+  background: rgba(248, 251, 255, 0.98);
+  color: #355574;
   border: 1px solid var(--line);
 }
 
 .cal-nav-aujourd-hui {
-  background: var(--blue);
+  background: linear-gradient(135deg, #0ea5e9 0%, #6b6cf6 100%);
   color: #ffffff;
-  box-shadow: 0 16px 28px rgba(15, 138, 67, 0.2);
+  box-shadow: 0 16px 28px rgba(107, 108, 246, 0.2);
 }
 
 .cal-nav-titre {
@@ -188,7 +188,7 @@
   min-width: 1320px;
   border-radius: 22px;
   overflow: hidden;
-  border: 1px solid rgba(217, 226, 221, 0.4);
+  border: 1px solid rgba(178, 197, 217, 0.4);
   background: rgba(255, 255, 255, 0.96);
   box-shadow: var(--shadow-card);
 }
@@ -196,13 +196,13 @@
 .cal-col-heures {
   width: 72px;
   flex-shrink: 0;
-  border-right: 1px solid rgba(217, 226, 221, 0.36);
+  border-right: 1px solid rgba(178, 197, 217, 0.36);
 }
 
 .cal-entete-vide,
 .cal-entete-jour {
   height: 56px;
-  border-bottom: 1px solid rgba(217, 226, 221, 0.36);
+  border-bottom: 1px solid rgba(178, 197, 217, 0.36);
 }
 
 .cal-entete-jour {
@@ -210,7 +210,7 @@
   gap: 0.1rem;
   align-content: center;
   padding: 0.75rem;
-  background: rgba(234, 247, 239, 0.96);
+  background: rgba(236, 245, 255, 0.96);
 }
 
 .cal-jour-nom {
@@ -227,7 +227,7 @@
 .cal-heure-cell,
 .cal-slot {
   height: 60px;
-  border-bottom: 1px solid rgba(217, 226, 221, 0.22);
+  border-bottom: 1px solid rgba(178, 197, 217, 0.22);
 }
 
 .cal-heure-cell {
@@ -241,7 +241,7 @@
 
 .cal-col-jour {
   flex: 1;
-  border-right: 1px solid rgba(217, 226, 221, 0.36);
+  border-right: 1px solid rgba(178, 197, 217, 0.36);
 }
 
 .cal-col-jour:last-child {
@@ -258,27 +258,31 @@
   right: 4px;
   z-index: 1;
   display: grid;
-  gap: 0.12rem;
+  gap: 0.18rem;
   padding: 0.45rem 0.55rem;
   border-radius: 12px;
-  background: linear-gradient(135deg, var(--primary-hover), var(--primary));
+  background: linear-gradient(135deg, #0ea5e9, #6b6cf6);
   color: #ffffff;
   overflow: hidden;
-  box-shadow: 0 12px 24px rgba(15, 138, 67, 0.18);
+  box-shadow: 0 12px 24px rgba(77, 111, 229, 0.24);
 }
 
 .cal-seance-code {
   font-size: 0.82rem;
   font-weight: 800;
+  line-height: 1.2;
 }
 
 .cal-seance-nom,
 .cal-seance-salle,
 .cal-seance-prof {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-size: 0.76rem;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  font-size: 0.75rem;
+  line-height: 1.25;
 }
 
 .cal-seance-salle,
@@ -298,4 +302,41 @@
   .cal-nav {
     gap: 0.6rem;
   }
+}
+
+/* Login-driven visual alignment */
+.planning-retour,
+.planning-code,
+.cal-nav-aujourd-hui {
+  color: var(--brand-dark);
+}
+
+.planning-infos,
+.planning-table-wrapper,
+.planning-message,
+.cal-grille {
+  border-color: var(--line);
+  background: var(--surface-strong);
+}
+
+.planning-table thead tr,
+.cal-entete-jour {
+  background: rgba(16, 167, 96, 0.08);
+}
+
+.cal-nav-btn {
+  border-color: var(--line-strong);
+  background: rgba(250, 251, 249, 0.96);
+  color: var(--text);
+}
+
+.cal-nav-aujourd-hui {
+  background: linear-gradient(135deg, var(--brand) 0%, var(--brand-dark) 100%);
+  color: var(--brand-contrast);
+  box-shadow: 0 16px 28px rgba(16, 167, 96, 0.18);
+}
+
+.cal-seance {
+  background: linear-gradient(135deg, var(--brand), #0d7c50);
+  box-shadow: 0 12px 24px rgba(16, 167, 96, 0.2);
 }

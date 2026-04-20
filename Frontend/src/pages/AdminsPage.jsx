@@ -6,6 +6,7 @@
  */
 import { Navigate } from "react-router-dom";
 import { AdminManagementPanel } from "../components/admins/AdminManagementPanel.jsx";
+import { AppShell } from "../components/layout/AppShell.jsx";
 import { utilisateurEstResponsable } from "../utils/roles.js";
 import "../styles/DashboardPage.css";
 
@@ -15,9 +16,15 @@ export function AdminsPage({ utilisateur, onLogout }) {
   }
 
   return (
-    <div className="dashboard-page">
-      <AdminManagementPanel />
-    </div>
+    <AppShell
+      utilisateur={utilisateur}
+      onLogout={onLogout}
+      title="Sous-admin"
+    >
+      <div className="dashboard-page">
+        <AdminManagementPanel />
+      </div>
+    </AppShell>
   );
 }
 /**

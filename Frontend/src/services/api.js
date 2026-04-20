@@ -85,65 +85,6 @@ export async function apiRequest(url, options = {}) {
 }
 
 /**
- * Telecharge un fichier binaire depuis le backend en conservant la gestion
- * d'erreur unifiee utilisee par le reste du frontend.
- *
- * Cette fonction sert notamment aux modeles Excel d'import exposes par les
- * modules CRUD. Le nom final privilegie l'entete Content-Disposition quand il
- * est fourni par le serveur.
- *
- * @param {string} url - Endpoint backend du fichier a telecharger
- * @param {RequestInit} [options={}] - Options fetch standard
- * @param {string} [nomFichierParDefaut="telechargement.bin"] - Nom de secours
- * @returns {Promise<{ filename: string }>} Nom du fichier telecharge
- */
-export async function telechargerFichier(
-  url,
-  options = {},
-  nomFichierParDefaut = "telechargement.bin"
-) {
-  const response = await fetch(url, {
-    credentials: "include",
-    ...options,
-  });
-
-  if (!response.ok) {
-    const data = await lireReponse(response);
-    const error = new Error(
-      data?.message || data?.error || "Une erreur est survenue."
-    );
-
-    error.status = response.status;
-    error.details = data?.erreurs || data?.details || [];
-    error.replanification = data?.replanification || null;
-    error.synchronisation = data?.synchronisation || null;
-    error.payload = data || null;
-
-    throw error;
-  }
-
-  const blob = await response.blob();
-  const objectUrl = URL.createObjectURL(blob);
-  const disposition = response.headers.get("content-disposition") || "";
-  const correspondance = disposition.match(/filename="?([^";\n]+)"?/i);
-  const filename = correspondance?.[1]?.trim() || nomFichierParDefaut;
-
-  const lien = document.createElement("a");
-  lien.href = objectUrl;
-  lien.download = filename;
-  lien.style.display = "none";
-  document.body.appendChild(lien);
-  lien.click();
-
-  window.setTimeout(() => {
-    URL.revokeObjectURL(objectUrl);
-    document.body.removeChild(lien);
-  }, 300);
-
-  return { filename };
-}
-
-/**
  * Alias de apiRequest pour la compatibilité avec les anciens modules
  * qui utilisent le nom "requeteApi".
  *

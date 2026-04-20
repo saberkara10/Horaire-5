@@ -1,4 +1,4 @@
-/**
+﻿/**
  * PAGE - Gestion des Groupes (Production-ready)
  *
  * Module complet de pilotage des groupes d'étudiants :
@@ -11,6 +11,7 @@
  * - Nettoyage des groupes vides
  */
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
+import { AppShell } from "../components/layout/AppShell.jsx";
 import { usePopup } from "../components/feedback/PopupProvider.jsx";
 import { emettreSynchronisationPlanning } from "../utils/planningSync.js";
 import {
@@ -68,7 +69,7 @@ function CapaciteBar({ effectif, max = CAPACITE_MAX }) {
 
 function StatutBadge({ aHoraire, effectif }) {
   if (effectif === 0) return <span className="gg-badge gg-badge--vide">Vide</span>;
-  if (aHoraire) return <span className="gg-badge gg-badge--ok">Horaire attribue</span>;
+  if (aHoraire) return <span className="gg-badge gg-badge--ok">✓ Horaire</span>;
   return <span className="gg-badge gg-badge--pending">Sans horaire</span>;
 }
 
@@ -120,7 +121,7 @@ function CoursEchouesInput({ cours, onChange }) {
                 value={c.note_echec ?? ""}
                 onChange={(e) => updateNote(c.code, e.target.value)}
               />
-              <button type="button" className="gg-btn-sm gg-btn-sm--danger" onClick={() => supprimer(c.code)}>X</button>
+              <button type="button" className="gg-btn-sm gg-btn-sm--danger" onClick={() => supprimer(c.code)}>✕</button>
             </div>
           ))}
         </div>
@@ -465,7 +466,9 @@ export function GestionGroupesPage({ utilisateur, onLogout }) {
 
   // ─── RENDU ────────────────────────────────────────────────────────────────
   return (
-    <div className="gg-page">
+    <AppShell utilisateur={utilisateur} onLogout={onLogout}
+      title="Gestion des Groupes">
+      <div className="gg-page">
 
         {/* ── Stats ── */}
         <div className="gg-stats-bar">
@@ -475,7 +478,7 @@ export function GestionGroupesPage({ utilisateur, onLogout }) {
           <div className="gg-stat gg-stat--orange"><span className="gg-stat-num">{stats.complets}</span><span className="gg-stat-lbl">Complets</span></div>
           <div className="gg-stat gg-stat--red"><span className="gg-stat-num">{stats.vides}</span><span className="gg-stat-lbl">Vides</span></div>
           <div className="gg-stat-actions">
-            <button className="gg-btn-primary" onClick={() => setShowCreateGroup(true)}>Nouveau groupe</button>
+            <button className="gg-btn-primary" onClick={() => setShowCreateGroup(true)}>+ Nouveau groupe</button>
           </div>
         </div>
 
@@ -507,7 +510,7 @@ export function GestionGroupesPage({ utilisateur, onLogout }) {
               {loading ? (
                 <div className="gg-empty"><div className="gg-spinner" />Chargement…</div>
               ) : groupesFiltres.length === 0 ? (
-                <div className="gg-empty"><p>Aucun groupe.</p></div>
+                <div className="gg-empty"><span className="gg-empty-icon">👥</span><p>Aucun groupe.</p></div>
               ) : (
                 groupesFiltres.map((g) => {
                   const eff = Number(g.effectif || 0);
@@ -519,7 +522,7 @@ export function GestionGroupesPage({ utilisateur, onLogout }) {
                       <div className="gg-groupe-card-top">
                         <span className="gg-groupe-nom">{g.nom_groupe}</span>
                         <button className="gg-btn-icon-danger" title="Supprimer"
-                          onClick={(ev) => { ev.stopPropagation(); handleSupprimer(g.id_groupes_etudiants, g.nom_groupe); }}>Suppr.</button>
+                          onClick={(ev) => { ev.stopPropagation(); handleSupprimer(g.id_groupes_etudiants, g.nom_groupe); }}>🗑️</button>
                       </div>
                       <div className="gg-groupe-meta">
                         {g.programme && <span className="gg-tag">{g.programme}</span>}
@@ -538,11 +541,11 @@ export function GestionGroupesPage({ utilisateur, onLogout }) {
 
             {/* Nettoyage */}
             <div className="gg-cleanup-zone">
-              <div className="gg-cleanup-header">Nettoyage groupes vides</div>
+              <div className="gg-cleanup-header">🧹 Nettoyage groupes vides</div>
               {candidatsNettoyage !== null && (
                 <div className="gg-cleanup-list">
                   {candidatsNettoyage.length === 0
-                    ? <p className="gg-cleanup-ok">Aucun groupe a nettoyer.</p>
+                    ? <p className="gg-cleanup-ok">✅ Aucun groupe à nettoyer.</p>
                     : (<>
                       <p className="gg-cleanup-count">{candidatsNettoyage.length} groupe(s) vide(s)</p>
                       {candidatsNettoyage.slice(0, 4).map((c) => (
@@ -570,8 +573,8 @@ export function GestionGroupesPage({ utilisateur, onLogout }) {
           <section className="gg-col-right">
             {!selectedId ? (
               <div className="gg-no-selection">
+                <div className="gg-no-sel-icon">👥</div>
                 <h3>Sélectionnez un groupe</h3>
-                <p>Consultez ses membres, ajoutez des étudiants ou générez son horaire.</p>
               </div>
             ) : (
               <>
@@ -591,9 +594,9 @@ export function GestionGroupesPage({ utilisateur, onLogout }) {
                 {/* Onglets */}
                 <div className="gg-detail-tabs">
                   {[
-                    { id: "membres", label: `Membres (${etudiantsGroupe.length})` },
-                    { id: "ajouter", label: "Ajouter" },
-                    { id: "gen", label: "Generer" },
+                    { id: "membres", label: `👥 Membres (${etudiantsGroupe.length})` },
+                    { id: "ajouter", label: "➕ Ajouter" },
+                    { id: "gen", label: "⚡ Générer" },
                   ].map((t) => (
                     <button key={t.id} className={`gg-tab ${onglet === t.id ? "gg-tab--active" : ""}`} onClick={() => setOnglet(t.id)}>{t.label}</button>
                   ))}
@@ -605,7 +608,7 @@ export function GestionGroupesPage({ utilisateur, onLogout }) {
                     {loadingEtudiants
                       ? <div className="gg-empty"><div className="gg-spinner" />Chargement des membres…</div>
                       : etudiantsGroupe.length === 0
-                        ? <div className="gg-empty"><p>Aucun étudiant dans ce groupe.</p><button className="gg-btn-primary" onClick={() => setOnglet("ajouter")}>Ajouter un étudiant</button></div>
+                        ? <div className="gg-empty"><span className="gg-empty-icon">📭</span><p>Aucun étudiant dans ce groupe.</p><button className="gg-btn-primary" onClick={() => setOnglet("ajouter")}>Ajouter un étudiant</button></div>
                         : (
                           <div className="gg-etudiants-list">
                             {etudiantsGroupe.map((e) => (
@@ -617,14 +620,14 @@ export function GestionGroupesPage({ utilisateur, onLogout }) {
                                     {e.matricule || "—"} · {e.programme || "—"} · Ét. {e.etape || "—"}
                                     {Number(e.nb_cours_echoues) > 0 && (
                                       <span className="gg-badge gg-badge--warn" style={{ marginLeft: "0.5rem" }}>
-                                        {e.nb_cours_echoues} cours à reprendre
+                                        ⚠️ {e.nb_cours_echoues} cours à reprendre
                                       </span>
                                     )}
                                   </span>
                                 </div>
                                 <div className="gg-etudiant-actions">
-                                  <button className="gg-btn-sm gg-btn-sm--move" title="Déplacer" onClick={() => { setShowDeplacer(e.id_etudiant); setDeplaceVers(""); }}>Depl.</button>
-                                  <button className="gg-btn-sm gg-btn-sm--danger" title="Retirer" onClick={() => handleRetirer(e.id_etudiant, `${e.prenom} ${e.nom}`)}>X</button>
+                                  <button className="gg-btn-sm gg-btn-sm--move" title="Déplacer" onClick={() => { setShowDeplacer(e.id_etudiant); setDeplaceVers(""); }}>⇄</button>
+                                  <button className="gg-btn-sm gg-btn-sm--danger" title="Retirer" onClick={() => handleRetirer(e.id_etudiant, `${e.prenom} ${e.nom}`)}>✕</button>
                                 </div>
                               </div>
                             ))}
@@ -640,14 +643,13 @@ export function GestionGroupesPage({ utilisateur, onLogout }) {
                     <div className="gg-ajouter-header">
                       <h4>Ajouter un étudiant</h4>
                       <button className="gg-btn-primary" style={{ fontSize: "0.85rem" }} onClick={() => { setAddErr(""); setShowAddEtudiant(true); }}>
-                        Creer un nouvel etudiant
+                        + Créer un nouvel étudiant
                       </button>
                     </div>
                     {Number(groupeSelectionne?.effectif || etudiantsGroupe.length) >= CAPACITE_MAX ? (
-                      <div className="gg-alert gg-alert--warning">Ce groupe est complet ({CAPACITE_MAX}/{CAPACITE_MAX}).</div>
+                      <div className="gg-alert gg-alert--warning">⚠️ Ce groupe est complet ({CAPACITE_MAX}/{CAPACITE_MAX}).</div>
                     ) : (
                       <>
-                        <p className="gg-muted">Assigner un étudiant existant ({etudiantsHorsGroupe.length} disponibles) :</p>
                         <div className="gg-etudiants-list">
                           {etudiantsHorsGroupe.slice(0, 100).map((e) => (
                             <div key={e.id_etudiant} className="gg-etudiant-row gg-etudiant-row--available">
@@ -659,7 +661,7 @@ export function GestionGroupesPage({ utilisateur, onLogout }) {
                               <button className="gg-btn-sm gg-btn-sm--add" onClick={() => handleAjouterExistant(e.id_etudiant)}>+</button>
                             </div>
                           ))}
-                          {etudiantsHorsGroupe.length > 100 && <p className="gg-muted">…et {etudiantsHorsGroupe.length - 100} autres.</p>}
+                          {etudiantsHorsGroupe.length > 100 && <p className="gg-muted">{etudiantsHorsGroupe.length - 100} autres</p>}
                         </div>
                       </>
                     )}
@@ -671,11 +673,6 @@ export function GestionGroupesPage({ utilisateur, onLogout }) {
                   <div className="gg-tab-content gg-gen-section">
                     <div className="gg-gen-card gg-gen-card--mode">
                       <h4>Mode d'optimisation</h4>
-                      <p className="gg-muted">
-                        Le meme profil de scoring pilote la generation d'un
-                        groupe et la generation ciblee. `Legacy` reste le
-                        fallback sur pour les appels anciens.
-                      </p>
                       <div className="gg-form-row">
                         <div className="gg-form-group">
                           <label>Mode</label>
@@ -699,19 +696,17 @@ export function GestionGroupesPage({ utilisateur, onLogout }) {
                     </div>
 
                     <div className="gg-gen-card">
-                      <h4>Generer l'horaire de ce groupe</h4>
-                      <p className="gg-muted">Régénère l'horaire uniquement pour <strong>{groupeSelectionne?.nom_groupe}</strong>. Les autres groupes restent intacts.</p>
+                      <h4>⚡ Générer l'horaire de ce groupe</h4>
                       {etudiantsGroupe.length === 0 && (
-                        <div className="gg-alert gg-alert--warning">Ajoutez des etudiants avant de generer.</div>
+                        <div className="gg-alert gg-alert--warning">⚠️ Ajoutez des étudiants avant de générer.</div>
                       )}
                       <button className="gg-btn-generate" onClick={handleGenererGroupe} disabled={genLoading || etudiantsGroupe.length === 0}>
-                        {genLoading ? <><span className="gg-spinner-sm" /> Génération…</> : "Generer cet horaire"}
+                        {genLoading ? <><span className="gg-spinner-sm" /> Génération…</> : "🚀 Générer cet horaire"}
                       </button>
                     </div>
 
                     <div className="gg-gen-card">
-                      <h4>Generation ciblee (programme / etape)</h4>
-                      <p className="gg-muted">Génère les horaires de tous les groupes correspondant aux critères.</p>
+                      <h4>🎯 Génération ciblée (programme / étape)</h4>
                       <form className="gg-gen-form" onSubmit={handleGenererCible}>
                         <div className="gg-form-row">
                           <div className="gg-form-group">
@@ -730,14 +725,14 @@ export function GestionGroupesPage({ utilisateur, onLogout }) {
                           </div>
                         </div>
                         <button type="submit" className="gg-btn-generate" disabled={genCibleLoading || (!genProgr && !genEtape)}>
-                          {genCibleLoading ? <><span className="gg-spinner-sm" /> Génération…</> : "Lancer la generation ciblee"}
+                          {genCibleLoading ? <><span className="gg-spinner-sm" /> Génération…</> : "🎯 Lancer la génération ciblée"}
                         </button>
                       </form>
                     </div>
 
                     {genRapport && (
                       <div className="gg-gen-rapport">
-                        <h4>Rapport de generation</h4>
+                        <h4>📊 Rapport de génération</h4>
                         <div className="gg-rapport-stats">
                           <div className="gg-rstat gg-rstat--green">
                             <span>{genRapport.nb_cours_planifies ?? genRapport.total_planifies ?? 0}</span>
@@ -771,6 +766,7 @@ export function GestionGroupesPage({ utilisateur, onLogout }) {
             )}
           </section>
         </div>
+      </div>
 
       {/* ══ MODAL Créer groupe ══ */}
       <Modal open={showCreateGroup} onClose={() => setShowCreateGroup(false)} title="Créer un groupe">
@@ -864,7 +860,7 @@ export function GestionGroupesPage({ utilisateur, onLogout }) {
             </div>
           )}
 
-          {addErr && <div className="gg-alert gg-alert--error">{addErr}</div>}
+          {addErr && <div className="gg-alert gg-alert--error">❌ {addErr}</div>}
 
           <div className="gg-form-actions">
             <button type="submit" className="gg-btn-primary">Ajouter l'étudiant</button>
@@ -877,9 +873,8 @@ export function GestionGroupesPage({ utilisateur, onLogout }) {
       <Modal open={showDeplacer !== null} onClose={() => { setShowDeplacer(null); setDeplaceVers(""); }}
         title={`Déplacer ${etudiantADeplacer?.prenom || ""} ${etudiantADeplacer?.nom || ""}`}>
         <div className="gg-form">
-          <p className="gg-muted">Uniquement les groupes du même programme et de la même étape, non complets.</p>
           {groupesCompatibles.length === 0
-            ? <div className="gg-alert gg-alert--warning">Aucun groupe compatible disponible.</div>
+            ? <div className="gg-alert gg-alert--warning">⚠️ Aucun groupe compatible disponible.</div>
             : (
               <>
                 <div className="gg-form-group">
@@ -901,6 +896,6 @@ export function GestionGroupesPage({ utilisateur, onLogout }) {
             )}
         </div>
       </Modal>
-    </div>
+    </AppShell>
   );
 }

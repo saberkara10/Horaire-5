@@ -43,7 +43,7 @@
   padding: 0 1rem;
   border: 1px solid var(--line);
   border-radius: 16px;
-  background: rgba(247, 249, 248, 0.98);
+  background: rgba(248, 251, 255, 0.98);
   color: var(--text);
 }
 
@@ -53,14 +53,20 @@
   margin-bottom: 1rem;
   padding: 1rem;
   border-radius: 18px;
-  background: rgba(247, 249, 248, 0.94);
-  border: 1px solid rgba(217, 226, 221, 0.42);
-  color: var(--ink-700);
+  background: rgba(248, 251, 255, 0.94);
+  border: 1px solid rgba(178, 197, 217, 0.42);
+  color: #355574;
 }
 
 .professeurs-page__availability-form {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.professeurs-page__absence-form {
+  display: grid;
   gap: 0.9rem;
   margin-bottom: 1rem;
 }
@@ -92,8 +98,8 @@
 .professeurs-page__day-card {
   border-radius: 18px;
   padding: 0.95rem 1rem;
-  background: rgba(247, 249, 248, 0.94);
-  border: 1px solid rgba(217, 226, 221, 0.38);
+  background: rgba(248, 251, 255, 0.94);
+  border: 1px solid rgba(178, 197, 217, 0.38);
 }
 
 .professeurs-page__day-title {
@@ -119,13 +125,27 @@
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.96);
   color: var(--text);
-  border: 1px solid rgba(217, 226, 221, 0.35);
+  border: 1px solid rgba(190, 208, 227, 0.35);
 }
 
 .professeurs-page__availability-item-actions {
   display: flex;
   gap: 0.65rem;
   flex-wrap: wrap;
+}
+
+.professeurs-page__absence-details {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.professeurs-page__absence-details strong {
+  color: var(--text);
+}
+
+.professeurs-page__absence-details span,
+.professeurs-page__absence-details small {
+  color: var(--muted);
 }
 
 .professeurs-page__empty-day {
@@ -151,13 +171,13 @@
 }
 
 .professeurs-page__calendar-btn {
-  background: rgba(234, 247, 239, 0.96);
-  color: var(--ink-700);
+  background: rgba(236, 245, 255, 0.96);
+  color: #355574;
   border: 1px solid var(--line);
 }
 
 .professeurs-page__calendar-today {
-  background: var(--blue);
+  background: linear-gradient(135deg, #0ea5e9 0%, #6b6cf6 100%);
   color: #ffffff;
 }
 
@@ -175,26 +195,26 @@
   min-width: 1320px;
   border-radius: 20px;
   overflow: hidden;
-  border: 1px solid rgba(217, 226, 221, 0.42);
+  border: 1px solid rgba(178, 197, 217, 0.42);
   background: rgba(255, 255, 255, 0.95);
 }
 
 .professeurs-page__hours-column {
   width: 72px;
   flex-shrink: 0;
-  border-right: 1px solid rgba(217, 226, 221, 0.4);
+  border-right: 1px solid rgba(178, 197, 217, 0.4);
 }
 
 .professeurs-page__calendar-head-empty,
 .professeurs-page__calendar-head {
   height: 56px;
-  border-bottom: 1px solid rgba(217, 226, 221, 0.4);
+  border-bottom: 1px solid rgba(178, 197, 217, 0.4);
 }
 
 .professeurs-page__calendar-head {
   display: block;
   padding: 0.75rem;
-  background: rgba(234, 247, 239, 0.98);
+  background: rgba(236, 245, 255, 0.98);
 }
 
 .professeurs-page__calendar-head span {
@@ -213,7 +233,7 @@
 .professeurs-page__hour-cell,
 .professeurs-page__slot {
   height: 60px;
-  border-bottom: 1px solid rgba(217, 226, 221, 0.22);
+  border-bottom: 1px solid rgba(178, 197, 217, 0.22);
 }
 
 .professeurs-page__hour-cell {
@@ -227,7 +247,7 @@
 
 .professeurs-page__day-column {
   flex: 1;
-  border-right: 1px solid rgba(217, 226, 221, 0.38);
+  border-right: 1px solid rgba(178, 197, 217, 0.38);
 }
 
 .professeurs-page__day-column:last-child {
@@ -244,23 +264,27 @@
   right: 4px;
   z-index: 1;
   display: grid;
-  gap: 0.1rem;
+  gap: 0.18rem;
   padding: 0.45rem 0.55rem;
   border-radius: 10px;
-  background: linear-gradient(135deg, var(--primary-hover), var(--primary));
+  background: linear-gradient(135deg, #6b6cf6, #0ea5e9);
   color: #ffffff;
   overflow: hidden;
 }
 
 .professeurs-page__session strong {
   font-size: 0.82rem;
+  line-height: 1.2;
 }
 
 .professeurs-page__session span,
 .professeurs-page__session small {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.25;
 }
 
 .professeurs-page__session small {
@@ -287,21 +311,24 @@
   right: 4px;
   z-index: 1;
   display: grid;
-  gap: 0.1rem;
+  gap: 0.18rem;
   padding: 0.45rem 0.55rem;
   border-radius: 10px;
-  background: linear-gradient(135deg, var(--primary-hover), var(--primary));
+  background: linear-gradient(135deg, #0f766e, #14b8a6);
   color: #ffffff;
   overflow: hidden;
-  box-shadow: 0 8px 24px rgba(15, 138, 67, 0.18);
+  box-shadow: 0 8px 24px rgba(20, 184, 166, 0.18);
 }
 
 .professeurs-page__availability-session strong,
 .professeurs-page__availability-session span,
 .professeurs-page__availability-session small {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.25;
 }
 
 .professeurs-page__availability-session strong {
@@ -318,17 +345,17 @@
   max-height: 280px;
   overflow: auto;
   padding: 0.25rem;
-  border: 1px solid rgba(217, 226, 221, 0.36);
+  border: 1px solid rgba(178, 197, 217, 0.36);
   border-radius: 18px;
-  background: rgba(247, 249, 248, 0.92);
+  background: rgba(248, 251, 255, 0.92);
 }
 
 .professeurs-page__course-summary {
   min-height: 52px;
   padding: 0.95rem 1rem;
   border-radius: 16px;
-  border: 1px solid rgba(217, 226, 221, 0.36);
-  background: rgba(247, 249, 248, 0.92);
+  border: 1px solid rgba(178, 197, 217, 0.36);
+  background: rgba(248, 251, 255, 0.92);
   color: var(--text);
   line-height: 1.55;
 }
@@ -359,7 +386,7 @@
 
 .professeurs-page__course-option input {
   margin-top: 0.15rem;
-  accent-color: var(--blue);
+  accent-color: #6b6cf6;
 }
 
 .professeurs-page__course-option div {
@@ -376,8 +403,8 @@
 }
 
 .professeurs-page__course-option--active {
-  border-color: rgba(15, 138, 67, 0.32);
-  background: rgba(234, 247, 239, 0.92);
+  border-color: rgba(107, 108, 246, 0.32);
+  background: rgba(240, 241, 255, 0.92);
 }
 
 .professeurs-page__course-empty {
@@ -414,4 +441,36 @@
     flex-direction: column;
     align-items: flex-start;
   }
+}
+
+/* Login-driven visual alignment */
+.professeurs-page__panel,
+.professeurs-page__course-picker,
+.professeurs-page__course-summary,
+.professeurs-page__day-card,
+.professeurs-page__availability-item,
+.professeurs-page__calendar-grid {
+  border-color: var(--line);
+  background: var(--surface-strong);
+}
+
+.professeurs-page__calendar-btn {
+  border-color: var(--line-strong);
+  background: rgba(250, 251, 249, 0.96);
+  color: var(--text);
+}
+
+.professeurs-page__calendar-today,
+.professeurs-page__session,
+.professeurs-page__availability-session {
+  background: linear-gradient(135deg, var(--brand), var(--brand-dark));
+}
+
+.professeurs-page__course-option--active {
+  border-color: rgba(16, 167, 96, 0.28);
+  background: rgba(235, 249, 241, 0.94);
+}
+
+.professeurs-page__course-option input {
+  accent-color: var(--brand);
 }
