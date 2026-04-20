@@ -12,26 +12,26 @@ export function FeedbackBanner({
 
   const paletteParType = {
     success: {
-      border: "#1e3a5f",
-      background: "#eef4fb",
-      color: "#1e3a5f",
-      title: "Information",
+      border: "var(--primary)",
+      background: "rgba(234, 247, 239, 0.96)",
+      color: "var(--primary-hover)",
+      title: "Succes",
     },
     error: {
       border: "#991b1b",
-      background: "#fef2f2",
+      background: "rgba(253, 236, 236, 0.96)",
       color: "#991b1b",
       title: "Erreur",
     },
     info: {
-      border: "#1d4ed8",
-      background: "#eff6ff",
-      color: "#1d4ed8",
+      border: "rgba(15, 138, 67, 0.18)",
+      background: "rgba(247, 249, 248, 0.96)",
+      color: "var(--primary-hover)",
       title: "Information",
     },
     warning: {
       border: "#b45309",
-      background: "#fffbeb",
+      background: "rgba(255, 241, 227, 0.96)",
       color: "#b45309",
       title: "Attention",
     },

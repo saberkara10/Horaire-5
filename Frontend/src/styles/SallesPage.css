@@ -33,7 +33,7 @@
   font-weight: 700;
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
-  box-shadow: 0 18px 34px rgba(107, 108, 246, 0.22);
+  box-shadow: 0 18px 34px rgba(15, 138, 67, 0.22);
 }
 
 .page-salles__add-button {
@@ -64,7 +64,7 @@
 }
 
 .page-salles__search::placeholder {
-  color: #8fa2b4;
+  color: var(--muted-soft);
 }
 
 .page-salles__alert {
@@ -82,7 +82,7 @@
 
 .page-salles__alert--success {
   background: rgba(240, 253, 244, 0.96);
-  border: 1px solid rgba(74, 222, 128, 0.18);
+  border: 1px solid rgba(15, 138, 67, 0.18);
   color: #166534;
 }
 
@@ -107,7 +107,7 @@
 }
 
 .page-salles__table thead tr {
-  background: rgba(236, 245, 255, 0.85);
+  background: rgba(234, 247, 239, 0.85);
 }
 
 .page-salles__table th,
@@ -121,7 +121,7 @@
 }
 
 .page-salles__table tbody tr:hover {
-  background: rgba(236, 245, 255, 0.48);
+  background: rgba(234, 247, 239, 0.48);
 }
 
 .page-salles__actions {
@@ -138,7 +138,7 @@
 }
 
 .page-salles__action--edit {
-  color: #2563eb;
+  color: var(--primary);
 }
 
 .page-salles__action--delete {
@@ -152,7 +152,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(233, 240, 248, 0.72);
+  background: rgba(237, 244, 240, 0.72);
   backdrop-filter: blur(8px);
   padding: 1rem;
 }
@@ -163,7 +163,7 @@
   border: 1px solid var(--line);
   border-radius: 24px;
   background: #ffffff;
-  box-shadow: 0 30px 70px rgba(114, 141, 171, 0.25);
+  box-shadow: 0 30px 70px rgba(76, 104, 84, 0.25);
   overflow: hidden;
 }
 
@@ -184,7 +184,7 @@
 .page-salles__close {
   border: none;
   background: transparent;
-  color: #94a3b8;
+  color: var(--muted-soft);
   font-size: 1.8rem;
   cursor: pointer;
 }
@@ -202,15 +202,15 @@
 
 .page-salles__field span {
   font-weight: 600;
-  color: #355574;
+  color: var(--ink-700);
 }
 
 .page-salles__field input {
   min-height: 54px;
   padding: 0 1rem;
-  border: 1px solid rgba(178, 197, 217, 0.72);
+  border: 1px solid rgba(217, 226, 221, 0.72);
   border-radius: 16px;
-  background: rgba(248, 251, 255, 0.96);
+  background: rgba(247, 249, 248, 0.96);
   color: var(--text);
   outline: none;
 }
@@ -225,9 +225,9 @@
 .page-salles__secondary-button {
   min-height: 48px;
   padding: 0 1rem;
-  border: 1px solid rgba(178, 197, 217, 0.72);
+  border: 1px solid rgba(217, 226, 221, 0.72);
   border-radius: 14px;
-  background: rgba(248, 251, 255, 0.98);
+  background: rgba(247, 249, 248, 0.98);
   color: var(--text);
   font-weight: 700;
   cursor: pointer;

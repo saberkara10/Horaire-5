@@ -1,9 +1,9 @@
 .centre-aide {
-  --help-accent: #2f5f89;
-  --help-indigo: #4d6f8a;
-  --help-teal: #6a7f90;
-  --help-ink: #223445;
-  --help-muted: #647382;
+  --help-accent: var(--primary);
+  --help-indigo: var(--primary-hover);
+  --help-teal: var(--muted);
+  --help-ink: var(--text);
+  --help-muted: var(--muted);
   --help-panel: rgba(255, 255, 255, 0.96);
   --help-panel-strong: rgba(255, 255, 255, 0.98);
   display: grid;
@@ -14,7 +14,7 @@
 .centre-aide__loading,
 .centre-aide__error,
 .centre-aide__empty {
-  border: 1px solid rgba(169, 191, 220, 0.32);
+  border: 1px solid rgba(217, 226, 221, 0.32);
   border-radius: 30px;
   background: var(--help-panel-strong);
   box-shadow: var(--shadow-card);
@@ -37,7 +37,7 @@
   width: 48px;
   height: 48px;
   border-radius: 999px;
-  border: 4px solid rgba(14, 165, 233, 0.16);
+  border: 4px solid rgba(15, 138, 67, 0.16);
   border-top-color: var(--help-accent);
   animation: centre-aide-spin 0.8s linear infinite;
 }
@@ -54,7 +54,7 @@
 .help-video-card,
 .help-faq-item,
 .help-learning-path__step {
-  border: 1px solid rgba(169, 191, 220, 0.28);
+  border: 1px solid rgba(217, 226, 221, 0.28);
   box-shadow: var(--shadow-card);
   background: var(--help-panel);
   backdrop-filter: blur(12px);
@@ -88,8 +88,8 @@
   gap: 0.5rem;
   padding: 0.5rem 0.8rem;
   border-radius: 999px;
-  background: rgba(47, 95, 137, 0.1);
-  color: #2f5f89;
+  background: rgba(15, 138, 67, 0.1);
+  color: var(--primary);
   font-size: 0.8rem;
   font-weight: 800;
   letter-spacing: 0.07em;
@@ -117,16 +117,16 @@
   display: flex;
   align-items: center;
   min-height: 64px;
-  border: 1px solid rgba(167, 191, 220, 0.42);
+  border: 1px solid rgba(217, 226, 221, 0.42);
   border-radius: 22px;
   background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 10px 24px rgba(129, 144, 158, 0.12);
+  box-shadow: 0 10px 24px rgba(76, 104, 84, 0.12);
 }
 
 .centre-aide__search-icon {
   position: absolute;
   left: 1rem;
-  color: #6b87a1;
+  color: var(--muted);
 }
 
 .centre-aide__search-input {
@@ -161,10 +161,10 @@
 .centre-aide__jump-links button {
   min-height: 42px;
   padding: 0 0.95rem;
-  border: 1px solid rgba(167, 191, 220, 0.36);
+  border: 1px solid rgba(217, 226, 221, 0.36);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.82);
-  color: #2b516f;
+  color: var(--ink-700);
   font-weight: 700;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
@@ -195,7 +195,7 @@
 .centre-aide__hero-note {
   padding: 1rem 1.05rem;
   border-radius: 24px;
-  border: 1px solid rgba(171, 193, 220, 0.28);
+  border: 1px solid rgba(217, 226, 221, 0.28);
   background: rgba(255, 255, 255, 0.78);
 }
 
@@ -242,7 +242,7 @@
 .centre-aide__section-eyebrow {
   display: inline-flex;
   margin-bottom: 0.45rem;
-  color: #5d7c99;
+  color: var(--muted);
   font-size: 0.78rem;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -277,18 +277,18 @@
 .centre-aide__section-link,
 .centre-aide__secondary-btn {
   padding: 0 0.95rem;
-  border: 1px solid rgba(167, 191, 220, 0.34);
+  border: 1px solid rgba(217, 226, 221, 0.34);
   background: rgba(255, 255, 255, 0.84);
-  color: #28506e;
+  color: var(--ink-700);
 }
 
 .centre-aide__primary-btn {
   width: fit-content;
   padding: 0 1rem;
   border: none;
-  background: #2f5f89;
+  background: var(--primary);
   color: #ffffff;
-  box-shadow: 0 10px 22px rgba(47, 95, 137, 0.18);
+  box-shadow: 0 10px 22px rgba(15, 138, 67, 0.18);
 }
 
 .centre-aide__grid,
@@ -336,7 +336,7 @@
 .help-video-card:hover,
 .help-category-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 12px 24px rgba(129, 144, 158, 0.14);
+  box-shadow: 0 12px 24px rgba(76, 104, 84, 0.14);
 }
 
 .help-learning-path__index {
@@ -345,7 +345,7 @@
   display: grid;
   place-items: center;
   border-radius: 14px;
-  background: rgba(232, 239, 245, 0.98);
+  background: rgba(234, 247, 239, 0.98);
   color: var(--help-ink);
   font-weight: 800;
 }
@@ -396,13 +396,13 @@
   align-items: center;
   min-height: 56px;
   padding-left: 1rem;
-  border: 1px solid rgba(167, 191, 220, 0.4);
+  border: 1px solid rgba(217, 226, 221, 0.4);
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.88);
 }
 
 .help-filters__search svg {
-  color: #6f8aa3;
+  color: var(--muted);
 }
 
 .help-filters__search input {
@@ -426,14 +426,14 @@
 }
 
 .help-filters__grid span {
-  color: #4e6a84;
+  color: var(--muted);
   font-size: 0.82rem;
   font-weight: 700;
 }
 
 .help-filters__grid select {
   min-height: 48px;
-  border: 1px solid rgba(167, 191, 220, 0.4);
+  border: 1px solid rgba(217, 226, 221, 0.4);
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.9);
   color: var(--help-ink);
@@ -451,7 +451,7 @@
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
-  color: #305270;
+  color: var(--ink-700);
   font-weight: 700;
 }
 
@@ -494,12 +494,12 @@
   display: grid;
   place-items: center;
   border-radius: 16px;
-  color: #0f709d;
-  background: linear-gradient(135deg, rgba(14, 165, 233, 0.12), rgba(107, 108, 246, 0.16));
+  color: var(--primary-hover);
+  background: linear-gradient(135deg, rgba(15, 138, 67, 0.12), rgba(15, 138, 67, 0.16));
 }
 
 .help-category-card__module {
-  color: #607a93;
+  color: var(--muted);
   font-size: 0.8rem;
   font-weight: 800;
   letter-spacing: 0.06em;
@@ -544,8 +544,8 @@
 .help-modal__badge,
 .help-doc-modal__badge,
 .help-video-card__eyebrow span {
-  color: #106fa0;
-  background: rgba(14, 165, 233, 0.11);
+  color: var(--primary-hover);
+  background: rgba(15, 138, 67, 0.11);
 }
 
 .help-card__module,
@@ -554,8 +554,8 @@
 .help-modal__chip,
 .help-doc-modal__chip,
 .help-video-card__eyebrow-tag {
-  color: #565dcb;
-  background: rgba(107, 108, 246, 0.11);
+  color: var(--primary);
+  background: rgba(15, 138, 67, 0.11);
 }
 
 .help-category-card__action,
@@ -568,7 +568,7 @@
   padding: 0;
   border: none;
   background: transparent;
-  color: #0d71a3;
+  color: var(--primary-hover);
   font-weight: 800;
 }
 
@@ -582,7 +582,7 @@
 
 .help-card--feature {
   background:
-    radial-gradient(circle at top right, rgba(20, 184, 166, 0.14), transparent 26%),
+    radial-gradient(circle at top right, rgba(15, 138, 67, 0.14), transparent 26%),
     linear-gradient(145deg, rgba(255, 255, 255, 0.96), rgba(244, 250, 255, 0.94));
 }
 
@@ -601,8 +601,8 @@
   display: grid;
   place-items: center;
   border-radius: 12px;
-  background: rgba(14, 165, 233, 0.12);
-  color: #0f6fa0;
+  background: rgba(15, 138, 67, 0.12);
+  color: var(--primary-hover);
 }
 
 .help-card__status,
@@ -617,8 +617,8 @@
 
 .help-card__status--ready,
 .help-video-card__status--ready {
-  color: #0f8e62;
-  background: rgba(20, 184, 166, 0.15);
+  color: var(--primary);
+  background: rgba(15, 138, 67, 0.15);
 }
 
 .help-card__status--coming,
@@ -653,7 +653,7 @@
 .help-card__meta-item,
 .help-card__footer,
 .help-video-card__footer {
-  color: #4e6b86;
+  color: var(--muted);
   font-weight: 700;
   font-size: 0.92rem;
 }
@@ -671,7 +671,7 @@
 }
 
 .help-card__action {
-  color: #2f5f89;
+  color: var(--primary);
 }
 
 .help-card__resource-summary {
@@ -690,7 +690,7 @@
   position: relative;
   aspect-ratio: 16 / 9;
   overflow: hidden;
-  background: linear-gradient(180deg, rgba(238, 243, 247, 0.98), rgba(247, 249, 251, 1));
+  background: linear-gradient(180deg, rgba(244, 248, 245, 0.98), rgba(247, 249, 251, 1));
 }
 
 .help-video-card__image {
@@ -705,14 +705,14 @@
   height: 100%;
   display: grid;
   place-items: center;
-  color: #5a7995;
+  color: var(--muted);
 }
 
 .help-video-card__status {
   position: absolute;
   top: 0.9rem;
   right: 0.9rem;
-  background: rgba(15, 23, 42, 0.75);
+  background: rgba(15, 138, 67, 0.88);
   color: #ffffff;
 }
 
@@ -761,7 +761,7 @@
 }
 
 .help-faq-item[open] summary {
-  border-bottom: 1px solid rgba(167, 191, 220, 0.26);
+  border-bottom: 1px solid rgba(217, 226, 221, 0.26);
 }
 
 .help-faq-item__body {
@@ -813,7 +813,7 @@
   width: min(1120px, calc(100vw - 2rem));
   max-height: calc(100vh - 2rem);
   overflow: auto;
-  border: 1px solid rgba(169, 191, 220, 0.24);
+  border: 1px solid rgba(217, 226, 221, 0.24);
   border-radius: 30px;
   background: rgba(255, 255, 255, 0.97);
   box-shadow: 0 34px 80px rgba(38, 63, 92, 0.32);
@@ -836,7 +836,7 @@
   border: none;
   border-radius: 14px;
   background: rgba(232, 241, 250, 0.88);
-  color: #496985;
+  color: var(--muted);
   cursor: pointer;
 }
 
@@ -857,7 +857,7 @@
   gap: 0.3rem;
   padding: 0.95rem 1rem;
   border-radius: 20px;
-  border: 1px solid rgba(169, 191, 220, 0.26);
+  border: 1px solid rgba(217, 226, 221, 0.26);
   background: rgba(245, 249, 253, 0.86);
 }
 
@@ -893,8 +893,8 @@
 .help-doc-modal__content {
   padding: 1rem 1.05rem;
   border-radius: 24px;
-  border: 1px solid rgba(167, 191, 220, 0.24);
-  background: rgba(248, 251, 255, 0.9);
+  border: 1px solid rgba(217, 226, 221, 0.24);
+  background: rgba(247, 249, 248, 0.9);
 }
 
 .help-modal__section-head {
@@ -912,8 +912,8 @@
 .help-modal__media {
   overflow: hidden;
   border-radius: 22px;
-  border: 1px solid rgba(167, 191, 220, 0.24);
-  background: linear-gradient(135deg, rgba(230, 241, 252, 0.96), rgba(246, 251, 255, 1));
+  border: 1px solid rgba(217, 226, 221, 0.24);
+  background: linear-gradient(135deg, rgba(234, 247, 239, 0.96), rgba(246, 251, 255, 1));
 }
 
 .help-modal__video {
@@ -964,7 +964,7 @@
   display: grid;
   gap: 0.2rem;
   padding: 0.8rem 0.9rem;
-  border: 1px solid rgba(167, 191, 220, 0.26);
+  border: 1px solid rgba(217, 226, 221, 0.26);
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.78);
   text-align: left;
@@ -991,7 +991,7 @@
   align-items: center;
   gap: 0.45rem;
   margin-bottom: 0.5rem;
-  color: #617d97;
+  color: var(--muted);
   font-size: 0.8rem;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -1015,8 +1015,8 @@
 }
 
 .help-doc-modal__status {
-  color: #0d6d9c;
-  background: rgba(14, 165, 233, 0.08);
+  color: var(--primary-hover);
+  background: rgba(15, 138, 67, 0.08);
 }
 
 .help-doc-modal__error {
@@ -1068,21 +1068,21 @@
 .markdown-content th,
 .markdown-content td {
   padding: 0.75rem 0.85rem;
-  border: 1px solid rgba(167, 191, 220, 0.24);
+  border: 1px solid rgba(217, 226, 221, 0.24);
   text-align: left;
 }
 
 .markdown-content th {
   color: var(--help-ink);
-  background: rgba(236, 245, 255, 0.86);
+  background: rgba(234, 247, 239, 0.86);
 }
 
 .markdown-content blockquote {
   margin: 1rem 0;
   padding: 0.85rem 1rem;
-  border-left: 4px solid rgba(14, 165, 233, 0.4);
+  border-left: 4px solid rgba(15, 138, 67, 0.4);
   border-radius: 0 16px 16px 0;
-  background: rgba(240, 248, 255, 0.9);
+  background: rgba(234, 247, 239, 0.9);
 }
 
 @keyframes centre-aide-spin {

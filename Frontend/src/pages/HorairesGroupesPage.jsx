@@ -408,7 +408,9 @@ export function HorairesGroupesPage({ utilisateur, onLogout }) {
         </div>
 
         {exportError && (
-          <p style={{ color: "#dc2626", fontSize: "0.85rem", marginBottom: "12px" }}>{exportError}</p>
+          <p style={{ color: "var(--danger)", fontSize: "0.85rem", marginBottom: "12px" }}>
+            {exportError}
+          </p>
         )}
 
         {loading ? (
@@ -424,7 +426,7 @@ export function HorairesGroupesPage({ utilisateur, onLogout }) {
               style={{
                 background: "none",
                 border: "none",
-                color: "#0ea5e9",
+                color: "var(--primary)",
                 cursor: "pointer",
                 fontWeight: 700,
                 textDecoration: "underline",
