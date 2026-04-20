@@ -41,7 +41,10 @@ export function EtudiantsTable({
     return (
       <section className="panel panel--centered">
         <h2>Aucun etudiant a afficher</h2>
-        <p>Ajustez vos filtres ou actualisez la liste pour afficher des etudiants.</p>
+        <p>
+          Importez un fichier Excel ou ajustez vos filtres pour afficher une liste
+          d'etudiants.
+        </p>
       </section>
     );
   }

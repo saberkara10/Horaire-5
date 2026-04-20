@@ -7,7 +7,7 @@
  * @module services/salles.api
  */
 
-import { apiRequest } from "./api.js";
+import { apiRequest, telechargerFichier } from "./api.js";
 
 /**
  * URL de base pour toutes les routes des salles.
@@ -22,6 +22,38 @@ const BASE_URL = "/api/salles";
  */
 export async function recupererSalles() {
   return apiRequest(BASE_URL);
+}
+
+/**
+ * Importe un fichier Excel/CSV de salles.
+ *
+ * Le backend applique une strategie partielle afin de conserver les lignes
+ * valides meme si certaines salles du fichier sont en erreur.
+ *
+ * @param {File} fichier - Fichier .xlsx, .xls ou .csv
+ * @returns {Promise<object>} Resume complet de l'import
+ */
+export async function importerSalles(fichier) {
+  const formData = new FormData();
+  formData.append("fichier", fichier);
+
+  return apiRequest(`${BASE_URL}/import`, {
+    method: "POST",
+    body: formData,
+  });
+}
+
+/**
+ * Telecharge le modele officiel d'import du module Salles.
+ *
+ * @returns {Promise<{ filename: string }>} Nom de fichier telecharge
+ */
+export async function telechargerModeleImportSalles() {
+  return telechargerFichier(
+    `${BASE_URL}/import/template`,
+    {},
+    "modele-import-salles.xlsx"
+  );
 }
 
 /**

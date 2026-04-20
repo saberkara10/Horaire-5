@@ -13,7 +13,6 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { AppShell } from "../components/layout/AppShell.jsx";
 import { ExportButtons } from "../components/export/ExportButtons.jsx";
 import {
   recupererGroupes,
@@ -285,12 +284,7 @@ export function HorairesGroupesPage({ utilisateur, onLogout }) {
   }
 
   return (
-    <AppShell
-      utilisateur={utilisateur}
-      onLogout={onLogout}
-      title="Horaires groupes"
-    >
-      <motion.div
+    <motion.div
         className="planning-container"
         initial={{ opacity: 0, y: 18 }}
         animate={{ opacity: 1, y: 0 }}
@@ -414,7 +408,9 @@ export function HorairesGroupesPage({ utilisateur, onLogout }) {
         </div>
 
         {exportError && (
-          <p style={{ color: "#dc2626", fontSize: "0.85rem", marginBottom: "12px" }}>{exportError}</p>
+          <p style={{ color: "var(--danger)", fontSize: "0.85rem", marginBottom: "12px" }}>
+            {exportError}
+          </p>
         )}
 
         {loading ? (
@@ -430,7 +426,7 @@ export function HorairesGroupesPage({ utilisateur, onLogout }) {
               style={{
                 background: "none",
                 border: "none",
-                color: "var(--brand-dark)",
+                color: "var(--primary)",
                 cursor: "pointer",
                 fontWeight: 700,
                 textDecoration: "underline",
@@ -581,6 +577,5 @@ export function HorairesGroupesPage({ utilisateur, onLogout }) {
           </>
         )}
       </motion.div>
-    </AppShell>
   );
 }

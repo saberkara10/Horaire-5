@@ -138,13 +138,10 @@ export function AdminManagementPanel() {
       </div>
 
       <div className="dashboard-admins__content">
-        <form
-          className="dashboard-admins__form"
-          onSubmit={handleSubmit}
-          autoComplete="off"
-        >
+        <form className="dashboard-admins__form" onSubmit={handleSubmit}>
           <div className="dashboard-admins__form-head">
             <strong>{editionId ? "Modifier un sous-admin" : "Ajouter un sous-admin"}</strong>
+            <p>Le role attribue est automatiquement `ADMIN`.</p>
           </div>
 
           <label className="dashboard-admins__field">
@@ -154,7 +151,7 @@ export function AdminManagementPanel() {
               type="text"
               value={formulaire.nom}
               onChange={handleChange}
-              autoComplete="off"
+              placeholder="Nom"
               required
             />
           </label>
@@ -166,7 +163,7 @@ export function AdminManagementPanel() {
               type="text"
               value={formulaire.prenom}
               onChange={handleChange}
-              autoComplete="off"
+              placeholder="Prenom"
               required
             />
           </label>
@@ -178,8 +175,7 @@ export function AdminManagementPanel() {
               type="email"
               value={formulaire.email}
               onChange={handleChange}
-              autoComplete="off"
-              spellCheck={false}
+              placeholder="admin@ecole.ca"
               required
             />
           </label>
@@ -191,7 +187,7 @@ export function AdminManagementPanel() {
               type="password"
               value={formulaire.password}
               onChange={handleChange}
-              autoComplete="new-password"
+              placeholder={editionId ? "Laisser vide pour conserver" : "Minimum 6 caracteres"}
               required={!editionId}
             />
           </label>

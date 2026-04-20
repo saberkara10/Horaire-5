@@ -5,13 +5,6 @@
  * utilitaires lies aux salles.
  */
 
-export const TYPES_SALLES = [
-  "Salle de cours",
-  "Laboratoire",
-  "Atelier multimedia",
-  "Salle reseautique",
-];
-
 export function construireLibelleSalle(salle) {
   return `${salle.code} - ${salle.type}`.trim();
 }

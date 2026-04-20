@@ -5,7 +5,6 @@
  * hebdomadaires des professeurs.
  */
 import { useEffect, useMemo, useState } from "react";
-import { AppShell } from "../components/layout/AppShell.jsx";
 import { ProfesseurSearchField } from "../components/ui/ProfesseurSearchField.jsx";
 import {
 
@@ -819,12 +818,7 @@ export function DisponibilitesProfesseursPage({ utilisateur, onLogout }) {
   }
 
   return (
-    <AppShell
-      utilisateur={utilisateur}
-      onLogout={onLogout}
-      title="Disponibilites professeurs"
-    >
-      <div className="crud-page">
+    <div className="crud-page">
         <section className="professeurs-page__workspace professeurs-page__workspace--full">
           <div className="professeurs-page__panel">
             <div className="professeurs-page__panel-header">
@@ -1446,6 +1440,5 @@ export function DisponibilitesProfesseursPage({ utilisateur, onLogout }) {
           </div>
         </section>
       </div>
-    </AppShell>
   );
 }
