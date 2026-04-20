@@ -1,21 +1,26 @@
 sequenceDiagram
-    actor UtilisateurAdministratif as Administrateur / Responsable administratif
+    participant Admin
     participant Frontend
-    participant RouteMe as Route /auth/me
-    participant RouteLogout as Route /auth/logout
-    participant Session
+    participant MeRoute
+    participant LogoutRoute
+    participant AuthGuard
+    participant SessionStore
 
-    UtilisateurAdministratif->>Frontend: Ouvre l'application
-    Frontend->>RouteMe: GET /auth/me
-    RouteMe->>Session: Lire req.session.user
+    Admin->>Frontend: Ouvre l'application
+    Frontend->>MeRoute: GET /auth/me
+    MeRoute->>AuthGuard: userAuth(request)
 
-    alt session absente
-        RouteMe-->>Frontend: 401 Authentification requise
-    else session presente
-        RouteMe-->>Frontend: 200 { user: req.session.user }
-        UtilisateurAdministratif->>Frontend: Clique sur deconnexion
-        Frontend->>RouteLogout: POST /auth/logout
-        RouteLogout->>Session: Detruire la session
-        Session-->>RouteLogout: Session supprimee
-        RouteLogout-->>Frontend: 200 Deconnexion reussie + clearCookie(sid)
+    alt utilisateur absent
+        AuthGuard-->>MeRoute: Refus
+        MeRoute-->>Frontend: 401 Non authentifie
+    else utilisateur present
+        AuthGuard-->>MeRoute: Acces autorise
+        MeRoute-->>Frontend: 200 request.user
+        Admin->>Frontend: Clique sur deconnexion
+        Frontend->>LogoutRoute: POST /auth/logout
+        LogoutRoute->>AuthGuard: userAuth(request)
+        AuthGuard-->>LogoutRoute: Acces autorise
+        LogoutRoute->>SessionStore: Fermer la session Passport
+        SessionStore-->>LogoutRoute: Retirer l utilisateur connecte
+        LogoutRoute-->>Frontend: 200 sans corps
     end
