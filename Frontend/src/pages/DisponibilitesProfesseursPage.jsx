@@ -5,7 +5,6 @@
  * hebdomadaires des professeurs.
  */
 import { useEffect, useMemo, useState } from "react";
-import { AppShell } from "../components/layout/AppShell.jsx";
 import { ProfesseurSearchField } from "../components/ui/ProfesseurSearchField.jsx";
 import {
 
@@ -819,12 +818,7 @@ export function DisponibilitesProfesseursPage({ utilisateur, onLogout }) {
   }
 
   return (
-    <AppShell
-      utilisateur={utilisateur}
-      onLogout={onLogout}
-      title="Disponibilites professeurs"
-    >
-      <div className="crud-page">
+    <div className="crud-page">
         <section className="professeurs-page__workspace professeurs-page__workspace--full">
           <div className="professeurs-page__panel">
             <div className="professeurs-page__panel-header">
@@ -1193,10 +1187,18 @@ export function DisponibilitesProfesseursPage({ utilisateur, onLogout }) {
 
                   <div className="professeurs-page__schedule-list">
                     <h3>Calendrier unifie</h3>
-                    <p className="professeurs-page__schedule-note">
-                      Vert = disponibilites effectives sur la semaine cible. Bleu = cours
-                      planifies sur cette meme semaine.
-                    </p>
+                    <div className="professeurs-page__schedule-legend">
+                      <span className="professeurs-page__legend-pill professeurs-page__legend-pill--available">
+                        Disponibilite
+                      </span>
+                      <span className="professeurs-page__legend-pill professeurs-page__legend-pill--occupied">
+                        Cours occupe
+                      </span>
+                      <p className="professeurs-page__schedule-note">
+                        Vert = disponibilites effectives sur la semaine cible. Bleu = cours
+                        planifies sur cette meme semaine.
+                      </p>
+                    </div>
 
                     <div className="professeurs-page__calendar-wrapper">
                       <div className="professeurs-page__calendar-grid">
@@ -1446,6 +1448,5 @@ export function DisponibilitesProfesseursPage({ utilisateur, onLogout }) {
           </div>
         </section>
       </div>
-    </AppShell>
   );
 }

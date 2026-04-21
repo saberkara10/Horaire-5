@@ -42,6 +42,7 @@ import adminsRoutes from "../routes/admins.routes.js";
 import dashboardRoutes from "../routes/dashboard.routes.js";
 import schedulerRoutes from "../routes/scheduler.routes.js";
 import exportRoutes from "../routes/export.routes.js";
+import helpRoutes    from "../routes/help.routes.js";   // Module Centre d'Aide
 
 // Pour la route /api/programmes qui interroge plusieurs tables à la fois
 import pool from "../db.js";
@@ -235,6 +236,7 @@ adminsRoutes(app);         // /api/admins/* — gestion des comptes admin
 dashboardRoutes(app);      // /api/dashboard/* — statistiques globales
 schedulerRoutes(app);      // /api/scheduler/* — génération d'horaires
 exportRoutes(app);         // /api/export/* — export PDF et Excel
+helpRoutes(app);           // /api/help/*   — Centre d'Aide (catégories, guides, streaming)
 
 // ── Routes de test de rôles (développement uniquement) ───────────────────
 

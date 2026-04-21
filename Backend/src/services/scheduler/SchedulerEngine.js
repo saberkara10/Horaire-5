@@ -141,10 +141,10 @@ export class SchedulerEngine {
         session.id_session,
         connection
       );
-      const groupesFormesAvecIds = groupesFormes.map((groupe) => ({
-        ...groupe,
-        id_groupe: idGroupeParNom.get(groupe.nomGroupe) || null,
-      }));
+      for (const groupe of groupesFormes) {
+        groupe.id_groupe = idGroupeParNom.get(groupe.nomGroupe) || null;
+      }
+      const groupesFormesAvecIds = groupesFormes;
       await SchedulerEngine._detacherEtudiantsHorsSession(
         session.id_session,
         sessionSaison,
@@ -518,21 +518,82 @@ export class SchedulerEngine {
 
       const {
         affectations: affectationsReprises,
+        affectationsIndividuelles = [],
         conflits: conflitsReprises,
+        placementsGeneres: placementsReprisesGeneres = [],
+        groupesGeneres: groupesReprisesGeneres = [],
+        transfertsGlobaux = [],
+        debug: debugReprises = {},
         stats: statsReprises,
       } = FailedCourseEngine.rattacherCoursEchoues({
         echouesParEtudiant,
         cours,
-        groupesFormes,
+        etudiants,
+        groupesFormes: groupesFormesAvecIds,
+        affectationsEtudiantGroupe,
         placementsPlanifies: solution,
         matrix,
+        salles,
+        professeurs,
+        datesParJourSemaine,
+        dispParProf,
+        absencesParProf,
+        indispoParSalle,
+        resourcePlacementIndex,
         activerCoursEnLigne: isOnlineCourseSchedulingEnabled(),
       });
+      if (placementsReprisesGeneres.length > 0) {
+        await SchedulerEngine._attacherGroupesAuxPlacements(
+          placementsReprisesGeneres,
+          idGroupeParNom,
+          session.id_session,
+          connection
+        );
+        SchedulerEngine._hydraterIdsGroupesGeneres(groupesReprisesGeneres, idGroupeParNom);
+        SchedulerEngine._hydraterIdsGroupesDansAffectations(
+          affectationsReprises,
+          idGroupeParNom
+        );
+        SchedulerEngine._hydraterIdsGroupesDansAffectations(
+          affectationsIndividuelles,
+          idGroupeParNom
+        );
+        solution.push(...placementsReprisesGeneres);
+      } else {
+        SchedulerEngine._hydraterIdsGroupesDansAffectations(
+          affectationsReprises,
+          idGroupeParNom
+        );
+        SchedulerEngine._hydraterIdsGroupesDansAffectations(
+          affectationsIndividuelles,
+          idGroupeParNom
+        );
+      }
+      if (transfertsGlobaux.length > 0) {
+        await SchedulerEngine._mettreAJourGroupesEtudiants(
+          affectationsEtudiantGroupe,
+          idGroupeParNom,
+          connection
+        );
+      }
+      if (groupesReprisesGeneres.length > 0) {
+        rapport.groupes_crees.push(
+          ...groupesReprisesGeneres.map((groupe) => ({
+            nom: groupe.nomGroupe,
+            taille_reguliere: 0,
+            taille_projete_max: GroupFormer.lireEffectifProjeteMax(groupe),
+            reprises_reservees: Array.isArray(groupe?.etudiants_par_cours?.[String(Object.keys(groupe.etudiants_par_cours || {})[0] || "")])
+              ? groupe.etudiants_par_cours[String(Object.keys(groupe.etudiants_par_cours || {})[0])].length
+              : 0,
+            est_groupe_special: true,
+          }))
+        );
+      }
       rapport.nb_cours_echoues_traites = nbDemandesCoursEchoues;
       rapport.nb_cours_en_ligne_generes = solution.filter((placement) =>
         Boolean(placement.est_en_ligne)
       ).length;
-      rapport.nb_groupes_speciaux = 0;
+      rapport.nb_groupes_speciaux = groupesReprisesGeneres.length;
       rapport.nb_resolutions_manuelles = conflitsReprises.length;
       rapport.resolutions_manuelles = conflitsReprises;
 
@@ -590,6 +651,15 @@ export class SchedulerEngine {
         reprises: {
           ...statsReprises,
           conflits_details: conflitsReprises,
+          groupes_generes: groupesReprisesGeneres.map((groupe) => ({
+            nom_groupe: groupe.nomGroupe,
+            id_groupe: idGroupeParNom.get(groupe.nomGroupe) || null,
+            programme: groupe.programme || null,
+            etape: groupe.etape || null,
+          })),
+          transferts_globaux: transfertsGlobaux,
+          affectations_individuelles_dernier_recours: affectationsIndividuelles,
+          diagnostic_etudiants: debugReprises?.etudiants || [],
         },
         optimisation_locale: {
           modeOptimisationUtilise: modeOptimisation,
@@ -658,6 +728,11 @@ export class SchedulerEngine {
 
       await SchedulerEngine._persisterAffectationsIndividuellesReprises(
         affectationsReprises,
+        session.id_session,
+        connection
+      );
+      await SchedulerEngine._persisterAffectationsIndividuellesDernierRecours(
+        affectationsIndividuelles,
         session.id_session,
         connection
       );
@@ -1900,6 +1975,33 @@ export class SchedulerEngine {
     }
   }
 
+  static _hydraterIdsGroupesGeneres(groupesGeneres, idGroupeParNom) {
+    for (const groupe of Array.isArray(groupesGeneres) ? groupesGeneres : []) {
+      const nomGroupe = String(groupe?.nomGroupe || "").trim();
+      if (!nomGroupe || !idGroupeParNom.has(nomGroupe)) {
+        continue;
+      }
+
+      groupe.id_groupe = idGroupeParNom.get(nomGroupe);
+    }
+  }
+
+  static _hydraterIdsGroupesDansAffectations(affectations, idGroupeParNom) {
+    for (const affectation of Array.isArray(affectations) ? affectations : []) {
+      const idGroupe = Number(affectation?.id_groupe);
+      if (Number.isInteger(idGroupe) && idGroupe > 0) {
+        continue;
+      }
+
+      const nomGroupe = String(affectation?.nom_groupe || "").trim();
+      if (!nomGroupe || !idGroupeParNom.has(nomGroupe)) {
+        continue;
+      }
+
+      affectation.id_groupe = idGroupeParNom.get(nomGroupe);
+    }
+  }
+
   static async _mettreAJourGroupesEtudiants(
     affectationsEtudiantGroupe,
     idGroupeParNom,
@@ -1953,6 +2055,15 @@ export class SchedulerEngine {
         `DELETE FROM affectation_etudiants
          WHERE id_session = ?
            AND source_type = 'reprise'`,
+        [idSession]
+      );
+
+      await connection.query(
+        `DELETE FROM affectation_etudiants
+         WHERE id_session = ?
+           AND source_type = 'individuelle'
+           AND id_echange_cours IS NULL
+           AND id_cours_echoue IS NULL`,
         [idSession]
       );
 
@@ -2088,6 +2199,55 @@ export class SchedulerEngine {
          WHERE id = ?
            AND id_session = ?`,
         [idGroupe, idCoursEchoue, Number(idSession)]
+      );
+    }
+  }
+
+  static async _persisterAffectationsIndividuellesDernierRecours(
+    affectations,
+    idSession,
+    connection
+  ) {
+    if (!idSession || !Array.isArray(affectations) || affectations.length === 0) {
+      return;
+    }
+
+    for (const affectation of affectations) {
+      const idEtudiant = Number(affectation?.id_etudiant);
+      const idGroupe = Number(affectation?.id_groupe);
+      const idCours = Number(affectation?.id_cours);
+
+      if (
+        !Number.isInteger(idEtudiant) ||
+        idEtudiant <= 0 ||
+        !Number.isInteger(idGroupe) ||
+        idGroupe <= 0 ||
+        !Number.isInteger(idCours) ||
+        idCours <= 0
+      ) {
+        continue;
+      }
+
+      await connection.query(
+        `DELETE FROM affectation_etudiants
+         WHERE id_etudiant = ?
+           AND id_cours = ?
+           AND id_session = ?
+           AND source_type = 'individuelle'
+           AND id_echange_cours IS NULL`,
+        [idEtudiant, idCours, Number(idSession)]
+      );
+
+      await connection.query(
+        `INSERT INTO affectation_etudiants (
+           id_etudiant,
+           id_groupes_etudiants,
+           id_cours,
+           id_session,
+           source_type
+         )
+         VALUES (?, ?, ?, ?, 'individuelle')`,
+        [idEtudiant, idGroupe, idCours, Number(idSession)]
       );
     }
   }

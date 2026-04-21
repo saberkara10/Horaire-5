@@ -12,7 +12,7 @@
  * @module services/professeurs.api
  */
 
-import { apiRequest } from "./api.js";
+import { apiRequest, telechargerFichier } from "./api.js";
 
 /**
  * URL de base pour toutes les routes professeurs.
@@ -27,6 +27,38 @@ const BASE_URL = "/api/professeurs";
  */
 export async function recupererProfesseurs() {
   return apiRequest(BASE_URL);
+}
+
+/**
+ * Importe un fichier Excel/CSV de professeurs.
+ *
+ * L'import est partiel : les lignes valides sont creees ou mises a jour,
+ * tandis que les lignes invalides sont rejetees avec detail d'erreur.
+ *
+ * @param {File} fichier - Fichier .xlsx, .xls ou .csv
+ * @returns {Promise<object>} Resume complet de l'import
+ */
+export async function importerProfesseurs(fichier) {
+  const formData = new FormData();
+  formData.append("fichier", fichier);
+
+  return apiRequest(`${BASE_URL}/import`, {
+    method: "POST",
+    body: formData,
+  });
+}
+
+/**
+ * Telecharge le modele officiel d'import du module Professeurs.
+ *
+ * @returns {Promise<{ filename: string }>} Nom de fichier telecharge
+ */
+export async function telechargerModeleImportProfesseurs() {
+  return telechargerFichier(
+    `${BASE_URL}/import/template`,
+    {},
+    "modele-import-professeurs.xlsx"
+  );
 }
 
 /**

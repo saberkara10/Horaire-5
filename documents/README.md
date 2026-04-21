@@ -74,6 +74,8 @@ Chaque lien ci-dessous est cliquable et redirige directement vers le fichier cib
 - Pour consulter la documentation du module groupes : [Documentation des groupes](documentation-groupes.md)
 - Pour consulter la documentation du processus d'import des etudiants : [Documentation de l'import etudiants](documentation-import-etudiants.md)
 
+Note : les documentations `Cours`, `Professeurs` et `Salles` incluent maintenant le contrat d'import Excel/CSV integre directement dans leurs pages existantes, ainsi que les formats attendus et la strategie de traitement des erreurs.
+
 ### Interface, supervision et sorties
 
 - Pour consulter la documentation de l'interface React et de ses flux : [Documentation du frontend](documentation-frontend.md)
@@ -142,4 +144,3 @@ Chaque lien ci-dessous est cliquable et redirige directement vers le fichier cib
 
 - Pour consulter une variante historique de la conception des horaires etudiants : [Conception horaires etudiants - variante](conception_horaires_etudiants.md)
 - Pour consulter une variante historique de la documentation des horaires etudiants : [Documentation horaires etudiants - variante](documentation_horaires_etudiants.md)
-

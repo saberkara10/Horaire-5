@@ -1,70 +1,187 @@
-# Documentation - Module de gestion des salles
+# Documentation - Module Salles
 
-## 1. Objectif
+## 1. Perimetre
 
-Le module Salles vise a gerer les salles utilisees dans la planification :
+Le module **Salles** est actif dans le backend et le frontend existants. Il couvre :
 
-- creation ;
-- consultation ;
-- modification ;
-- suppression sous contrainte metier.
+- la creation manuelle ;
+- la consultation ;
+- la modification ;
+- la suppression sous contrainte ;
+- l'import Excel/CSV integre directement dans `SallesPage.jsx`.
 
-## 2. Etat reel dans le depot
+La documentation precedente mentionnait un branchement incomplet du backend. Ce n'est plus le cas : les routes Salles sont bien disponibles dans l'application principale.
 
-Le projet contient aujourd'hui :
+## 2. Composants impliques
 
-- une table `salles` dans `Backend/Database/GDH5.sql` ;
-- une page frontend `Frontend/src/pages/SallesPage.jsx` ;
-- des diagrammes et documents de conception associes.
+### Backend
 
-En revanche, le depot ne contient pas de route backend `salles` branchee dans l'entree lancee par defaut (`Backend/src/server.js` -> `Backend/src/app.js`).
+- `Backend/routes/salles.routes.js`
+- `Backend/src/model/salle.js`
+- `Backend/src/validations/salles.validation.js`
+- `Backend/src/validations/import-excel.validation.js`
+- `Backend/src/services/import-salles.service.js`
+- `Backend/src/services/import-excel.shared.js`
+- `Backend/src/services/import-excel.definitions.js`
+- `Backend/src/services/import-excel-template.service.js`
 
-Cette documentation decrit donc :
+### Frontend
 
-- la structure de donnees reelle ;
-- le role metier du module ;
-- le contrat cible attendu si le module backend est branche.
+- `Frontend/src/pages/SallesPage.jsx`
+- `Frontend/src/components/imports/ModuleExcelImportPanel.jsx`
+- `Frontend/src/config/importExcelModules.js`
+- `Frontend/src/services/salles.api.js`
+- `Frontend/src/styles/CrudPages.css`
 
-## 3. Structure de donnees reelle
+## 3. Routes exposees
 
-Source : `Backend/Database/GDH5.sql`
-
-| Champ | Type | Contraintes | Description |
-|--------|--------|------------|------------|
-| `id_salle` | INT | PRIMARY KEY, AUTO_INCREMENT | Identifiant technique |
-| `code` | VARCHAR(50) | NOT NULL, UNIQUE | Code metier de la salle |
-| `type` | VARCHAR(50) | NOT NULL | Type de salle |
-| `capacite` | INT | NOT NULL | Capacite maximale |
-
-## 4. Role metier
-
-La salle intervient dans la planification avec les autres ressources :
-
-- un cours ;
-- un professeur ;
-- une plage horaire ;
-- un ou plusieurs groupes.
-
-La table `affectation_cours` reference deja `id_salle` dans le schema SQL.
-
-## 5. Contrat cible attendu
-
-Si le module backend `salles` est branche, le contrat attendu est le suivant :
+### CRUD et occupation
 
 - `GET /api/salles`
+- `GET /api/salles/types`
 - `GET /api/salles/:id`
+- `GET /api/salles/:id/occupation`
 - `POST /api/salles`
 - `PUT /api/salles/:id`
 - `DELETE /api/salles/:id`
 
-Ce contrat correspond a la logique du frontend et aux schemas de conception, mais il n'est pas active dans l'entree backend par defaut.
+### Import Excel
 
-## 6. Regles metier attendues
+- `GET /api/salles/import/template`
+- `POST /api/salles/import`
 
-- le code de salle doit etre unique ;
-- le type et la capacite sont obligatoires ;
-- une salle deja referencee dans une affectation ne doit pas etre supprimee sans controle.
+## 4. Modele de donnees
 
-## 7. Conclusion
+Table `salles` :
 
-Le module Salles est bien present au niveau conception, SQL et interface, mais il n'est pas encore integre au backend demarre par defaut. Cette documentation l'indique explicitement pour eviter toute contradiction avec le projet reel.
+- `id_salle`
+- `code`
+- `type`
+- `capacite`
+
+Dans la version actuelle du produit, l'import ne persiste pas de colonnes `campus`, `bloc`, `batiment` ou equivalentes car elles ne font pas partie du modele SQL courant.
+
+## 5. Format attendu pour l'import
+
+Colonnes obligatoires :
+
+- `code`
+- `type`
+- `capacite`
+
+Regles :
+
+- `code` doit etre unique dans le fichier ;
+- `capacite` doit etre un entier strictement positif ;
+- `type` est normalise via la meme logique que le formulaire manuel.
+
+Le modele officiel est telechargeable depuis la page **Salles**.
+
+## 6. Strategie d'import
+
+Strategie retenue : **import partiel**.
+
+Fonctionnement :
+
+1. verification du fichier ;
+2. lecture Excel/CSV ;
+3. validation des colonnes ;
+4. validation ligne par ligne ;
+5. transaction globale ;
+6. `SAVEPOINT` par ligne ;
+7. creation, mise a jour, ignore ou rejet detaille par ligne.
+
+Cette strategie est adaptee au module Salles car une erreur sur une salle ne doit pas empecher l'integration de toutes les autres salles valides.
+
+## 7. Regles metier appliquees
+
+- si le `code` n'existe pas : creation ;
+- si le `code` existe deja : mise a jour du `type` et de la `capacite` ;
+- si les donnees importees sont identiques a la base : ligne ignoree ;
+- si `capacite` est invalide : ligne rejetee ;
+- si `code` ou `type` depassent les limites metier : ligne rejetee.
+
+## 8. Resume retourne par l'API
+
+```json
+{
+  "module": "salles",
+  "strategie": "partielle",
+  "statut": "partial",
+  "message": "Import termine partiellement.",
+  "total_lignes_lues": 6,
+  "lignes_importees": 4,
+  "lignes_creees": 2,
+  "lignes_mises_a_jour": 2,
+  "lignes_ignorees": 0,
+  "lignes_en_erreur": 2,
+  "erreurs": [
+    "Ligne 5 : capacite invalide (0)."
+  ],
+  "ignores": []
+}
+```
+
+Le frontend affiche ce resume dans la page Salles sans navigation supplementaire.
+
+## 9. Comportement de l'interface
+
+L'import est integre dans `Frontend/src/pages/SallesPage.jsx` :
+
+- le bouton manuel `+ Ajouter une salle` reste disponible ;
+- le panneau d'import presente les colonnes attendues ;
+- le telechargement du modele est disponible ;
+- un retour utilisateur detaille est affiche apres traitement ;
+- la liste des salles est rechargee automatiquement apres import.
+
+## 10. Compatibilite avec l'existant
+
+Les garanties de non-regression sont les suivantes :
+
+- le formulaire manuel n'a pas ete remplace ;
+- la route `GET /api/salles/types` continue d'alimenter les selecteurs existants ;
+- les affichages et recherches actuels restent bases sur la meme structure de donnees ;
+- les fonctions du modele `salle.js` ont simplement ete rendues compatibles avec un executor transactionnel optionnel pour reutiliser le meme coeur SQL.
+
+## 11. Gestion d'erreurs
+
+Erreurs globales :
+
+- aucun fichier fourni ;
+- format de fichier non supporte ;
+- fichier vide ;
+- fichier illisible ;
+- colonnes obligatoires manquantes.
+
+Erreurs de ligne :
+
+- code vide ;
+- type vide ;
+- capacite non numerique ou <= 0 ;
+- doublon de code dans le fichier.
+
+## 12. Validation et tests
+
+Tests automatises associes :
+
+- `Backend/tests/import-salles.service.test.js`
+- `Backend/tests/salles.import.test.js`
+
+Les cas verifies incluent :
+
+- import nominal ;
+- format invalide ;
+- erreurs de lecture ;
+- erreurs de capacite ;
+- remontée des erreurs de service au niveau route.
+
+## 13. Guide utilisateur
+
+1. Ouvrir la page **Salles**.
+2. Telecharger le modele si necessaire.
+3. Completer les colonnes `code`, `type`, `capacite`.
+4. Importer le fichier.
+5. Lire le resume.
+6. Corriger les lignes en erreur puis reimporter.
+
+Toutes les salles importees restent modifiables via le modal manuel existant.

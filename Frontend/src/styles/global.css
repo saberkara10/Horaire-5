@@ -1,43 +1,63 @@
 :root {
   color-scheme: light;
-  --bg-page: #f5f7f4;
-  --bg-app: #eef3ef;
-  --bg-structure: #e5ece8;
-  --surface: rgba(255, 255, 255, 0.82);
-  --surface-strong: rgba(255, 255, 255, 0.92);
-  --surface-solid: #ffffff;
-  --surface-muted: rgba(246, 248, 246, 0.94);
-  --panel: rgba(255, 255, 255, 0.82);
-  --panel-strong: rgba(255, 255, 255, 0.92);
-  --panel-soft: rgba(246, 248, 246, 0.94);
-  --line: rgba(123, 140, 131, 0.18);
-  --line-strong: rgba(123, 140, 131, 0.28);
-  --line-soft: rgba(123, 140, 131, 0.12);
-  --text: #162018;
-  --muted: #5f6d64;
-  --muted-strong: #47544d;
+  --brand-50: #eaf7ef;
+  --brand-100: #dcefe2;
+  --brand-200: #c9e3d1;
+  --brand-500: #0f8a43;
+  --brand-600: #0b6b34;
+  --brand-700: #095227;
   --brand: #10a760;
-  --brand-dark: #0d9657;
-  --brand-soft: rgba(16, 167, 96, 0.12);
-  --brand-soft-strong: rgba(16, 167, 96, 0.2);
+  --brand-dark: #0d7c50;
+  --brand-soft: #eaf7ef;
   --brand-contrast: #ffffff;
-  --structure: #7c90a4;
-  --structure-soft: rgba(124, 144, 164, 0.14);
-  --success: #0f8a4f;
-  --warning: #b86f12;
-  --danger: #b42318;
-  --purple: #10a760;
-  --blue: #7c90a4;
-  --teal: #0f8a4f;
-  --radius-2xl: 28px;
+  --neutral-0: #ffffff;
+  --neutral-50: #f7f9f8;
+  --neutral-100: #f3f7f4;
+  --neutral-150: #eef4f0;
+  --neutral-200: #d9e2dd;
+  --neutral-300: #c5d1ca;
+  --ink-900: #111111;
+  --ink-700: #2f2f2f;
+  --ink-600: #454545;
+  --ink-500: #5c5c5c;
+  --ink-400: #778278;
+  --warning-500: #f28c28;
+  --warning-600: #b85d12;
+  --warning-soft: #fff1e3;
+  --danger-600: #d62828;
+  --danger-soft: #fdecec;
+  --bg-start: #fcfdfc;
+  --bg-mid: #f7f9f8;
+  --bg-end: #eef4f0;
+  --panel: rgba(255, 255, 255, 0.94);
+  --panel-strong: rgba(255, 255, 255, 0.98);
+  --panel-soft: rgba(247, 249, 248, 0.96);
+  --surface-strong: rgba(255, 255, 255, 0.98);
+  --line: rgba(217, 226, 221, 0.9);
+  --line-soft: rgba(217, 226, 221, 0.6);
+  --text: var(--ink-900);
+  --muted: var(--ink-500);
+  --muted-strong: var(--ink-700);
+  --muted-soft: var(--ink-400);
+  --primary: var(--brand-500);
+  --primary-hover: var(--brand-600);
+  --primary-active: var(--brand-700);
+  --primary-soft: var(--brand-50);
+  --primary-soft-strong: var(--brand-100);
+  --focus-ring: rgba(15, 138, 67, 0.16);
   --radius-xl: 24px;
+  --radius-2xl: 28px;
   --radius-lg: 18px;
   --radius-md: 14px;
-  --radius-sm: 10px;
-  --shadow-card: 0 24px 55px rgba(52, 70, 59, 0.11);
-  --shadow-soft: 0 14px 30px rgba(52, 70, 59, 0.08);
-  --shadow-purple: 0 18px 34px rgba(16, 167, 96, 0.18);
-  --shadow-focus: 0 0 0 4px rgba(16, 167, 96, 0.12);
+  --shadow-purple: 0 12px 28px rgba(76, 104, 84, 0.12);
+  --shadow-card: 0 18px 40px rgba(76, 104, 84, 0.12);
+  --shadow-soft: 0 10px 22px rgba(76, 104, 84, 0.1);
+  --success: var(--brand-500);
+  --danger: var(--danger-600);
+  --blue: var(--brand-500);
+  --purple: var(--brand-600);
+  --purple-2: var(--brand-500);
+  --teal: var(--brand-600);
 }
 
 * {
@@ -47,6 +67,8 @@
 html,
 body,
 #root {
+  width: 100%;
+  height: 100%;
   min-height: 100%;
 }
 
@@ -56,18 +78,16 @@ html {
 
 body {
   margin: 0;
-  font-family: "Aptos", "Segoe UI", "Helvetica Neue", sans-serif;
+  overflow: hidden;
+  font-family: "Segoe UI Variable", "Segoe UI", Inter, Roboto, Arial, sans-serif;
   background:
-    radial-gradient(circle at top left, rgba(16, 167, 96, 0.1), transparent 20%),
-    radial-gradient(circle at bottom right, rgba(124, 144, 164, 0.16), transparent 22%),
-    linear-gradient(180deg, #f9fbf8 0%, var(--bg-page) 48%, var(--bg-app) 100%);
+    radial-gradient(circle at top left, rgba(15, 138, 67, 0.06), transparent 28%),
+    linear-gradient(180deg, var(--bg-start) 0%, var(--bg-mid) 52%, var(--bg-end) 100%);
   color: var(--text);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
 }
 
-a {
-  color: inherit;
+#root {
+  overflow: hidden;
 }
 
 button,
@@ -77,36 +97,14 @@ textarea {
   font: inherit;
 }
 
+button {
+  font-weight: 600;
+}
+
 input,
 select,
 textarea {
   color-scheme: light;
-}
-
-button,
-input,
-select,
-textarea {
-  transition:
-    border-color 0.2s ease,
-    box-shadow 0.2s ease,
-    background-color 0.2s ease,
-    color 0.2s ease,
-    transform 0.2s ease;
-}
-
-button:focus-visible,
-input:focus-visible,
-select:focus-visible,
-textarea:focus-visible {
-  outline: none;
-  border-color: var(--brand);
-  box-shadow: var(--shadow-focus);
-}
-
-::selection {
-  background: rgba(16, 167, 96, 0.18);
-  color: var(--text);
 }
 
 svg {
@@ -118,20 +116,36 @@ svg {
   stroke-linejoin: round;
 }
 
-::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+a {
+  color: inherit;
 }
 
-::-webkit-scrollbar-thumb {
-  border: 2px solid transparent;
-  border-radius: 999px;
-  background: rgba(95, 109, 100, 0.28);
-  background-clip: padding-box;
+::selection {
+  background: rgba(15, 138, 67, 0.18);
 }
 
-::-webkit-scrollbar-track {
-  background: transparent;
+button,
+input,
+select,
+textarea,
+[role="button"],
+[tabindex] {
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    background-color 0.18s ease,
+    color 0.18s ease,
+    transform 0.18s ease;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[role="button"]:focus-visible,
+[tabindex]:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px var(--focus-ring);
 }
 
 .app-loading-screen {
@@ -145,27 +159,25 @@ svg {
   display: grid;
   gap: 1rem;
   place-items: center;
-  min-width: 300px;
+  min-width: 280px;
   padding: 2rem;
   border: 1px solid var(--line);
-  border-radius: var(--radius-xl);
-  background: var(--surface-strong);
+  border-radius: 24px;
+  background: var(--panel-strong);
   box-shadow: var(--shadow-card);
-  backdrop-filter: blur(12px);
 }
 
 .app-loading-screen__card p {
   margin: 0;
   color: var(--muted);
-  font-weight: 600;
 }
 
 .app-loading-screen__spinner {
-  width: 48px;
-  height: 48px;
+  width: 46px;
+  height: 46px;
   border-radius: 999px;
-  border: 4px solid rgba(95, 109, 100, 0.16);
-  border-top-color: var(--brand);
+  border: 4px solid rgba(217, 226, 221, 0.56);
+  border-top-color: var(--primary);
   animation: spin 0.9s linear infinite;
 }
 

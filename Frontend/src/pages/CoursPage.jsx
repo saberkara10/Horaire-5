@@ -5,22 +5,24 @@
  * et la maintenance des cours.
  */
 import { useEffect, useMemo, useState } from "react";
-import { AppShell } from "../components/layout/AppShell.jsx";
 import { usePopup } from "../components/feedback/PopupProvider.jsx";
+import { ModuleExcelImportPanel } from "../components/imports/ModuleExcelImportPanel.jsx";
+import { recupererConfigurationImportExcel } from "../config/importExcelModules.js";
 import {
   recupererCours,
   creerCours,
   modifierCours,
   supprimerCours,
+  importerCours,
+  telechargerModeleImportCours,
 } from "../services/cours.api.js";
 import { recupererProgrammes } from "../services/programmes.api.js";
 import { recupererSalles } from "../services/salles.api.js";
-import { TYPES_SALLES } from "../utils/salles.utils.js";
 import "../styles/CrudPages.css";
 
 const ETAPES_DISPONIBLES = ["1", "2", "3", "4", "5", "6", "7", "8"];
-const MODES_COURS = ["Presentiel", "En ligne"];
-const DUREE_FIXE_COURS = 3;
+const DUREES_DISPONIBLES = ["1", "2", "3", "4"];
+const IMPORT_COURS = recupererConfigurationImportExcel("cours");
 
 function formaterDureeHeures(duree) {
   const valeur = Number(duree);
@@ -54,10 +56,9 @@ export function CoursPage({ utilisateur, onLogout }) {
   const [formulaire, setFormulaire] = useState({
     code: "",
     nom: "",
-    mode_cours: "Presentiel",
+    duree: "1",
     programme: "",
     etape_etude: "1",
-    type_salle: "",
     id_salle_reference: "",
   });
 
@@ -110,9 +111,7 @@ export function CoursPage({ utilisateur, onLogout }) {
         String(element.code || "").toLowerCase().includes(terme) ||
         String(element.nom || "").toLowerCase().includes(terme) ||
         String(element.programme || "").toLowerCase().includes(terme) ||
-        String(element.mode_cours || "").toLowerCase().includes(terme) ||
         String(element.salle_code || "").toLowerCase().includes(terme) ||
-        String(element.type_salle || "").toLowerCase().includes(terme) ||
         String(element.salle_type || "").toLowerCase().includes(terme) ||
         String(element.etape_etude || "").toLowerCase().includes(terme)
       );
@@ -131,16 +130,6 @@ export function CoursPage({ utilisateur, onLogout }) {
     );
   }, [salles]);
 
-  const sallesReferenceDisponibles = useMemo(() => {
-    if (!formulaire.type_salle) {
-      return sallesDisponibles;
-    }
-
-    return sallesDisponibles.filter(
-      (salle) => String(salle.type) === String(formulaire.type_salle)
-    );
-  }, [formulaire.type_salle, sallesDisponibles]);
-
   function ouvrirModal(coursAEditer = null) {
     setEdition(coursAEditer);
     setErreurFormulaire("");
@@ -149,20 +138,18 @@ export function CoursPage({ utilisateur, onLogout }) {
       setFormulaire({
         code: coursAEditer.code || "",
         nom: coursAEditer.nom || "",
-        mode_cours: coursAEditer.mode_cours || "Presentiel",
+        duree: String(coursAEditer.duree || "1"),
         programme: coursAEditer.programme || "",
         etape_etude: String(coursAEditer.etape_etude || "1"),
-        type_salle: coursAEditer.type_salle || "",
         id_salle_reference: String(coursAEditer.id_salle_reference || ""),
       });
     } else {
       setFormulaire({
         code: "",
         nom: "",
-        mode_cours: "Presentiel",
+        duree: "1",
         programme: "",
         etape_etude: "1",
-        type_salle: "",
         id_salle_reference: "",
       });
     }
@@ -177,10 +164,9 @@ export function CoursPage({ utilisateur, onLogout }) {
     setFormulaire({
       code: "",
       nom: "",
-      mode_cours: "Presentiel",
+      duree: "1",
       programme: "",
       etape_etude: "1",
-      type_salle: "",
       id_salle_reference: "",
     });
   }
@@ -192,17 +178,9 @@ export function CoursPage({ utilisateur, onLogout }) {
     try {
       const payload = {
         ...formulaire,
-        duree: DUREE_FIXE_COURS,
+        duree: Number(formulaire.duree),
         etape_etude: String(formulaire.etape_etude),
-        mode_cours: String(formulaire.mode_cours),
-        type_salle:
-          formulaire.mode_cours === "En ligne" ? null : String(formulaire.type_salle),
-        id_salle_reference:
-          formulaire.mode_cours === "En ligne"
-            ? null
-            : formulaire.id_salle_reference
-          ? Number(formulaire.id_salle_reference)
-          : null,
+        id_salle_reference: Number(formulaire.id_salle_reference),
       };
 
       if (edition) {
@@ -242,12 +220,7 @@ export function CoursPage({ utilisateur, onLogout }) {
   }
 
   return (
-    <AppShell
-      utilisateur={utilisateur}
-      onLogout={onLogout}
-      title="Cours"
-    >
-      <div className="crud-page">
+    <div className="crud-page">
         <div className="crud-page__header">
           <button
             type="button"
@@ -257,6 +230,15 @@ export function CoursPage({ utilisateur, onLogout }) {
             + Ajouter un cours
           </button>
         </div>
+
+        <ModuleExcelImportPanel
+          definition={IMPORT_COURS}
+          onImporter={importerCours}
+          onTelechargerModele={telechargerModeleImportCours}
+          onImportSuccess={() =>
+            Promise.all([chargerCours(), chargerProgrammes(), chargerSalles()])
+          }
+        />
 
         <div className="crud-page__toolbar">
           <input
@@ -277,11 +259,9 @@ export function CoursPage({ utilisateur, onLogout }) {
                 <tr>
                   <th>Code</th>
                   <th>Nom</th>
-                  <th>Mode</th>
                   <th>Duree</th>
                   <th>Programme</th>
                   <th>Etape</th>
-                  <th>Type requis</th>
                   <th>Salle de reference</th>
                   <th>Actions</th>
                 </tr>
@@ -290,7 +270,7 @@ export function CoursPage({ utilisateur, onLogout }) {
               <tbody>
                 {coursFiltres.length === 0 ? (
                   <tr>
-                    <td colSpan="9" className="crud-page__empty">
+                    <td colSpan="7" className="crud-page__empty">
                       Aucun cours trouve.
                     </td>
                   </tr>
@@ -299,17 +279,11 @@ export function CoursPage({ utilisateur, onLogout }) {
                     <tr key={element.id_cours}>
                       <td>{element.code}</td>
                       <td>{element.nom}</td>
-                      <td>{element.mode_cours || "Presentiel"}</td>
                       <td>{formaterDureeHeures(element.duree)}</td>
                       <td>{element.programme}</td>
                       <td>{element.etape_etude}</td>
                       <td>
-                        {element.mode_cours === "En ligne" ? "Aucune salle requise" : element.type_salle || "-"}
-                      </td>
-                      <td>
-                        {element.mode_cours === "En ligne" ? (
-                          "En ligne"
-                        ) : element.salle_code ? (
+                        {element.salle_code ? (
                           <>
                             <strong>{element.salle_code}</strong>
                             <br />
@@ -399,35 +373,22 @@ export function CoursPage({ utilisateur, onLogout }) {
                 </label>
 
                 <label className="crud-page__field">
-                  <span>Mode</span>
+                  <span>Duree</span>
                   <select
-                    value={formulaire.mode_cours}
+                    value={formulaire.duree}
                     onChange={(event) =>
-                      setFormulaire((valeurActuelle) => ({
-                        ...valeurActuelle,
-                        mode_cours: event.target.value,
-                        type_salle:
-                          event.target.value === "En ligne"
-                            ? ""
-                            : valeurActuelle.type_salle,
-                        id_salle_reference:
-                          event.target.value === "En ligne"
-                            ? ""
-                            : valeurActuelle.id_salle_reference,
-                      }))
+                      setFormulaire({
+                        ...formulaire,
+                        duree: event.target.value,
+                      })
                     }
                   >
-                    {MODES_COURS.map((modeCours) => (
-                      <option key={modeCours} value={modeCours}>
-                        {modeCours}
+                    {DUREES_DISPONIBLES.map((duree) => (
+                      <option key={duree} value={duree}>
+                        {formaterDureeHeures(duree)}
                       </option>
                     ))}
                   </select>
-                </label>
-
-                <label className="crud-page__field">
-                  <span>Duree</span>
-                  <input type="text" value={formaterDureeHeures(DUREE_FIXE_COURS)} disabled />
                 </label>
 
                 <label className="crud-page__field">
@@ -442,9 +403,7 @@ export function CoursPage({ utilisateur, onLogout }) {
                     }
                     required
                   >
-                    <option value="" disabled hidden>
-                      Choisir un programme
-                    </option>
+                    <option value="">Choisir un programme</option>
                     {programmesDisponibles.map((programme) => (
                       <option key={programme} value={programme}>
                         {programme}
@@ -472,77 +431,31 @@ export function CoursPage({ utilisateur, onLogout }) {
                   </select>
                 </label>
 
-                {formulaire.mode_cours === "Presentiel" ? (
-                  <>
-                    <label className="crud-page__field">
-                      <span>Type de salle requis</span>
-                      <select
-                        value={formulaire.type_salle}
-                        onChange={(event) =>
-                          setFormulaire({
-                            ...formulaire,
-                            type_salle: event.target.value,
-                            id_salle_reference:
-                              formulaire.id_salle_reference &&
-                              !salles.some(
-                                (salle) =>
-                                  String(salle.id_salle) ===
-                                    String(formulaire.id_salle_reference) &&
-                                  String(salle.type) === String(event.target.value)
-                              )
-                                ? ""
-                                : formulaire.id_salle_reference,
-                          })
-                        }
-                        required
-                      >
-                        <option value="" disabled hidden>
-                          Choisir un type de salle
-                        </option>
-                        {TYPES_SALLES.map((typeSalle) => (
-                          <option key={typeSalle} value={typeSalle}>
-                            {typeSalle}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-
-                    <label className="crud-page__field">
-                      <span>Salle de reference optionnelle</span>
-                      <select
-                        value={formulaire.id_salle_reference}
-                        onChange={(event) =>
-                          setFormulaire({
-                            ...formulaire,
-                            id_salle_reference: event.target.value,
-                          })
-                        }
-                        disabled={!formulaire.type_salle}
-                      >
-                        <option
-                          value=""
-                          disabled={!formulaire.type_salle || sallesReferenceDisponibles.length === 0}
-                          hidden={!formulaire.type_salle || sallesReferenceDisponibles.length === 0}
-                        >
-                          {!formulaire.type_salle
-                            ? "Choisir d'abord le type requis"
-                            : sallesReferenceDisponibles.length === 0
-                              ? "Aucune salle disponible pour ce type"
-                              : "Aucune preference particuliere"}
-                        </option>
-                        {sallesReferenceDisponibles.map((salle) => (
-                          <option key={salle.id_salle} value={salle.id_salle}>
-                            {formaterSalle(salle)}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  </>
-                ) : (
-                  <div className="crud-page__alert crud-page__alert--success crud-page__form-feedback">
-                    Ce cours sera planifie en ligne, sans salle.
-                  </div>
-                )}
+                <label className="crud-page__field">
+                  <span>Salle de reference</span>
+                  <select
+                    value={formulaire.id_salle_reference}
+                    onChange={(event) =>
+                      setFormulaire({
+                        ...formulaire,
+                        id_salle_reference: event.target.value,
+                      })
+                    }
+                    required
+                    disabled={sallesDisponibles.length === 0}
+                  >
+                    <option value="">
+                      {sallesDisponibles.length === 0
+                        ? "Ajoutez d'abord une salle"
+                        : "Choisir une salle"}
+                    </option>
+                    {sallesDisponibles.map((salle) => (
+                      <option key={salle.id_salle} value={salle.id_salle}>
+                        {formaterSalle(salle)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
 
                 {erreurFormulaire ? (
                   <div className="crud-page__alert crud-page__alert--error crud-page__form-feedback">
@@ -568,6 +481,5 @@ export function CoursPage({ utilisateur, onLogout }) {
           </div>
         ) : null}
       </div>
-    </AppShell>
   );
 }

@@ -19,6 +19,9 @@ import {
   supprimerProfesseur,
   validerContrainteCoursProfesseur,
 } from "../src/model/professeurs.model.js";
+import { ImportExcelError } from "../src/services/import-excel.shared.js";
+import { genererModeleImportExcel } from "../src/services/import-excel-template.service.js";
+import { importerProfesseursDepuisFichier } from "../src/services/import-professeurs.service.js";
 import {
   validerCreateProfesseur,
   validerDeleteProfesseur,
@@ -26,6 +29,7 @@ import {
   validerUpdateProfesseur,
   verifierProfesseurExiste,
 } from "../src/validations/professeurs.validation.js";
+import { televerserFichierImportExcel } from "../src/validations/import-excel.validation.js";
 import {
   userAdmin,
   userAuth,
@@ -222,6 +226,50 @@ export default function professeursRoutes(app) {
       response.status(500).json({ message: "Erreur serveur." });
     }
   });
+
+  app.get(
+    "/api/professeurs/import/template",
+    ...accesGestionProfesseurs,
+    async (request, response) => {
+      try {
+        const modele = genererModeleImportExcel("professeurs");
+        response.setHeader("Content-Type", modele.contentType);
+        response.setHeader(
+          "Content-Disposition",
+          `attachment; filename="${modele.filename}"`
+        );
+        return response.status(200).send(modele.buffer);
+      } catch (error) {
+        return response.status(error.status || 500).json({
+          message: error.message || "Erreur serveur.",
+          ...(error.erreurs?.length ? { erreurs: error.erreurs } : {}),
+        });
+      }
+    }
+  );
+
+  app.post(
+    "/api/professeurs/import",
+    ...accesGestionProfesseurs,
+    televerserFichierImportExcel,
+    async (request, response) => {
+      try {
+        const resultat = await importerProfesseursDepuisFichier(request.file);
+        return response.status(200).json(resultat);
+      } catch (error) {
+        if (error instanceof ImportExcelError) {
+          return response.status(error.status || 400).json({
+            message: error.message,
+            ...(error.erreurs?.length ? { erreurs: error.erreurs } : {}),
+          });
+        }
+
+        return response.status(500).json({
+          message: error.message || "Erreur serveur.",
+        });
+      }
+    }
+  );
 
   app.get(
     "/api/professeurs/:id",

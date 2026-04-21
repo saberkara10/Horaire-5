@@ -15,7 +15,7 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--muted, #64748b);
+  color: var(--muted, var(--muted));
   margin-right: 0.25rem;
   white-space: nowrap;
 }
@@ -63,32 +63,32 @@
 
 /* ── PDF ──────────────────────────────────────────────────────────────────────── */
 .export-btn--pdf {
-  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+  background: linear-gradient(135deg, #c32638 0%, #8e1730 55%, #6b1025 100%);
   color: #fff;
-  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.28);
+  box-shadow: 0 12px 22px rgba(142, 23, 48, 0.22);
 }
 
 .export-btn--pdf:not(:disabled):hover {
-  box-shadow: 0 4px 14px rgba(220, 38, 38, 0.38);
+  box-shadow: 0 16px 28px rgba(142, 23, 48, 0.28);
   transform: translateY(-1px);
 }
 
 /* ── Excel ────────────────────────────────────────────────────────────────────── */
 .export-btn--excel {
-  background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+  background: var(--primary);
   color: #fff;
-  box-shadow: 0 2px 8px rgba(22, 163, 74, 0.28);
+  box-shadow: 0 2px 8px rgba(15, 138, 67, 0.22);
 }
 
 .export-btn--excel:not(:disabled):hover {
-  box-shadow: 0 4px 14px rgba(22, 163, 74, 0.38);
+  box-shadow: 0 4px 14px rgba(15, 138, 67, 0.28);
   transform: translateY(-1px);
 }
 
 /* ── État succès ──────────────────────────────────────────────────────────────── */
 .export-btn--ok {
-  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%) !important;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.25) !important;
+  background: linear-gradient(135deg, var(--primary-hover) 0%, var(--primary) 100%) !important;
+  box-shadow: 0 2px 8px rgba(15, 138, 67, 0.25) !important;
 }
 
 /* ── Icône et spinner ─────────────────────────────────────────────────────────── */

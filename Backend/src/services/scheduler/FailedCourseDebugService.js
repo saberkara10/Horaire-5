@@ -201,11 +201,19 @@ export class FailedCourseDebugService {
          ON ph.id_plage_horaires = ac.id_plage_horaires
        WHERE e.id_etudiant = ?
          AND ge.id_session = ?
+         AND NOT EXISTS (
+           SELECT 1
+           FROM affectation_etudiants ae_override
+           WHERE ae_override.id_etudiant = e.id_etudiant
+             AND ae_override.id_cours = ac.id_cours
+             AND ae_override.id_session = ge.id_session
+             AND ae_override.source_type = 'individuelle'
+         )
 
        UNION ALL
 
        SELECT
-         'reprise' AS source_type,
+         ae.source_type AS source_type,
          c.code AS code_cours,
          c.nom AS nom_cours,
          ge.nom_groupe AS groupe_source,
@@ -226,7 +234,7 @@ export class FailedCourseDebugService {
          ON ph.id_plage_horaires = ac.id_plage_horaires
        WHERE ae.id_etudiant = ?
          AND ae.id_session = ?
-         AND ae.source_type = 'reprise'
+         AND ae.source_type IN ('reprise', 'individuelle')
 
        ORDER BY date ASC, heure_debut ASC`,
       [Number(idEtudiant), Number(idSession), Number(idEtudiant), Number(idSession)]
@@ -272,7 +280,7 @@ export class FailedCourseDebugService {
          SELECT id_groupes_etudiants, id_cours, COUNT(*) AS reprises_planifiees
          FROM affectation_etudiants
          WHERE id_session = ?
-           AND source_type = 'reprise'
+           AND source_type IN ('reprise', 'individuelle')
          GROUP BY id_groupes_etudiants, id_cours
        ) reprises
          ON reprises.id_groupes_etudiants = ge.id_groupes_etudiants

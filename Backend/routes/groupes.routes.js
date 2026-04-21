@@ -19,6 +19,7 @@ import {
 import pool from "../db.js";
 import { userAuth, userAdminOrResponsable } from "../middlewares/auth.js";
 import { assurerSchemaSchedulerAcademique } from "../src/services/academic-scheduler-schema.js";
+import { analyserCompatibiliteChangementGroupePrincipalEtudiant } from "../src/services/etudiants/student-course-exchange.service.js";
 
 const CAPACITE_MAX_GROUPE = 30;
 
@@ -64,6 +65,48 @@ function extraireSaison(nomSession, dateDebut) {
  */
 function lireModeOptimisation(source = {}) {
   return source.optimization_mode || source.mode_optimisation || "legacy";
+}
+
+function formaterHeureCourte(heure) {
+  const valeur = String(heure || "").trim();
+  return valeur ? valeur.slice(0, 5) : null;
+}
+
+function construireMessageRefusChangementGroupe(diagnostic) {
+  const conflit = Array.isArray(diagnostic?.conflits) ? diagnostic.conflits[0] : null;
+  const nomGroupe = diagnostic?.groupe_cible?.nom_groupe || "demande";
+
+  if (!conflit) {
+    return `Changement de groupe refuse : conflit avec cours echoue planifie dans le groupe "${nomGroupe}".`;
+  }
+
+  const libelleCoursEchoue = [
+    conflit.code_cours_echoue || conflit.code_cours_conflit,
+    conflit.nom_cours_echoue || conflit.nom_cours_conflit,
+  ]
+    .filter(Boolean)
+    .join(" - ");
+  const libelleCoursGroupe = [
+    conflit.code_cours_groupe || conflit.code_cours_cible,
+    conflit.nom_cours_groupe || conflit.nom_cours_cible,
+  ]
+    .filter(Boolean)
+    .join(" - ");
+  const dateConflit = conflit.date ? `le ${conflit.date}` : null;
+  const plageConflit =
+    conflit.heure_debut_conflit || conflit.heure_fin_conflit
+      ? `de ${formaterHeureCourte(conflit.heure_debut_conflit || conflit.heure_debut)} a ${formaterHeureCourte(conflit.heure_fin_conflit || conflit.heure_fin)}`
+      : null;
+
+  return [
+    "Changement de groupe refuse : conflit avec cours echoue planifie",
+    libelleCoursEchoue || null,
+    [dateConflit, plageConflit].filter(Boolean).join(" ") || null,
+    libelleCoursGroupe ? `avec ${libelleCoursGroupe}` : null,
+    `dans le groupe "${nomGroupe}".`,
+  ]
+    .filter(Boolean)
+    .join(" ");
 }
 
 // ─── Routes ─────────────────────────────────────────────────────────────────
@@ -625,6 +668,7 @@ export default function groupesRoutes(app) {
       );
       const [[gc]] = await pool.query(
         `SELECT ge.id_groupes_etudiants, ge.nom_groupe,
+                ge.id_session,
                 COALESCE(MAX(e.programme), ge.programme) AS programme,
                 COALESCE(MAX(e.etape), ge.etape) AS etape,
                 COUNT(e.id_etudiant) AS effectif
@@ -656,6 +700,31 @@ export default function groupesRoutes(app) {
       );
       if (!etudiant) return res.status(404).json({ message: "Étudiant introuvable dans le groupe source." });
 
+      const diagnosticChangement = await analyserCompatibiliteChangementGroupePrincipalEtudiant(
+        {
+          idEtudiant,
+          idGroupeCible,
+          idSession: Number(gc.id_session) || null,
+          nomGroupeCible: gc.nom_groupe,
+        },
+        pool
+      );
+
+      if (!diagnosticChangement.changement_autorise) {
+        console.warn("[groupes] deplacement refuse pour conflit avec reprise planifiee", {
+          id_etudiant: idEtudiant,
+          id_groupe_source: idGroupeSource,
+          id_groupe_cible: idGroupeCible,
+          nb_conflits: diagnosticChangement.conflits.length,
+        });
+
+        return res.status(409).json({
+          message: construireMessageRefusChangementGroupe(diagnosticChangement),
+          code: "GROUP_CHANGE_FAILED_COURSE_CONFLICT",
+          details: diagnosticChangement.conflits,
+        });
+      }
+
       await pool.query(`UPDATE etudiants SET id_groupes_etudiants = ? WHERE id_etudiant = ?`, [idGroupeCible, idEtudiant]);
 
       return res.json({
@@ -674,7 +743,11 @@ export default function groupesRoutes(app) {
       });
     } catch (err) {
       console.error("[groupes] PUT /:id/etudiants/:idEtudiant/deplacer:", err);
-      return res.status(500).json({ message: "Erreur serveur lors du déplacement." });
+      return res.status(err.statusCode || 500).json({
+        message: err.message || "Erreur serveur lors du deplacement.",
+        ...(err.code ? { code: err.code } : {}),
+        ...(err.details?.length ? { details: err.details } : {}),
+      });
     }
   });
 

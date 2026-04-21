@@ -4,6 +4,7 @@ import {
   getLibelleRoleFrontend,
   utilisateurEstResponsable,
 } from "../../utils/roles.js";
+import { usePopup } from "../feedback/PopupProvider.jsx";
 import laciteCampus from "../../assets/1733872234400.jpg";
 import laciteLogo from "../../assets/lacite-logo.png";
 
@@ -19,6 +20,7 @@ export function AppShell({
   subtitle = "",
 }) {
   const location = useLocation();
+  const { confirm } = usePopup();
   const rolesUtilisateur = Array.isArray(utilisateur?.roles) ? utilisateur.roles : [];
   const estResponsable = utilisateurEstResponsable(utilisateur);
   const peutUtiliserScheduler =
@@ -100,6 +102,10 @@ export function AppShell({
       label: "Gestion groupes",
       to: "/gestion-groupes",
     },
+    {
+      label: "Centre d'aide",
+      to: "/centre-aide",
+    },
     ...(peutUtiliserScheduler
       ? [
           {
@@ -111,7 +117,7 @@ export function AppShell({
     ...(estResponsable
       ? [
           {
-            label: "Sous-admin",
+            label: "Sous-admins",
             to: "/admins",
           },
         ]
@@ -169,6 +175,22 @@ export function AppShell({
     );
   }
 
+  async function handleLogoutClick() {
+    const confirmation = await confirm({
+      title: "Se deconnecter ?",
+      message: "Votre session courante sera fermee sur ce navigateur.",
+      confirmLabel: "Se deconnecter",
+      cancelLabel: "Rester connecte",
+      tone: "danger",
+    });
+
+    if (!confirmation) {
+      return;
+    }
+
+    await onLogout?.();
+  }
+
   return (
     <div className="app-shell" style={{ "--app-shell-bg": `url(${laciteCampus})` }}>
       <div className="app-shell__backdrop" aria-hidden="true" />
@@ -184,19 +206,25 @@ export function AppShell({
           <div className="app-shell__brand-title">Gestion des horaires</div>
         </div>
 
-        <div className="app-shell__nav-label">Navigation campus</div>
-        <nav className="app-shell__nav" aria-label="Navigation principale">
-          {navigationCampus.map((item) =>
-            item.children ? renderNavGroup(item) : renderNavLink(item)
-          )}
-        </nav>
+        <div className="app-shell__sidebar-body">
+          <section className="app-shell__nav-section">
+            <div className="app-shell__nav-label">Navigation campus</div>
+            <nav className="app-shell__nav" aria-label="Navigation principale">
+              {navigationCampus.map((item) =>
+                item.children ? renderNavGroup(item) : renderNavLink(item)
+              )}
+            </nav>
+          </section>
 
-        <div className="app-shell__nav-label">Outils</div>
-        <nav className="app-shell__nav" aria-label="Navigation secondaire">
-          {navigationSecondaire.map((item) => renderNavLink(item))}
-        </nav>
+          <section className="app-shell__nav-section">
+            <div className="app-shell__nav-label">Outils</div>
+            <nav className="app-shell__nav" aria-label="Navigation secondaire">
+              {navigationSecondaire.map((item) => renderNavLink(item))}
+            </nav>
+          </section>
+        </div>
 
-        <button className="app-shell__logout" type="button" onClick={onLogout}>
+        <button className="app-shell__logout" type="button" onClick={handleLogoutClick}>
           <span className="app-shell__nav-bullet" aria-hidden="true" />
           <span>Deconnexion</span>
         </button>

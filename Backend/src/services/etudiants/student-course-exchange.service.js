@@ -5,6 +5,7 @@
  * - reconstituer l'horaire effectif d'un etudiant a partir des affectations de groupe
  *   et des surcharges individuelles ;
  * - exposer les exceptions individuelles visibles dans l'horaire etudiant ;
+ * - simuler l'impact d'un changement de groupe principal sur l'horaire final ;
  * - preparer et executer les echanges cibles de cours entre deux etudiants
  *   sans violer les contraintes de conflit horaire.
  */
@@ -271,6 +272,102 @@ export async function recupererSeancesGroupeEffectivesEtudiant(
        )${exclusionCours.clause}
      ORDER BY ph.date ASC, ph.heure_debut ASC`,
     [Number(idEtudiant), Number(session.id_session), ...exclusionCours.valeurs]
+  );
+
+  return rows.map(normaliserSeance);
+}
+
+/**
+ * Reconstitue l'horaire de groupe qu'un etudiant suivrait s'il etait rattache
+ * a un autre groupe principal.
+ *
+ * Les overrides individuels existants sur certains cours sont conserves :
+ * si l'etudiant suit deja un cours via une affectation individuelle, ce cours
+ * du groupe cible est retire de la simulation car il ne ferait pas partie de
+ * l'horaire final reel apres changement.
+ *
+ * @param {number} idEtudiant Identifiant de l'etudiant concerne.
+ * @param {number} idGroupeEtudiants Identifiant du groupe principal cible.
+ * @param {Object} [options={}] Options de session et d'exclusion de cours.
+ * @param {Object} [executor=pool] Executeur SQL ou connexion transactionnelle.
+ * @returns {Promise<Array<Object>>} Seances du groupe cible normalisees.
+ */
+async function recupererSeancesGroupeSimuleesEtudiantDansGroupe(
+  idEtudiant,
+  idGroupeEtudiants,
+  options = {},
+  executor = pool
+) {
+  const session = await resoudreSession(options.idSession, executor);
+
+  if (!session) {
+    return [];
+  }
+
+  const exclusionCours = construireClauseExclusionCours(
+    "ac.id_cours",
+    options.exclureCoursIds
+  );
+
+  const [rows] = await executor.query(
+    `SELECT
+       ac.id_affectation_cours,
+       c.id_cours,
+       c.code AS code_cours,
+       c.nom AS nom_cours,
+       p.id_professeur,
+       p.nom AS nom_professeur,
+       p.prenom AS prenom_professeur,
+       s.id_salle,
+       s.code AS code_salle,
+       ph.id_plage_horaires,
+       DATE_FORMAT(ph.date, '%Y-%m-%d') AS date,
+       ph.heure_debut,
+       ph.heure_fin,
+       ge.id_groupes_etudiants AS id_groupe_source,
+       ge.nom_groupe AS groupe_source,
+       ge.id_groupes_etudiants AS id_groupe_principal,
+       ge.nom_groupe AS groupe_principal,
+       0 AS est_reprise,
+       0 AS est_exception_individuelle,
+       'groupe' AS source_horaire,
+       NULL AS statut_reprise,
+       NULL AS note_echec,
+       NULL AS id_cours_echoue,
+       NULL AS id_affectation_etudiant,
+       NULL AS id_echange_cours,
+       NULL AS type_exception,
+       NULL AS etudiant_echange
+     FROM groupes_etudiants ge
+     JOIN affectation_groupes ag
+       ON ag.id_groupes_etudiants = ge.id_groupes_etudiants
+     JOIN affectation_cours ac
+       ON ac.id_affectation_cours = ag.id_affectation_cours
+     JOIN cours c
+       ON c.id_cours = ac.id_cours
+     JOIN professeurs p
+       ON p.id_professeur = ac.id_professeur
+     LEFT JOIN salles s
+       ON s.id_salle = ac.id_salle
+     JOIN plages_horaires ph
+       ON ph.id_plage_horaires = ac.id_plage_horaires
+     WHERE ge.id_groupes_etudiants = ?
+       AND ge.id_session = ?
+       AND NOT EXISTS (
+         SELECT 1
+         FROM affectation_etudiants ae_override
+         WHERE ae_override.id_etudiant = ?
+           AND ae_override.id_cours = ac.id_cours
+           AND ae_override.id_session = ge.id_session
+           AND ae_override.source_type = 'individuelle'
+       )${exclusionCours.clause}
+     ORDER BY ph.date ASC, ph.heure_debut ASC`,
+    [
+      Number(idGroupeEtudiants),
+      Number(session.id_session),
+      Number(idEtudiant),
+      ...exclusionCours.valeurs,
+    ]
   );
 
   return rows.map(normaliserSeance);
@@ -595,12 +692,144 @@ function listerConflitsEntreSeances(seancesReference = [], occurrencesCibles = [
   });
 }
 
+function dedoublonnerConflits(conflits = []) {
+  const index = new Set();
+  const uniques = [];
+
+  for (const conflit of Array.isArray(conflits) ? conflits : []) {
+    const cle = [
+      conflit.date || "",
+      conflit.heure_debut || "",
+      conflit.heure_fin || "",
+      conflit.code_cours_conflit || "",
+      conflit.code_cours_cible || "",
+      conflit.groupe_demande || "",
+    ].join("|");
+
+    if (index.has(cle)) {
+      continue;
+    }
+
+    index.add(cle);
+    uniques.push(conflit);
+  }
+
+  return uniques;
+}
+
 function enrichirOccurrencesAvecCours(affectation) {
   return (affectation?.occurrences || []).map((occurrence) => ({
     ...occurrence,
     code_cours: affectation?.code_cours || null,
     nom_cours: affectation?.nom_cours || null,
   }));
+}
+
+/**
+ * Simule l'horaire final d'un etudiant si son groupe principal etait change.
+ *
+ * La validation se concentre sur les reprises deja planifiees : ces seances
+ * sont conservees telles quelles et comparees a l'horaire du groupe cible
+ * tel qu'il serait reellement suivi par l'etudiant apres changement.
+ *
+ * @param {Object} payload Identifiants et contexte de simulation.
+ * @param {Object} [executor=pool] Executeur SQL ou connexion transactionnelle.
+ * @returns {Promise<Object>} Diagnostic de compatibilite avec details.
+ */
+export async function analyserCompatibiliteChangementGroupePrincipalEtudiant(
+  { idEtudiant, idGroupeCible, idSession = null, nomGroupeCible = null },
+  executor = pool
+) {
+  await assurerSchemaSchedulerAcademique(executor);
+
+  const idEtudiantNumerique = Number(idEtudiant);
+  const idGroupeCibleNumerique = Number(idGroupeCible);
+
+  if (!Number.isInteger(idEtudiantNumerique) || idEtudiantNumerique <= 0) {
+    throw creerErreurEchange(
+      "L'etudiant cible est obligatoire.",
+      400,
+      "GROUP_CHANGE_STUDENT_REQUIRED"
+    );
+  }
+
+  if (!Number.isInteger(idGroupeCibleNumerique) || idGroupeCibleNumerique <= 0) {
+    throw creerErreurEchange(
+      "Le groupe cible est obligatoire.",
+      400,
+      "GROUP_CHANGE_TARGET_GROUP_REQUIRED"
+    );
+  }
+
+  const reprisesPlanifiees = (await recupererSeancesIndividuellesEtudiant(
+    idEtudiantNumerique,
+    {
+      idSession,
+      sourceTypes: ["reprise"],
+    },
+    executor
+  )).filter(
+    (seance) =>
+      String(seance?.source_horaire || "") === "reprise" &&
+      Number(seance?.id_groupe_source || 0) > 0
+  );
+
+  if (reprisesPlanifiees.length === 0) {
+    return {
+      validation_requise: false,
+      changement_autorise: true,
+      groupe_cible: {
+        id_groupes_etudiants: idGroupeCibleNumerique,
+        nom_groupe: nomGroupeCible || null,
+      },
+      reprises_planifiees: [],
+      conflits: [],
+    };
+  }
+
+  const seancesGroupeCible = await recupererSeancesGroupeSimuleesEtudiantDansGroupe(
+    idEtudiantNumerique,
+    idGroupeCibleNumerique,
+    {
+      idSession,
+    },
+    executor
+  );
+
+  const reprisesPlanifieesParCours = [...agregerCoursDepuisSeances(reprisesPlanifiees).values()]
+    .map((reprise) => ({
+      id_cours: Number(reprise.id_cours || 0) || null,
+      code_cours: reprise.code_cours || null,
+      nom_cours: reprise.nom_cours || null,
+      groupe_reprise: reprise.groupe_source || null,
+      id_groupe_reprise: Number(reprise.id_groupe_source || 0) || null,
+    }))
+    .sort((a, b) =>
+      String(a.code_cours || "").localeCompare(String(b.code_cours || ""), "fr")
+    );
+
+  const conflits = dedoublonnerConflits(
+    listerConflitsEntreSeances(reprisesPlanifiees, seancesGroupeCible).map((conflit) => ({
+      ...conflit,
+      groupe_demande: nomGroupeCible || conflit.groupe_cible || null,
+      code_cours_echoue: conflit.code_cours_conflit || null,
+      nom_cours_echoue: conflit.nom_cours_conflit || null,
+      groupe_reprise: conflit.groupe_conflit || null,
+      code_cours_groupe: conflit.code_cours_cible || null,
+      nom_cours_groupe: conflit.nom_cours_cible || null,
+    }))
+  );
+
+  return {
+    validation_requise: true,
+    changement_autorise: conflits.length === 0,
+    groupe_cible: {
+      id_groupes_etudiants: idGroupeCibleNumerique,
+      nom_groupe: nomGroupeCible || null,
+    },
+    reprises_planifiees: reprisesPlanifieesParCours,
+    conflits,
+  };
 }
 
 /**

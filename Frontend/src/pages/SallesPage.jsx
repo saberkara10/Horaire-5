@@ -8,16 +8,21 @@
  *  - possibilite d'ajouter un nouveau type via un champ texte dedie.
  */
 import { useEffect, useMemo, useState } from "react";
-import { AppShell } from "../components/layout/AppShell.jsx";
 import { usePopup } from "../components/feedback/PopupProvider.jsx";
+import { ModuleExcelImportPanel } from "../components/imports/ModuleExcelImportPanel.jsx";
+import { recupererConfigurationImportExcel } from "../config/importExcelModules.js";
 import {
   recupererSalles,
   recupererTypesSalles,
   creerSalle,
   modifierSalle,
   supprimerSalle,
+  importerSalles,
+  telechargerModeleImportSalles,
 } from "../services/salles.api.js";
 import "../styles/CrudPages.css";
+
+const IMPORT_SALLES = recupererConfigurationImportExcel("salles");
 
 
 /* ─────────────────────────────────────────────────────────────
@@ -322,12 +327,7 @@ export function SallesPage({ utilisateur, onLogout }) {
 
   /* ─────────────── Rendu ─────────────── */
   return (
-    <AppShell
-      utilisateur={utilisateur}
-      onLogout={onLogout}
-      title="Salles"
-    >
-      <div className="crud-page">
+    <div className="crud-page">
         {/* En-tête */}
         <div className="crud-page__header">
           <button
@@ -338,6 +338,13 @@ export function SallesPage({ utilisateur, onLogout }) {
             + Ajouter une salle
           </button>
         </div>
+
+        <ModuleExcelImportPanel
+          definition={IMPORT_SALLES}
+          onImporter={importerSalles}
+          onTelechargerModele={telechargerModeleImportSalles}
+          onImportSuccess={chargerSalles}
+        />
 
         {/* Barre de recherche */}
         <div className="crud-page__toolbar">
@@ -493,6 +500,5 @@ export function SallesPage({ utilisateur, onLogout }) {
           </div>
         )}
       </div>
-    </AppShell>
   );
 }

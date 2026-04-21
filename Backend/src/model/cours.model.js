@@ -1,49 +1,46 @@
+/**
+ * Modèle de données — Gestion des cours.
+ *
+ * Ce module gère toutes les opérations CRUD sur la table `cours`.
+ * Un cours représente une matière enseignée dans un programme donné,
+ * à une étape précise (E1, E2, E3...) et nécessitant un certain type de salle.
+ *
+ * Relation importante avec les salles :
+ *  - Chaque cours a une `salle_reference` (une salle concrète qui sert de modèle).
+ *  - Le `type_salle` du cours est automatiquement déduit du type de la salle choisie.
+ *  - Cela garantit la cohérence : on ne peut pas avoir un cours "type Labo"
+ *    associé à une salle de type "Classe".
+ *
+ * @module model/cours
+ */
+
 import pool from "../../db.js";
 import { assurerProgrammeReference } from "./programmes.model.js";
 import { normaliserNomProgramme } from "../utils/programmes.js";
 
-export const DUREE_COURS_FIXE = 3;
-export const MODES_COURS = ["Presentiel", "En ligne"];
-
-const SELECTION_COURS_SQL = `SELECT c.id_cours,
-        c.code,
-        c.nom,
-        c.duree,
-        c.programme,
-        c.etape_etude,
-        c.type_salle,
-        c.id_salle_reference,
-        COALESCE(c.est_en_ligne, 0) AS est_en_ligne,
-        CASE
-          WHEN COALESCE(c.est_en_ligne, 0) = 1 THEN 'En ligne'
-          ELSE 'Presentiel'
-        END AS mode_cours,
-        s.code AS salle_code,
-        s.type AS salle_type
- FROM cours c
- LEFT JOIN salles s
-   ON s.id_salle = c.id_salle_reference`;
-
+/**
+ * Normalise un code de cours en majuscules et sans espaces superflus.
+ *
+ * Les codes de cours sont des identifiants métier comme "INF-1001" ou "WEB-301".
+ * On les standardise pour éviter des doublons du type "inf-1001" et "INF-1001".
+ *
+ * @param {*} codeCours - Le code brut reçu
+ * @returns {string} Le code normalisé en majuscules
+ */
 function normaliserCodeCours(codeCours) {
   return String(codeCours || "").trim().toUpperCase();
 }
 
-function normaliserTypeSalle(typeSalle) {
-  return String(typeSalle || "").trim();
-}
-
-function normaliserModeCours(modeCours, estEnLigne) {
-  if (typeof modeCours === "string" && modeCours.trim() !== "") {
-    return modeCours.trim() === "En ligne" ? "En ligne" : "Presentiel";
-  }
-
-  return Boolean(Number(estEnLigne || 0)) ? "En ligne" : "Presentiel";
-}
-
-function determinerEstEnLigne(modeCours, estEnLigne) {
-  return normaliserModeCours(modeCours, estEnLigne) === "En ligne";
-}
-
+/**
+ * Récupère une salle par son identifiant (usage interne uniquement).
+ *
+ * Utilisée avant chaque insertion/modification de cours pour valider
+ * que la salle de référence existe et pour récupérer son type.
+ *
+ * @param {number} idSalle - L'identifiant de la salle à chercher
+ * @param {object} [executor=pool] - Connexion MySQL (pool ou transaction)
+ * @returns {Promise<object|null>} La salle ou null si elle n'existe pas
+ */
 async function recupererSalleParId(idSalle, executor = pool) {
   const [salles] = await executor.query(
     `SELECT id_salle, code, type, capacite
@@ -56,24 +53,75 @@ async function recupererSalleParId(idSalle, executor = pool) {
   return salles[0] || null;
 }
 
-export async function recupererTousLesCours() {
-  const [listeCours] = await pool.query(`${SELECTION_COURS_SQL}
-     ORDER BY c.code ASC`);
+/**
+ * Récupère tous les cours du système, triés par code.
+ *
+ * Inclut les informations de la salle de référence via une jointure LEFT JOIN.
+ * Si un cours n'a pas de salle de référence, les champs `salle_code` et
+ * `salle_type` seront null (LEFT JOIN ne filtre pas les cours sans salle).
+ *
+ * @returns {Promise<object[]>} La liste complète des cours avec détails de salle
+ */
+export async function recupererTousLesCours(executor = pool) {
+  const [listeCours] = await executor.query(
+    `SELECT c.id_cours,
+            c.code,
+            c.nom,
+            c.duree,
+            c.programme,
+            c.etape_etude,
+            c.type_salle,
+            c.id_salle_reference,
+            s.code AS salle_code,
+            s.type AS salle_type
+     FROM cours c
+     LEFT JOIN salles s
+       ON s.id_salle = c.id_salle_reference
+     ORDER BY c.code ASC`
+  );
 
   return listeCours;
 }
 
-export async function recupererCoursParId(idCours) {
-  const [coursTrouve] = await pool.query(
-    `${SELECTION_COURS_SQL}
+/**
+ * Récupère un cours par son identifiant.
+ *
+ * Même format de données que recupererTousLesCours(), mais pour un seul cours.
+ *
+ * @param {number} idCours - L'identifiant du cours à récupérer
+ * @returns {Promise<object|null>} Le cours avec ses détails de salle, ou null
+ */
+export async function recupererCoursParId(idCours, executor = pool) {
+  const [coursTrouve] = await executor.query(
+    `SELECT c.id_cours,
+            c.code,
+            c.nom,
+            c.duree,
+            c.programme,
+            c.etape_etude,
+            c.type_salle,
+            c.id_salle_reference,
+            s.code AS salle_code,
+            s.type AS salle_type
+     FROM cours c
+     LEFT JOIN salles s
+       ON s.id_salle = c.id_salle_reference
      WHERE c.id_cours = ?
      LIMIT 1`,
     [idCours]
   );
 
-  return coursTrouve[0] || null;
+  return coursTrouve.length ? coursTrouve[0] : null;
 }
 
+/**
+ * Récupère la liste des types de salles distincts utilisés dans le système.
+ *
+ * Utilisée pour alimenter des listes déroulantes dans le formulaire de cours,
+ * permettant à l'utilisateur de filtrer les cours par type de salle requis.
+ *
+ * @returns {Promise<string[]>} Liste triée des types de salles (ex: ["Classe", "Laboratoire"])
+ */
 export async function recupererTypesSalleDisponibles() {
   const [typesSalle] = await pool.query(
     `SELECT DISTINCT type
@@ -86,58 +134,73 @@ export async function recupererTypesSalleDisponibles() {
   return typesSalle.map(({ type }) => type);
 }
 
-export async function recupererCoursParCode(codeCours) {
-  const [coursTrouve] = await pool.query(
-    `${SELECTION_COURS_SQL}
+/**
+ * Recherche un cours par son code unique.
+ *
+ * La comparaison est insensible à la casse — "inf-1001" et "INF-1001"
+ * retournent le même cours.
+ *
+ * @param {string} codeCours - Le code du cours à rechercher
+ * @returns {Promise<object|null>} Le cours trouvé ou null si aucun résultat
+ */
+export async function recupererCoursParCode(codeCours, executor = pool) {
+  const [coursTrouve] = await executor.query(
+    `SELECT c.id_cours,
+            c.code,
+            c.nom,
+            c.duree,
+            c.programme,
+            c.etape_etude,
+            c.type_salle,
+            c.id_salle_reference,
+            s.code AS salle_code,
+            s.type AS salle_type
+     FROM cours c
+     LEFT JOIN salles s
+       ON s.id_salle = c.id_salle_reference
      WHERE UPPER(TRIM(c.code)) = ?
      LIMIT 1`,
     [normaliserCodeCours(codeCours)]
   );
 
-  return coursTrouve[0] || null;
+  return coursTrouve.length ? coursTrouve[0] : null;
 }
 
-function resoudreTypeSallePresentiel(typeSalle, salleReference) {
-  return salleReference?.type || normaliserTypeSalle(typeSalle);
-}
+/**
+ * Ajoute un nouveau cours dans la base de données.
+ *
+ * Validations préalables effectuées dans cette fonction :
+ *  1. La salle de référence doit exister (sinon erreur).
+ *  2. Le code est normalisé en majuscules.
+ *  3. Le programme est normalisé et enregistré dans programmes_reference si absent.
+ *  4. Le type_salle est automatiquement déduit du type de la salle choisie.
+ *
+ * @param {object} nouveauCours - Les données du cours à créer
+ * @param {string} nouveauCours.code - Code unique du cours (ex: "INF-1001")
+ * @param {string} nouveauCours.nom - Nom complet du cours
+ * @param {number} nouveauCours.duree - Durée en heures
+ * @param {string} nouveauCours.programme - Nom du programme associé
+ * @param {string} nouveauCours.etape_etude - Étape d'études (ex: "1", "2", "3")
+ * @param {number} nouveauCours.id_salle_reference - ID de la salle de référence
+ * @returns {Promise<object>} Le cours créé avec ses données complètes
+ * @throws {Error} Si la salle de référence n'existe pas
+ */
+export async function ajouterCours(nouveauCours, executor = pool) {
+  const { code, nom, duree, programme, etape_etude, id_salle_reference } =
+    nouveauCours;
 
-export async function ajouterCours(nouveauCours) {
-  const {
-    code,
-    nom,
-    duree,
-    programme,
-    etape_etude,
-    id_salle_reference,
-    type_salle,
-    mode_cours,
-    est_en_ligne,
-  } = nouveauCours;
-
+  // Valider que la salle existe avant d'insérer
+  const salleReference = await recupererSalleParId(id_salle_reference, executor);
   const codeNormalise = normaliserCodeCours(code);
-  const estEnLigne = determinerEstEnLigne(mode_cours, est_en_ligne);
-  const idSalleReference =
-    id_salle_reference === null || id_salle_reference === undefined
-      ? null
-      : Number(id_salle_reference);
-  const salleReference =
-    !estEnLigne && Number.isInteger(idSalleReference) && idSalleReference > 0
-      ? await recupererSalleParId(idSalleReference)
-      : null;
-  const typeSalleFinal = estEnLigne
-    ? "En ligne"
-    : resoudreTypeSallePresentiel(type_salle, salleReference);
-  const programmeNormalise = await assurerProgrammeReference(programme);
 
-  if (!estEnLigne && idSalleReference && !salleReference) {
+  // Assurer l'existence du programme dans programmes_reference et récupérer son nom officiel
+  const programmeNormalise = await assurerProgrammeReference(programme, executor);
+
+  if (!salleReference) {
     throw new Error("Salle de reference introuvable.");
   }
 
-  if (!estEnLigne && (!typeSalleFinal || typeSalleFinal === "En ligne")) {
-    throw new Error("Type de salle obligatoire.");
-  }
-
-  const [resultatInsertion] = await pool.query(
+  const [resultatInsertion] = await executor.query(
     `INSERT INTO cours (
       code,
       nom,
@@ -145,145 +208,101 @@ export async function ajouterCours(nouveauCours) {
       programme,
       etape_etude,
       type_salle,
-      id_salle_reference,
-      est_en_ligne
+      id_salle_reference
     )
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
     [
       codeNormalise,
       String(nom || "").trim(),
       duree,
+      // Priorité : nom officiel via programmes_reference, sinon normalisation locale
       programmeNormalise || normaliserNomProgramme(programme),
       String(etape_etude).trim(),
-      typeSalleFinal,
-      salleReference?.id_salle || null,
-      estEnLigne ? 1 : 0,
+      salleReference.type,        // type_salle déduit de la salle choisie
+      salleReference.id_salle,    // on stocke l'ID validé, pas celui reçu brut
     ]
   );
 
-  return recupererCoursParId(resultatInsertion.insertId);
+  // Relire le cours créé pour retourner les données complètes avec jointures
+  return recupererCoursParId(resultatInsertion.insertId, executor);
 }
 
-export async function modifierCours(idCours, donneesModification) {
-  const coursActuel = await recupererCoursParId(idCours);
-
-  if (!coursActuel) {
-    return null;
-  }
-
-  const {
-    code,
-    nom,
-    duree,
-    programme,
-    etape_etude,
-    id_salle_reference,
-    type_salle,
-    mode_cours,
-    est_en_ligne,
-  } = donneesModification;
-  const modeFourni = mode_cours !== undefined || est_en_ligne !== undefined;
-  const salleFournie = Object.prototype.hasOwnProperty.call(
-    donneesModification,
-    "id_salle_reference"
-  );
-  const typeFourni = Object.prototype.hasOwnProperty.call(
-    donneesModification,
-    "type_salle"
-  );
-  const estEnLigneFinal = modeFourni
-    ? determinerEstEnLigne(mode_cours, est_en_ligne)
-    : Boolean(Number(coursActuel.est_en_ligne || 0));
-  let idSalleFinal = coursActuel.id_salle_reference ?? null;
-  let typeSalleFinal = normaliserTypeSalle(coursActuel.type_salle);
-  let salleReference = null;
-
-  if (estEnLigneFinal) {
-    idSalleFinal = null;
-    typeSalleFinal = "En ligne";
-  } else {
-    if (salleFournie) {
-      if (id_salle_reference === null || id_salle_reference === undefined || id_salle_reference === "") {
-        idSalleFinal = null;
-      } else {
-        const idSalleReference = Number(id_salle_reference);
-        salleReference = await recupererSalleParId(idSalleReference);
-
-        if (!salleReference) {
-          throw new Error("Salle de reference introuvable.");
-        }
-
-        idSalleFinal = salleReference.id_salle;
-        typeSalleFinal = salleReference.type;
-      }
-    }
-
-    if (typeFourni) {
-      typeSalleFinal = normaliserTypeSalle(type_salle);
-    }
-
-    if (salleReference) {
-      typeSalleFinal = salleReference.type;
-    }
-
-    if (!typeSalleFinal || typeSalleFinal === "En ligne") {
-      throw new Error("Type de salle obligatoire.");
-    }
-  }
-
+/**
+ * Modifie les données d'un cours existant.
+ *
+ * Seuls les champs présents dans `donneesModification` sont mis à jour.
+ * Si un champ n'est pas inclus, sa valeur actuelle est conservée.
+ * Cette approche (UPDATE partiel) évite d'écraser accidentellement des données.
+ *
+ * Si `id_salle_reference` est fourni, le `type_salle` est automatiquement
+ * recalculé à partir de la nouvelle salle.
+ *
+ * @param {number} idCours - L'identifiant du cours à modifier
+ * @param {object} donneesModification - Les champs à mettre à jour (partiels)
+ * @returns {Promise<object|null>} Le cours mis à jour, ou null si non trouvé
+ * @throws {Error} Si la salle de référence fournie n'existe pas
+ */
+export async function modifierCours(idCours, donneesModification, executor = pool) {
+  // Construction dynamique de la requête SQL selon les champs fournis
   const champsAModifier = [];
   const valeurs = [];
 
-  if (code !== undefined) {
+  if (donneesModification.code !== undefined) {
     champsAModifier.push("code = ?");
-    valeurs.push(normaliserCodeCours(code));
+    valeurs.push(normaliserCodeCours(donneesModification.code));
   }
 
-  if (nom !== undefined) {
+  if (donneesModification.nom !== undefined) {
     champsAModifier.push("nom = ?");
-    valeurs.push(String(nom || "").trim());
+    valeurs.push(String(donneesModification.nom || "").trim());
   }
 
-  if (duree !== undefined) {
+  if (donneesModification.duree !== undefined) {
     champsAModifier.push("duree = ?");
-    valeurs.push(duree);
+    valeurs.push(donneesModification.duree);
   }
 
-  if (programme !== undefined) {
-    const programmeNormalise = await assurerProgrammeReference(programme);
+  if (donneesModification.programme !== undefined) {
+    const programmeNormalise = await assurerProgrammeReference(
+      donneesModification.programme,
+      executor
+    );
     champsAModifier.push("programme = ?");
     valeurs.push(
-      programmeNormalise || normaliserNomProgramme(programme)
+      programmeNormalise ||
+        normaliserNomProgramme(donneesModification.programme)
     );
   }
 
-  if (etape_etude !== undefined) {
+  if (donneesModification.etape_etude !== undefined) {
     champsAModifier.push("etape_etude = ?");
-    valeurs.push(String(etape_etude).trim());
+    valeurs.push(String(donneesModification.etape_etude).trim());
   }
 
-  if (modeFourni) {
-    champsAModifier.push("est_en_ligne = ?");
-    valeurs.push(estEnLigneFinal ? 1 : 0);
-  }
+  if (donneesModification.id_salle_reference !== undefined) {
+    const salleReference = await recupererSalleParId(
+      donneesModification.id_salle_reference,
+      executor
+    );
 
-  if (typeFourni || salleFournie || modeFourni) {
-    champsAModifier.push("type_salle = ?");
-    valeurs.push(typeSalleFinal);
-  }
+    if (!salleReference) {
+      throw new Error("Salle de reference introuvable.");
+    }
 
-  if (salleFournie || modeFourni) {
     champsAModifier.push("id_salle_reference = ?");
-    valeurs.push(idSalleFinal);
+    valeurs.push(salleReference.id_salle);
+    champsAModifier.push("type_salle = ?");
+    valeurs.push(salleReference.type); // Synchroniser le type avec la nouvelle salle
   }
 
+  // Si aucun champ n'a été fourni → retourner l'état actuel sans modifier
   if (champsAModifier.length === 0) {
-    return coursActuel;
+    return recupererCoursParId(idCours, executor);
   }
 
-  valeurs.push(idCours);
+  valeurs.push(idCours); // L'ID va dans le WHERE
 
-  const [resultatModification] = await pool.query(
+  const [resultatModification] = await executor.query(
     `UPDATE cours
      SET ${champsAModifier.join(", ")}
      WHERE id_cours = ?
@@ -292,12 +311,21 @@ export async function modifierCours(idCours, donneesModification) {
   );
 
   if (resultatModification.affectedRows === 0) {
-    return null;
+    return null; // Le cours n'existait pas
   }
 
-  return recupererCoursParId(idCours);
+  return recupererCoursParId(idCours, executor);
 }
 
+/**
+ * Vérifie si un cours est déjà utilisé dans un horaire généré.
+ *
+ * Utilisée avant suppression pour protéger l'intégrité des données :
+ * on ne doit pas supprimer un cours qui a des séances planifiées.
+ *
+ * @param {number} idCours - L'identifiant du cours à vérifier
+ * @returns {Promise<boolean>} true si le cours a au moins une affectation
+ */
 export async function coursEstDejaAffecte(idCours) {
   const [affectations] = await pool.query(
     `SELECT 1
@@ -310,6 +338,16 @@ export async function coursEstDejaAffecte(idCours) {
   return affectations.length > 0;
 }
 
+/**
+ * Supprime un cours de la base de données.
+ *
+ * Attention : ne pas appeler cette fonction sans avoir vérifié d'abord avec
+ * coursEstDejaAffecte() que le cours n'est pas utilisé dans un horaire.
+ * La suppression en cascade n'est pas garantie par cette fonction seule.
+ *
+ * @param {number} idCours - L'identifiant du cours à supprimer
+ * @returns {Promise<boolean>} true si supprimé, false si le cours n'existait pas
+ */
 export async function supprimerCours(idCours) {
   const [resultatSuppression] = await pool.query(
     `DELETE FROM cours
@@ -321,7 +359,16 @@ export async function supprimerCours(idCours) {
   return resultatSuppression.affectedRows > 0;
 }
 
-export async function salleExisteParId(idSalle) {
-  const salle = await recupererSalleParId(idSalle);
+/**
+ * Vérifie qu'une salle existe dans la base de données.
+ *
+ * Utilisée dans les validations pour confirmer qu'une salle de référence
+ * soumise par le client est bien réelle avant de l'utiliser.
+ *
+ * @param {number} idSalle - L'identifiant de la salle à vérifier
+ * @returns {Promise<boolean>} true si la salle existe
+ */
+export async function salleExisteParId(idSalle, executor = pool) {
+  const salle = await recupererSalleParId(idSalle, executor);
   return Boolean(salle);
 }

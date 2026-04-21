@@ -1,31 +1,35 @@
 sequenceDiagram
-    actor UtilisateurAdministratif as Administrateur / Responsable administratif
+    participant Admin
     participant Frontend
-    participant RouteAuth as Route /auth/login
-    participant RouteLogic as auth.routes.js
-    participant Bcrypt
-    participant Session
-    participant MySQL
+    participant LoginRoute
+    participant Passport
+    participant UserModel
+    participant PasswordUtil
+    participant SessionStore
+    participant Database
 
-    UtilisateurAdministratif->>Frontend: Saisit email et mot de passe
-    Frontend->>RouteAuth: POST /auth/login
-    RouteAuth->>RouteLogic: Normaliser l'email
-    RouteLogic->>MySQL: SELECT id_utilisateur, email, motdepasse, nom, prenom, role FROM utilisateurs WHERE email = ?
-    MySQL-->>RouteLogic: ligne utilisateur ou aucune ligne
-    RouteLogic-->>RouteAuth: resultat
+    Admin->>Frontend: Saisit email et mot de passe
+    Frontend->>LoginRoute: POST /auth/login
+    LoginRoute->>LoginRoute: Valider email et password
 
-    alt utilisateur introuvable
-        RouteAuth-->>Frontend: 401 Identifiants invalides
-    else utilisateur trouve
-        RouteAuth->>Bcrypt: compare(password, hash)
-        Bcrypt-->>RouteAuth: true ou false
+    alt donnees invalides
+        LoginRoute-->>Frontend: 400 Courriel invalide ou Mot de passe invalide
+    else donnees valides
+        LoginRoute->>Passport: Lancer auth locale
+        Passport->>UserModel: Rechercher l utilisateur par email
+        UserModel->>Database: Lire utilisateur
+        Database-->>UserModel: Utilisateur ou null
+        UserModel-->>Passport: Donnees utilisateur
+        Passport->>PasswordUtil: Verifier le mot de passe
+        PasswordUtil-->>Passport: true ou false
 
-        alt mot de passe invalide
-            RouteAuth-->>Frontend: 401 Identifiants invalides
-        else mot de passe valide
-            RouteAuth->>RouteLogic: Construire {id, email, nom, prenom, role}
-            RouteAuth->>Session: req.session.user = {id, email, nom, prenom, role}
-            Session-->>RouteAuth: session active
-            RouteAuth-->>Frontend: 200 Connexion reussie
+        alt utilisateur inconnu ou mot de passe invalide
+            Passport-->>LoginRoute: Echec auth
+            LoginRoute-->>Frontend: 401 erreur d'authentification
+        else authentification valide
+            Passport-->>LoginRoute: Utilisateur valide
+            LoginRoute->>SessionStore: Ouvrir la session
+            SessionStore-->>LoginRoute: Stocker user.id
+            LoginRoute-->>Frontend: 200 sans corps
         end
     end

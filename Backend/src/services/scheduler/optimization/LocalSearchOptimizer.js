@@ -372,6 +372,7 @@ export class LocalSearchOptimizer {
           dureeHeures: timeMetadata.dureeHeures,
           est_en_ligne: Boolean(placement.est_en_ligne),
           est_cours_cle: Boolean(placement.est_cours_cle),
+          verrouille_optimisation_locale: Boolean(placement.verrouille_optimisation_locale),
           code_cours: placement.code_cours || null,
           nom_cours: placement.nom_cours || null,
           placements: [],
@@ -379,6 +380,9 @@ export class LocalSearchOptimizer {
       }
 
       index.get(seriesKey).placements.push(placement);
+      if (Boolean(placement.verrouille_optimisation_locale)) {
+        index.get(seriesKey).verrouille_optimisation_locale = true;
+      }
     }
 
     return [...index.values()]
@@ -429,6 +433,10 @@ export class LocalSearchOptimizer {
     currentScore,
     maxCandidatesPerSeries,
   }) {
+    if (Boolean(series?.verrouille_optimisation_locale)) {
+      return null;
+    }
+
     if (!Number.isInteger(series.slotStartIndex) || series.slotStartIndex < 0) {
       return null;
     }

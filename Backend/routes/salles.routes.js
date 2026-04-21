@@ -32,6 +32,9 @@ import {
   recupererOccupationSalle,
   remplacerIndisponibilitesSalle,
 } from "../src/model/salle.js";
+import { ImportExcelError } from "../src/services/import-excel.shared.js";
+import { genererModeleImportExcel } from "../src/services/import-excel-template.service.js";
+import { importerSallesDepuisFichier } from "../src/services/import-salles.service.js";
 import {
   validerCreateSalle,
   validerDeleteSalle,
@@ -39,6 +42,7 @@ import {
   validerUpdateSalle,
   verifierSalleExiste,
 } from "../src/validations/salles.validation.js";
+import { televerserFichierImportExcel } from "../src/validations/import-excel.validation.js";
 import { userAdmin, userAdminOrResponsable, userAuth } from "../middlewares/auth.js";
 
 /**
@@ -141,6 +145,50 @@ export default function sallesRoutes(app) {
       response.status(500).json({ message: "Erreur serveur." });
     }
   });
+
+  app.get(
+    "/api/salles/import/template",
+    ...accesGestionSalles,
+    async (request, response) => {
+      try {
+        const modele = genererModeleImportExcel("salles");
+        response.setHeader("Content-Type", modele.contentType);
+        response.setHeader(
+          "Content-Disposition",
+          `attachment; filename="${modele.filename}"`
+        );
+        return response.status(200).send(modele.buffer);
+      } catch (error) {
+        return response.status(error.status || 500).json({
+          message: error.message || "Erreur serveur.",
+          ...(error.erreurs?.length ? { erreurs: error.erreurs } : {}),
+        });
+      }
+    }
+  );
+
+  app.post(
+    "/api/salles/import",
+    ...accesGestionSalles,
+    televerserFichierImportExcel,
+    async (request, response) => {
+      try {
+        const resultat = await importerSallesDepuisFichier(request.file);
+        return response.status(200).json(resultat);
+      } catch (error) {
+        if (error instanceof ImportExcelError) {
+          return response.status(error.status || 400).json({
+            message: error.message,
+            ...(error.erreurs?.length ? { erreurs: error.erreurs } : {}),
+          });
+        }
+
+        return response.status(500).json({
+          message: error.message || "Erreur serveur.",
+        });
+      }
+    }
+  );
 
   /**
    * GET /api/salles/:id
