@@ -184,7 +184,7 @@ export function SchedulerPage({ utilisateur, onLogout }) {
   const [selectedSession, setSelectedSession] = useState("");
   const inclureWeekend = false;
   const [optimizationMode, setOptimizationMode] = useState("legacy");
-  const [saIterations, setSaIterations]     = useState(50);
+  const saIterations = 50;
   const [generating, setGenerating]         = useState(false);
   const [bootstrapping, setBootstrapping]   = useState(false);
   const [phase, setPhase]                   = useState(null);
@@ -469,22 +469,6 @@ export function SchedulerPage({ utilisateur, onLogout }) {
                         : "Lundi au vendredi uniquement"}
                     </button>
                   </div>
-                </div>
-
-                <div className="form-group">
-                  <label>Intensité optimisation SA</label>
-                  <div className="slider-wrapper">
-                    <input
-                      type="range"
-                      min="10"
-                      max="200"
-                      value={saIterations}
-                      onChange={(e) => setSaIterations(Number(e.target.value))}
-                      className="form-slider"
-                    />
-                    <span className="slider-val">{saIterations} iter/T°</span>
-                  </div>
-                  <small>Plus élevé = meilleure qualité mais plus lent</small>
                 </div>
 
                 <div className="algo-info">

@@ -1187,10 +1187,18 @@ export function DisponibilitesProfesseursPage({ utilisateur, onLogout }) {
 
                   <div className="professeurs-page__schedule-list">
                     <h3>Calendrier unifie</h3>
-                    <p className="professeurs-page__schedule-note">
-                      Vert = disponibilites effectives sur la semaine cible. Bleu = cours
-                      planifies sur cette meme semaine.
-                    </p>
+                    <div className="professeurs-page__schedule-legend">
+                      <span className="professeurs-page__legend-pill professeurs-page__legend-pill--available">
+                        Disponibilite
+                      </span>
+                      <span className="professeurs-page__legend-pill professeurs-page__legend-pill--occupied">
+                        Cours occupe
+                      </span>
+                      <p className="professeurs-page__schedule-note">
+                        Vert = disponibilites effectives sur la semaine cible. Bleu = cours
+                        planifies sur cette meme semaine.
+                      </p>
+                    </div>
 
                     <div className="professeurs-page__calendar-wrapper">
                       <div className="professeurs-page__calendar-grid">

@@ -910,21 +910,3 @@
   padding: 0.125rem 0;
 }
 
-/*APPSHELL LOGOUT*/
-
-.app-shell__logout {
-  margin-top: auto;
-  padding: 0.75rem 1rem;
-  background: none;
-  border: none;
-  color: #D9E2DD;
-  cursor: pointer;
-  font-size: 0.875rem;
-  text-align: left;
-  width: 100%;
-  transition: color 0.2s;
-}
-
-.app-shell__logout:hover {
-  color: #ef4444;
-}

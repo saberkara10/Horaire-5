@@ -148,6 +148,13 @@ export function SalleOccupationBoard({
     return null;
   }
 
+  const classeEtatActuel =
+    tempsReel?.statut === "conflit"
+      ? "room-occupation-board__live-card--conflict"
+      : tempsReel?.occupee_maintenant
+        ? "room-occupation-board__live-card--occupied"
+        : "room-occupation-board__live-card--free";
+
   return (
     <div className="detail-card__section">
       <div className="table-header">
@@ -169,7 +176,9 @@ export function SalleOccupationBoard({
       </div>
 
       <div className="etudiant-schedule__legend">
-        <span className="status-pill status-pill--busy">Occupee</span>
+        <span className="status-pill room-occupation-board__pill room-occupation-board__pill--occupied">
+          Occupee
+        </span>
         <span className="status-pill room-occupation-board__pill room-occupation-board__pill--free">
           Libre
         </span>
@@ -179,7 +188,7 @@ export function SalleOccupationBoard({
       </div>
 
       <div className="room-occupation-board__live-grid">
-        <article className="room-occupation-board__live-card">
+        <article className={`room-occupation-board__live-card ${classeEtatActuel}`}>
           <span className="planning-label">Etat actuel</span>
           <strong>{formaterStatutTempsReel(tempsReel)}</strong>
           <p>{formaterDetailTempsReel(tempsReel)}</p>
@@ -338,7 +347,7 @@ export function SalleOccupationBoard({
                       className={`status-pill ${
                         occupation.conflit_detecte
                           ? "room-occupation-board__pill room-occupation-board__pill--conflict"
-                          : "status-pill--busy"
+                          : "room-occupation-board__pill room-occupation-board__pill--occupied"
                       }`}
                     >
                       {occupation.conflit_detecte ? "Conflit" : "Occupee"}

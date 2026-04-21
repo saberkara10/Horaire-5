@@ -242,14 +242,15 @@
   position: absolute;
   left: 4px;
   right: 4px;
-  z-index: 1;
+  z-index: 2;
   display: grid;
   gap: 0.1rem;
   padding: 0.45rem 0.55rem;
   border-radius: 10px;
-  background: linear-gradient(135deg, var(--primary-hover), var(--primary));
+  background: linear-gradient(135deg, #1c6fb8 0%, #2b8fd8 55%, #64b6ec 100%);
   color: #ffffff;
   overflow: hidden;
+  box-shadow: 0 12px 24px rgba(28, 111, 184, 0.18);
 }
 
 .professeurs-page__session strong {
@@ -276,9 +277,41 @@
   color: var(--text);
 }
 
-.professeurs-page__schedule-note {
+.professeurs-page__schedule-legend {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
   margin: 0 0 1rem;
+}
+
+.professeurs-page__schedule-note {
+  margin: 0;
   color: var(--muted);
+}
+
+.professeurs-page__legend-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 0 0.9rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.professeurs-page__legend-pill--available {
+  background: rgba(234, 247, 239, 0.98);
+  color: var(--primary-hover);
+  border-color: rgba(15, 138, 67, 0.22);
+}
+
+.professeurs-page__legend-pill--occupied {
+  background: rgba(224, 242, 254, 0.98);
+  color: #1c6fb8;
+  border-color: rgba(43, 143, 216, 0.24);
 }
 
 .professeurs-page__availability-session {
@@ -290,10 +323,10 @@
   gap: 0.1rem;
   padding: 0.45rem 0.55rem;
   border-radius: 10px;
-  background: linear-gradient(135deg, var(--primary-hover), var(--primary));
+  background: linear-gradient(135deg, #0f8a43 0%, #17a34a 55%, #52c06b 100%);
   color: #ffffff;
   overflow: hidden;
-  box-shadow: 0 8px 24px rgba(15, 138, 67, 0.18);
+  box-shadow: 0 10px 24px rgba(15, 138, 67, 0.2);
 }
 
 .professeurs-page__availability-session strong,

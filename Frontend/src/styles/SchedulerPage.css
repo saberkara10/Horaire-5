@@ -185,16 +185,6 @@
 .toggle-btn.on  { background: rgba(234, 247, 239, 0.96); border-color: rgba(15, 138, 67, 0.2); color: var(--blue); }
 .toggle-btn.off { background: rgba(239,68,68,0.1); border-color: rgba(239,68,68,0.3); color: #f87171; }
 
-/* Slider */
-.slider-wrapper { display: flex; align-items: center; gap: 1rem; }
-.form-slider {
-  flex: 1;
-  accent-color: var(--primary);
-  height: 4px;
-  cursor: pointer;
-}
-.slider-val { color: var(--primary); font-weight: 700; font-size: 0.85rem; min-width: 80px; }
-
 /* ─── Phases list ───────────────────────────────────────────── */
 .algo-info {
   background: rgba(255,255,255,0.03);
@@ -1268,7 +1258,6 @@
 }
 
 .phase-item.done,
-.slider-val,
 .phase-item.active,
 .scheduler-tab.active {
   color: var(--blue);

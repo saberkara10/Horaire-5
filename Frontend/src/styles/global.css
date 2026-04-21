@@ -6,6 +6,10 @@
   --brand-500: #0f8a43;
   --brand-600: #0b6b34;
   --brand-700: #095227;
+  --brand: #10a760;
+  --brand-dark: #0d7c50;
+  --brand-soft: #eaf7ef;
+  --brand-contrast: #ffffff;
   --neutral-0: #ffffff;
   --neutral-50: #f7f9f8;
   --neutral-100: #f3f7f4;
@@ -28,10 +32,12 @@
   --panel: rgba(255, 255, 255, 0.94);
   --panel-strong: rgba(255, 255, 255, 0.98);
   --panel-soft: rgba(247, 249, 248, 0.96);
+  --surface-strong: rgba(255, 255, 255, 0.98);
   --line: rgba(217, 226, 221, 0.9);
   --line-soft: rgba(217, 226, 221, 0.6);
   --text: var(--ink-900);
   --muted: var(--ink-500);
+  --muted-strong: var(--ink-700);
   --muted-soft: var(--ink-400);
   --primary: var(--brand-500);
   --primary-hover: var(--brand-600);
@@ -40,6 +46,7 @@
   --primary-soft-strong: var(--brand-100);
   --focus-ring: rgba(15, 138, 67, 0.16);
   --radius-xl: 24px;
+  --radius-2xl: 28px;
   --radius-lg: 18px;
   --radius-md: 14px;
   --shadow-purple: 0 12px 28px rgba(76, 104, 84, 0.12);

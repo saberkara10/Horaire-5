@@ -72,6 +72,21 @@
   background: rgba(255, 255, 255, 0.92);
 }
 
+.room-occupation-board__live-card--free {
+  border-color: rgba(15, 138, 67, 0.22);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(234, 247, 239, 0.94));
+}
+
+.room-occupation-board__live-card--occupied {
+  border-color: rgba(43, 143, 216, 0.24);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(224, 242, 254, 0.94));
+}
+
+.room-occupation-board__live-card--conflict {
+  border-color: rgba(239, 68, 68, 0.26);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(254, 242, 242, 0.94));
+}
+
 .room-occupation-board__live-card strong {
   color: var(--text);
   font-size: 1.05rem;
@@ -98,13 +113,15 @@
 }
 
 .room-occupation-board__slot--occupied {
-  box-shadow: 0 12px 24px rgba(77, 111, 229, 0.24);
+  background: linear-gradient(135deg, #1c6fb8 0%, #2b8fd8 52%, #64b6ec 100%);
+  color: #ffffff;
+  box-shadow: 0 12px 24px rgba(28, 111, 184, 0.24);
 }
 
 .room-occupation-board__slot--free {
-  background: linear-gradient(180deg, rgba(246, 250, 255, 0.96), rgba(234, 247, 239, 0.9));
-  border: 1px dashed rgba(148, 163, 184, 0.55);
-  color: #4b6178;
+  background: linear-gradient(180deg, rgba(246, 252, 248, 0.98), rgba(234, 247, 239, 0.94));
+  border: 1px dashed rgba(15, 138, 67, 0.32);
+  color: var(--primary-hover);
   align-content: center;
   justify-items: center;
 }
@@ -146,9 +163,15 @@
 }
 
 .room-occupation-board__pill--free {
-  background: rgba(248, 250, 252, 0.98);
-  color: var(--muted);
-  border-color: rgba(148, 163, 184, 0.28);
+  background: rgba(234, 247, 239, 0.98);
+  color: var(--primary-hover);
+  border-color: rgba(15, 138, 67, 0.22);
+}
+
+.room-occupation-board__pill--occupied {
+  background: rgba(224, 242, 254, 0.98);
+  color: #1c6fb8;
+  border-color: rgba(43, 143, 216, 0.24);
 }
 
 .room-occupation-board__pill--conflict {
