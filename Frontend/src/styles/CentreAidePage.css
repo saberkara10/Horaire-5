@@ -227,6 +227,25 @@
   animation: centre-aide-rise 0.45s ease both;
 }
 
+.help-overview-grid,
+.help-shortcut-grid,
+.help-health-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.help-overview-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.help-shortcut-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.help-health-grid {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
 .centre-aide__section--panel {
   padding: 1.35rem;
   border-radius: 32px;
@@ -289,6 +308,172 @@
   background: var(--primary);
   color: #ffffff;
   box-shadow: 0 10px 22px rgba(15, 138, 67, 0.18);
+}
+
+.help-overview-card,
+.help-shortcut-card,
+.help-health-card {
+  border: 1px solid rgba(217, 226, 221, 0.28);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: var(--shadow-card);
+}
+
+.help-overview-card {
+  display: grid;
+  gap: 0.5rem;
+  padding: 1rem 1.05rem;
+}
+
+.help-overview-card__icon,
+.help-shortcut-card__icon {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  color: var(--primary-hover);
+  background: linear-gradient(135deg, rgba(15, 138, 67, 0.12), rgba(15, 138, 67, 0.18));
+}
+
+.help-overview-card strong {
+  color: var(--help-ink);
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+.help-overview-card span,
+.help-shortcut-card p,
+.help-health-card p {
+  color: var(--help-muted);
+}
+
+.help-overview-card span {
+  font-weight: 800;
+}
+
+.help-overview-card p {
+  margin: 0;
+  color: var(--help-muted);
+  line-height: 1.65;
+}
+
+.help-shortcut-card {
+  display: grid;
+  gap: 0.7rem;
+  padding: 1rem 1.05rem;
+  border: none;
+  text-align: left;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.help-shortcut-card:hover,
+.help-health-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px rgba(76, 104, 84, 0.14);
+}
+
+.help-shortcut-card strong,
+.help-health-card h3 {
+  color: var(--help-ink);
+}
+
+.help-shortcut-card strong {
+  font-size: 1.02rem;
+}
+
+.help-shortcut-card p,
+.help-health-card p {
+  margin: 0;
+  line-height: 1.7;
+}
+
+.help-shortcut-card span,
+.help-health-card__action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: fit-content;
+  color: var(--primary-hover);
+  font-weight: 800;
+}
+
+.help-health-card {
+  display: grid;
+  gap: 0.85rem;
+  padding: 1.05rem 1.1rem;
+}
+
+.help-health-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.help-health-card__head h3 {
+  margin: 0.2rem 0 0;
+  font-size: 1.05rem;
+}
+
+.help-health-card__module,
+.help-health-card__status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 0.7rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.help-health-card__module {
+  color: var(--primary-hover);
+  background: rgba(15, 138, 67, 0.11);
+}
+
+.help-health-card__status {
+  color: var(--ink-700);
+  background: rgba(232, 241, 250, 0.88);
+}
+
+.help-health-card__metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.help-health-card__metrics span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 0.65rem;
+  border-radius: 999px;
+  color: var(--help-muted);
+  background: rgba(247, 249, 248, 0.96);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.help-health-card__progress {
+  overflow: hidden;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(217, 226, 221, 0.4);
+}
+
+.help-health-card__progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(15, 138, 67, 0.82), rgba(53, 89, 121, 0.85));
+}
+
+.help-health-card__action {
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
 }
 
 .centre-aide__grid,
@@ -1104,6 +1289,11 @@
 }
 
 @media (max-width: 1200px) {
+  .help-overview-grid,
+  .help-shortcut-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .help-filters__grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -1122,6 +1312,11 @@
 
   .centre-aide__metric-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .help-overview-grid,
+  .help-shortcut-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .help-filters__grid {
@@ -1148,6 +1343,8 @@
 
   .centre-aide__metric-grid,
   .help-learning-path,
+  .help-overview-grid,
+  .help-shortcut-grid,
   .help-filters__grid {
     grid-template-columns: 1fr;
   }

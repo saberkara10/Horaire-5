@@ -21,6 +21,7 @@ await jest.unstable_mockModule("../db.js", () => ({
 }));
 
 await jest.unstable_mockModule("../src/model/cours.model.js", () => ({
+  DUREE_COURS_FIXE: 3,
   ajouterCours: ajouterCoursMock,
   modifierCours: modifierCoursMock,
   recupererCoursParCode: recupererCoursParCodeMock,
@@ -111,7 +112,7 @@ describe("service import-cours", () => {
       {
         code: "INF301",
         nom: "Reseaux",
-        duree: 2,
+        duree: 3,
         programme: "Programmation informatique",
         etape_etude: "3",
         id_salle_reference: 3,
@@ -136,6 +137,13 @@ describe("service import-cours", () => {
   });
 
   test("rejette les lignes dont la duree sort du cadre editable du produit", async () => {
+    getSalleByCodeMock.mockResolvedValueOnce({
+      id_salle: 3,
+      code: "B204",
+      type: "Laboratoire",
+    });
+    recupererCoursParCodeMock.mockResolvedValueOnce(null);
+
     const fichier = creerFichierExcel([
       ["code", "nom", "duree", "programme", "etape_etude", "salle_reference_code"],
       ["INF301", "Reseaux", "6", "Programmation informatique", "3", "B204"],
@@ -144,11 +152,21 @@ describe("service import-cours", () => {
     const resultat = await importerCoursDepuisFichier(fichier);
 
     expect(resultat).toMatchObject({
-      lignes_importees: 0,
-      lignes_en_erreur: 1,
-      statut: "warning",
+      lignes_creees: 1,
+      lignes_importees: 1,
+      lignes_en_erreur: 0,
+      statut: "success",
     });
-    expect(resultat.erreurs[0]).toContain("duree invalide");
-    expect(ajouterCoursMock).not.toHaveBeenCalled();
+    expect(ajouterCoursMock).toHaveBeenCalledWith(
+      {
+        code: "INF301",
+        nom: "Reseaux",
+        duree: 3,
+        programme: "Programmation informatique",
+        etape_etude: "3",
+        id_salle_reference: expect.any(Number),
+      },
+      connectionMock
+    );
   });
 });

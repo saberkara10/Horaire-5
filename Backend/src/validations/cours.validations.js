@@ -22,7 +22,7 @@ function typeSalleValide(typeSalle) {
 
 function appliquerCoursEnLigne(body) {
   body.mode_cours = "En ligne";
-  body.type_salle = null;
+  body.type_salle = "En ligne";
   body.id_salle_reference = null;
   body.est_en_ligne = 1;
 }
@@ -39,11 +39,6 @@ function validerNomCours(nom) {
 function validerEtape(etape) {
   const etapeInt = Number(etape);
   return Number.isInteger(etapeInt) && etapeInt >= 1 && etapeInt <= 8;
-}
-
-function validerDuree(duree) {
-  const dureeInt = Number(duree);
-  return Number.isInteger(dureeInt) && dureeInt > 0;
 }
 
 export function validerIdCours(request, response, next) {
@@ -101,13 +96,7 @@ export async function validerCreateCours(request, response, next) {
     return envoyerErreur(response, 400, "Etape invalide (1 a 8).");
   }
 
-  if (duree === undefined || duree === null || duree === "") {
-    request.body.duree = DUREE_COURS_FIXE;
-  } else if (!validerDuree(duree)) {
-    return envoyerErreur(response, 400, "Duree invalide (> 0).");
-  } else {
-    request.body.duree = Number(duree);
-  }
+  request.body.duree = DUREE_COURS_FIXE;
 
   const dejaExiste = await recupererCoursParCode(String(code).trim());
 
@@ -199,13 +188,7 @@ export async function validerUpdateCours(request, response, next) {
     return envoyerErreur(response, 400, "Nom invalide.");
   }
 
-  if (duree !== undefined) {
-    if (!validerDuree(duree)) {
-      return envoyerErreur(response, 400, "Duree invalide (> 0).");
-    }
-
-    request.body.duree = Number(duree);
-  }
+  request.body.duree = DUREE_COURS_FIXE;
 
   if (programme !== undefined && String(programme).trim() === "") {
     return envoyerErreur(response, 400, "Programme invalide.");

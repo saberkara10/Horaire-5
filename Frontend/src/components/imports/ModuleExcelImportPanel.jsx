@@ -99,6 +99,11 @@ export function ModuleExcelImportPanel({
     columns: [],
     notes: [],
   };
+  const afficherDescription = definitionModule.afficherDescription !== false;
+  const afficherMeta = definitionModule.afficherMeta !== false;
+  const afficherDescriptionsColonnes =
+    definitionModule.afficherDescriptionsColonnes !== false;
+  const afficherNotes = definitionModule.afficherNotes !== false;
 
   const resumeStatistiques = useMemo(
     () =>
@@ -218,7 +223,9 @@ export function ModuleExcelImportPanel({
         <div className="crud-import-panel__copy">
           <span className="crud-import-panel__eyebrow">Import Excel</span>
           <h2>{definitionModule.moduleLabel}</h2>
-          <p>{definitionModule.description}</p>
+          {afficherDescription && definitionModule.description ? (
+            <p>{definitionModule.description}</p>
+          ) : null}
         </div>
 
         <div className="crud-import-panel__actions">
@@ -246,12 +253,14 @@ export function ModuleExcelImportPanel({
         </div>
       </div>
 
-      <div className="crud-import-panel__meta">
-        <div className="crud-import-panel__badge">Formats acceptes : .xlsx, .xls, .csv</div>
-        <div className="crud-import-panel__badge">
-          Strategie : import partiel avec detail des lignes rejetees
+      {afficherMeta ? (
+        <div className="crud-import-panel__meta">
+          <div className="crud-import-panel__badge">Formats acceptes : .xlsx, .xls, .csv</div>
+          <div className="crud-import-panel__badge">
+            Strategie : import partiel avec detail des lignes rejetees
+          </div>
         </div>
-      </div>
+      ) : null}
 
       <div className="crud-import-panel__columns">
         {definitionModule.columns.map((colonne) => (
@@ -260,12 +269,16 @@ export function ModuleExcelImportPanel({
               <strong>{colonne.key}</strong>
               <span>{colonne.required ? "Obligatoire" : "Optionnelle"}</span>
             </div>
-            <p>{colonne.description}</p>
+            {afficherDescriptionsColonnes && colonne.description ? (
+              <p>{colonne.description}</p>
+            ) : null}
           </article>
         ))}
       </div>
 
-      {Array.isArray(definitionModule.notes) && definitionModule.notes.length > 0 ? (
+      {afficherNotes &&
+      Array.isArray(definitionModule.notes) &&
+      definitionModule.notes.length > 0 ? (
         <ul className="crud-import-panel__notes">
           {definitionModule.notes.map((note) => (
             <li key={note}>{note}</li>

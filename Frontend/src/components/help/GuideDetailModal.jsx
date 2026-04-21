@@ -100,6 +100,11 @@ export function GuideDetailModal({
                 {item.categoryName}
               </span>
             ) : null}
+            {item.updatedAt ? (
+              <span className="help-modal__badge help-modal__badge--soft">
+                Mis a jour {new Date(item.updatedAt).toLocaleDateString("fr-CA")}
+              </span>
+            ) : null}
             {item.levelLabel ? (
               <span className="help-modal__badge help-modal__badge--soft">
                 <Layers3 size={14} />

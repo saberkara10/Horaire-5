@@ -33,6 +33,7 @@ const SEARCH_MIN_LENGTH = 2;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const REPOSITORY_ROOT = path.resolve(__dirname, "../../../..");
+const FRONTEND_PUBLIC_ROOT = path.resolve(REPOSITORY_ROOT, "Frontend/public");
 
 function createHttpError(status, message) {
   const error = new Error(message);
@@ -96,6 +97,70 @@ function parseKeywords(rawKeywords) {
 
 function uniqueValues(values) {
   return [...new Set((Array.isArray(values) ? values : []).filter(Boolean))];
+}
+
+function resolvePublicAssetPath(publicAssetPath) {
+  const normalizedPath = String(publicAssetPath || "")
+    .trim()
+    .replace(/\\/g, "/")
+    .replace(/^\/+/, "");
+
+  if (!normalizedPath) {
+    return { ok: false, reason: "Aucun chemin public n'est configure." };
+  }
+
+  const absolutePath = path.resolve(FRONTEND_PUBLIC_ROOT, normalizedPath);
+  const relativeToPublicRoot = path.relative(FRONTEND_PUBLIC_ROOT, absolutePath);
+
+  if (
+    !relativeToPublicRoot ||
+    relativeToPublicRoot.startsWith("..") ||
+    path.isAbsolute(relativeToPublicRoot)
+  ) {
+    return {
+      ok: false,
+      reason: "Le chemin public pointe hors du dossier Frontend/public.",
+    };
+  }
+
+  if (!fs.existsSync(absolutePath)) {
+    return { ok: false, reason: "Le fichier public est introuvable." };
+  }
+
+  return {
+    ok: true,
+    publicPath: `/${normalizedPath}`,
+    absolutePath,
+  };
+}
+
+function resolvePublicVideoSlot(slot) {
+  const candidates = uniqueValues([
+    slot.publicVideoPath,
+    ...(Array.isArray(slot.publicVideoCandidates) ? slot.publicVideoCandidates : []),
+  ]);
+
+  for (const candidate of candidates) {
+    const resolvedVideo = resolvePublicAssetPath(candidate);
+
+    if (resolvedVideo.ok) {
+      const resolvedThumbnail = resolvePublicAssetPath(slot.publicThumbnailUrl);
+
+      return {
+        streamUrl: resolvedVideo.publicPath,
+        hasVideo: true,
+        thumbnailUrl: resolvedThumbnail.ok ? resolvedThumbnail.publicPath : null,
+        hasThumbnail: resolvedThumbnail.ok,
+      };
+    }
+  }
+
+  return {
+    streamUrl: null,
+    hasVideo: false,
+    thumbnailUrl: null,
+    hasThumbnail: false,
+  };
 }
 
 function formatEstimatedMinutes(minutes) {
@@ -177,7 +242,10 @@ function mapVideoSlot(slot, guideDefinition, categoriesById, videosBySlug) {
   const category = categoriesById.get(guideDefinition.categoryId);
   const repositoryVideo = slot.videoSlug ? videosBySlug.get(slot.videoSlug) : null;
   const resolvedVideo = repositoryVideo ? mapVideo(repositoryVideo) : null;
-  const hasPlayableVideo = Boolean(resolvedVideo?.hasVideo && resolvedVideo?.streamUrl);
+  const publicVideo = resolvePublicVideoSlot(slot);
+  const hasPlayableVideo = Boolean(
+    (resolvedVideo?.hasVideo && resolvedVideo?.streamUrl) || publicVideo.streamUrl
+  );
 
   return {
     id: slot.id,
@@ -200,9 +268,9 @@ function mapVideoSlot(slot, guideDefinition, categoriesById, videosBySlug) {
     durationSeconds: resolvedVideo?.durationSeconds || null,
     status: hasPlayableVideo ? "available" : "coming-soon",
     hasVideo: hasPlayableVideo,
-    hasThumbnail: Boolean(resolvedVideo?.thumbnailUrl),
-    streamUrl: hasPlayableVideo ? resolvedVideo.streamUrl : null,
-    thumbnailUrl: resolvedVideo?.thumbnailUrl || null,
+    hasThumbnail: Boolean(resolvedVideo?.thumbnailUrl || publicVideo.thumbnailUrl),
+    streamUrl: resolvedVideo?.streamUrl || publicVideo.streamUrl,
+    thumbnailUrl: resolvedVideo?.thumbnailUrl || publicVideo.thumbnailUrl,
     backendVideoId: resolvedVideo?.id || null,
     tags: uniqueValues(["video", ...guideDefinition.tags]),
     keywords: uniqueValues([slot.title, guideDefinition.title, ...guideDefinition.keywords]),

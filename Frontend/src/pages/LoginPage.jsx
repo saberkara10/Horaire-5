@@ -99,6 +99,16 @@ export function LoginPage({ onLogin }) {
 
       <section className="login-page__content">
         <div className="login-card">
+          <div className="login-card__topbar">
+            <button
+              type="button"
+              className="login-card__help-button"
+              onClick={() => navigate("/login/aide")}
+            >
+              Aide
+            </button>
+          </div>
+
           <div className="login-card__brand">
             <img
               className="login-page__logo"

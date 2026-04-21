@@ -13,7 +13,9 @@ import {
   Compass,
   Filter,
   Layers3,
+  PlayCircle,
   Search,
+  ShieldCheck,
 } from "lucide-react";
 import { GuideCard } from "../components/help/GuideCard.jsx";
 import { GuideDetailModal } from "../components/help/GuideDetailModal.jsx";
@@ -45,7 +47,6 @@ const SECTION_IDS = {
   videos: "videos",
   documents: "documents",
   faq: "faq",
-  scenarios: "scenarios",
 };
 
 function SectionHeader({ eyebrow, title, description, actionLabel, onAction }) {
@@ -157,7 +158,6 @@ export function CentreAidePage({ utilisateur, onLogout }) {
   const videosRef = useRef(null);
   const documentsRef = useRef(null);
   const faqRef = useRef(null);
-  const scenariosRef = useRef(null);
 
   const deferredQuery = useDeferredValue(filters.query.trim().toLowerCase());
 
@@ -215,7 +215,7 @@ export function CentreAidePage({ utilisateur, onLogout }) {
   }, [helpCenter]);
 
   const contentById = useMemo(
-    () => new Map(allContent.map((item) => [item.id, item])),
+    () => new Map(allContent.map((item) => [String(item.id), item])),
     [allContent]
   );
 
@@ -247,7 +247,15 @@ export function CentreAidePage({ utilisateur, onLogout }) {
 
       return true;
     });
-  }, [allContent, deferredQuery, filters.categoryId, filters.level, filters.moduleKey, filters.tag, filters.type]);
+  }, [
+    allContent,
+    deferredQuery,
+    filters.categoryId,
+    filters.level,
+    filters.moduleKey,
+    filters.tag,
+    filters.type,
+  ]);
 
   const hasActiveFilters = useMemo(() => {
     return Object.entries(filters).some(([key, value]) => {
@@ -270,7 +278,6 @@ export function CentreAidePage({ utilisateur, onLogout }) {
       [SECTION_IDS.videos]: videosRef,
       [SECTION_IDS.documents]: documentsRef,
       [SECTION_IDS.faq]: faqRef,
-      [SECTION_IDS.scenarios]: scenariosRef,
     };
 
     refMap[sectionId]?.current?.scrollIntoView({
@@ -304,7 +311,7 @@ export function CentreAidePage({ utilisateur, onLogout }) {
   }
 
   function handleOpenContentById(contentId) {
-    const item = contentById.get(contentId);
+    const item = contentById.get(String(contentId));
 
     if (!item) {
       return;
@@ -369,18 +376,18 @@ export function CentreAidePage({ utilisateur, onLogout }) {
         <section className="centre-aide__hero">
           <div className="centre-aide__hero-main">
             <span className="centre-aide__hero-pill">
-              <Layers3 size={16} />
-              Support produit premium
+              <ShieldCheck size={16} />
+              Centre d'aide operationnel
             </span>
 
             <h2 className="centre-aide__hero-title">
-              Tout retrouver sans se perdre, du premier clic a la resolution d'un blocage
+              Un centre d'aide clair, structurant et exploitable en situation reelle
             </h2>
 
             <p className="centre-aide__hero-text">
-              Le Centre d'aide rassemble guides, videos, markdowns, FAQ et
-              scenarios concrets pour accompagner l'administration academique
-              sans jargon technique.
+              Retrouvez dans une seule interface les procedures de reference, les
+              contenus relies aux modules, les cas de blocage frequents et les
+              ressources de reprise utiles pour piloter les horaires avec methode.
             </p>
 
             <div className="centre-aide__search-shell">
@@ -388,7 +395,7 @@ export function CentreAidePage({ utilisateur, onLogout }) {
               <input
                 type="search"
                 className="centre-aide__search-input"
-                placeholder="Rechercher par module, mot-cle ou action: generation, export, disponibilite..."
+                placeholder="Rechercher une action, un module ou un blocage: generation, disponibilite, export..."
                 value={filters.query}
                 onChange={(event) => updateFilters({ query: event.target.value })}
                 aria-label="Rechercher dans le centre d'aide"
@@ -406,7 +413,7 @@ export function CentreAidePage({ utilisateur, onLogout }) {
                 Videos
               </button>
               <button type="button" onClick={() => scrollToSection(SECTION_IDS.documents)}>
-                Markdown
+                Docs
               </button>
               <button type="button" onClick={() => scrollToSection(SECTION_IDS.faq)}>
                 FAQ
@@ -422,11 +429,11 @@ export function CentreAidePage({ utilisateur, onLogout }) {
               </article>
               <article className="centre-aide__metric-card">
                 <strong>{helpCenter?.summary?.documents || 0}</strong>
-                <span>documents markdown</span>
+                <span>documents relies</span>
               </article>
               <article className="centre-aide__metric-card">
-                <strong>{helpCenter?.summary?.videos || 0}</strong>
-                <span>capsules preparees</span>
+                <strong>{helpCenter?.summary?.videosReady || 0}</strong>
+                <span>videos prêtes</span>
               </article>
               <article className="centre-aide__metric-card">
                 <strong>{helpCenter?.summary?.faqs || 0}</strong>
@@ -435,11 +442,11 @@ export function CentreAidePage({ utilisateur, onLogout }) {
             </div>
 
             <div className="centre-aide__hero-note">
-              <h3>Progression recommandee</h3>
+              <h3>Mode de consultation recommande</h3>
               <p>
-                Commencez par les guides d'onboarding, passez par les donnees de
-                reference, puis montez vers la generation, la correction et les
-                exports.
+                Commencez par les raccourcis metier, passez ensuite par les
+                modules concernes, puis utilisez la recherche avancee pour
+                isoler rapidement un cas plus precis.
               </p>
             </div>
           </div>
@@ -461,27 +468,6 @@ export function CentreAidePage({ utilisateur, onLogout }) {
 
         {!error ? (
           <>
-            <section className="centre-aide__section">
-              <SectionHeader
-                eyebrow="Acces rapide"
-                title="Les demandes les plus frequentes"
-                description="Des scenarios orientes action pour les operations les plus critiques de la plateforme."
-                actionLabel="Explorer les scenarios"
-                onAction={() => scrollToSection(SECTION_IDS.scenarios)}
-              />
-
-              <div className="centre-aide__grid centre-aide__grid--feature">
-                {(helpCenter?.featured?.quickAccess || []).map((item) => (
-                  <GuideCard
-                    key={item.id}
-                    item={item}
-                    variant="feature"
-                    onOpen={handleOpenContent}
-                  />
-                ))}
-              </div>
-            </section>
-
             <section className="centre-aide__section">
               <SectionHeader
                 eyebrow="Parcours d'apprentissage"
@@ -690,20 +676,6 @@ export function CentreAidePage({ utilisateur, onLogout }) {
               )}
             </section>
 
-            <section className="centre-aide__section">
-              <SectionHeader
-                eyebrow="Popularite"
-                title="Guides les plus consultes"
-                description="Les fiches les plus utiles pour la preparation, la generation et la correction."
-              />
-
-              <div className="centre-aide__grid">
-                {(helpCenter?.featured?.popularGuides || []).map((item) => (
-                  <GuideCard key={item.id} item={item} onOpen={handleOpenContent} />
-                ))}
-              </div>
-            </section>
-
             <section
               ref={videosRef}
               id={SECTION_IDS.videos}
@@ -711,8 +683,8 @@ export function CentreAidePage({ utilisateur, onLogout }) {
             >
               <SectionHeader
                 eyebrow="Capsules video"
-                title="Une interface deja prete pour vos videos"
-                description="Les miniatures, etats de disponibilite et emplacements de lecture sont deja integres."
+                title="Une base video deja exploitable"
+                description="Visualisez les contenus deja disponibles et les emplacements prets pour les futures capsules de demonstration."
               />
 
               <div className="centre-aide__video-grid">
@@ -729,30 +701,12 @@ export function CentreAidePage({ utilisateur, onLogout }) {
             >
               <SectionHeader
                 eyebrow="Documentation markdown"
-                title="Des documents relies au produit"
-                description="Guides pas a pas, explications metier, procedures detaillees, resolution de problemes et bonnes pratiques."
+                title="Documents relies au produit"
+                description="Guides pas a pas, procedures detaillees, resolution de problemes et bonnes pratiques relies directement au depot."
               />
 
               <div className="centre-aide__grid">
                 {(helpCenter?.documents || []).slice(0, 8).map((item) => (
-                  <GuideCard key={item.id} item={item} onOpen={handleOpenContent} />
-                ))}
-              </div>
-            </section>
-
-            <section
-              ref={scenariosRef}
-              id={SECTION_IDS.scenarios}
-              className="centre-aide__section"
-            >
-              <SectionHeader
-                eyebrow="Scenarios d'utilisation"
-                title="Cas concrets pour les operations metier"
-                description="Des parcours guides pour les situations les plus frequentes pendant une session de planification."
-              />
-
-              <div className="centre-aide__grid">
-                {(helpCenter?.scenarios || []).map((item) => (
                   <GuideCard key={item.id} item={item} onOpen={handleOpenContent} />
                 ))}
               </div>
@@ -776,19 +730,6 @@ export function CentreAidePage({ utilisateur, onLogout }) {
               </div>
             </section>
 
-            <section className="centre-aide__section">
-              <SectionHeader
-                eyebrow="Nouveautes"
-                title="Contenus recemment ajoutes"
-                description="Des contenus de demonstration qui enrichissent progressivement la base d'aide."
-              />
-
-              <div className="centre-aide__grid">
-                {(helpCenter?.featured?.recentContent || []).map((item) => (
-                  <GuideCard key={item.id} item={item} onOpen={handleOpenContent} />
-                ))}
-              </div>
-            </section>
           </>
         ) : null}
       </div>

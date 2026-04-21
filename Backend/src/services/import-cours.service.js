@@ -16,6 +16,7 @@ import {
 import { recupererDefinitionImportExcel } from "./import-excel.definitions.js";
 import {
   ajouterCours,
+  DUREE_COURS_FIXE,
   modifierCours,
   recupererCoursParCode,
 } from "../model/cours.model.js";
@@ -35,7 +36,7 @@ function transformerLigneCours(brut, { numeroLigne }) {
     code: normaliserCodeCoursImport(brut.code),
     nom: normaliserValeurTexte(brut.nom),
     dureeBrute: normaliserValeurTexte(brut.duree),
-    duree: Number(normaliserValeurTexte(brut.duree)),
+    duree: DUREE_COURS_FIXE,
     programme: normaliserValeurTexte(brut.programme),
     etapeBrute: normaliserValeurTexte(brut.etape_etude),
     etape_etude: Number(normaliserValeurTexte(brut.etape_etude)),
@@ -63,12 +64,6 @@ function validerLigneCours(ligne) {
     erreurs.push(`Ligne ${ligne.numeroLigne} : programme obligatoire.`);
   } else if (ligne.programme.length > 150) {
     erreurs.push(`Ligne ${ligne.numeroLigne} : programme trop long (max 150).`);
-  }
-
-  if (!Number.isInteger(ligne.duree) || ligne.duree < 1 || ligne.duree > 4) {
-    erreurs.push(
-      `Ligne ${ligne.numeroLigne} : duree invalide (${ligne.dureeBrute || "vide"}). Les valeurs attendues vont de 1 a 4 heures.`
-    );
   }
 
   if (
@@ -138,7 +133,7 @@ async function traiterLigneCours(ligne, connection) {
   const payload = {
     code: ligne.code,
     nom: ligne.nom,
-    duree: ligne.duree,
+    duree: DUREE_COURS_FIXE,
     programme: ligne.programme,
     etape_etude: String(ligne.etape_etude),
     id_salle_reference: Number(salleReference.id_salle),

@@ -67,12 +67,31 @@ function getResourceSummary(item) {
   return `${documentsCount} doc${documentsCount > 1 ? "s" : ""} | ${videosCount} video${videosCount > 1 ? "s" : ""}`;
 }
 
+function formatHelpDate(dateValue) {
+  if (!dateValue) {
+    return null;
+  }
+
+  const parsedDate = new Date(dateValue);
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    return null;
+  }
+
+  return new Intl.DateTimeFormat("fr-CA", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(parsedDate);
+}
+
 export function GuideCard({ item, onOpen, variant = "default" }) {
   const config = TYPE_CONFIG[item.type] || TYPE_CONFIG.guide;
   const Icon = config.icon;
   const secondaryMeta = getSecondaryMeta(item);
   const statusLabel = getStatusLabel(item);
   const resourceSummary = getResourceSummary(item);
+  const updatedLabel = formatHelpDate(item.updatedAt || item.addedAt);
   const cardClassName =
     variant === "feature" ? "help-card help-card--feature" : "help-card";
 
@@ -151,6 +170,12 @@ export function GuideCard({ item, onOpen, variant = "default" }) {
           <span className="help-card__meta-item">
             {item.type === "video" ? <Clapperboard size={15} /> : <BookOpen size={15} />}
             {secondaryMeta}
+          </span>
+        ) : null}
+
+        {updatedLabel ? (
+          <span className="help-card__meta-item">
+            Mis a jour {updatedLabel}
           </span>
         ) : null}
       </div>

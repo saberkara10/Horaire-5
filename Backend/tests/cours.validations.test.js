@@ -203,6 +203,30 @@ describe("validations cours", () => {
     expect(req.body.duree).toBe(3);
   });
 
+  it("validerCreateCours force la duree a 3 meme si une autre valeur est envoyee", async () => {
+    recupererCoursParCode.mockResolvedValue(null);
+    salleExisteParId.mockResolvedValue(true);
+    const req = {
+      body: {
+        code: "INF101",
+        nom: "Algo",
+        duree: 1,
+        mode_cours: "Presentiel",
+        programme: "Programmation informatique",
+        etape_etude: 1,
+        type_salle: "Laboratoire informatique",
+        id_salle_reference: 4,
+      },
+    };
+    const res = createResponse();
+    const next = jest.fn();
+
+    await validerCreateCours(req, res, next);
+
+    expect(next).toHaveBeenCalled();
+    expect(req.body.duree).toBe(3);
+  });
+
   it("validerCreateCours accepte un cours en ligne sans salle", async () => {
     recupererCoursParCode.mockResolvedValue(null);
     const req = {
@@ -220,7 +244,7 @@ describe("validations cours", () => {
     await validerCreateCours(req, res, next);
 
     expect(next).toHaveBeenCalled();
-    expect(req.body.type_salle).toBeNull();
+    expect(req.body.type_salle).toBe("En ligne");
     expect(req.body.id_salle_reference).toBeNull();
     expect(req.body.duree).toBe(3);
   });
@@ -244,7 +268,7 @@ describe("validations cours", () => {
     await validerCreateCours(req, res, next);
 
     expect(next).toHaveBeenCalled();
-    expect(req.body.type_salle).toBeNull();
+    expect(req.body.type_salle).toBe("En ligne");
     expect(req.body.id_salle_reference).toBeNull();
   });
 
@@ -269,7 +293,7 @@ describe("validations cours", () => {
     await validerUpdateCours(req, res, next);
 
     expect(next).toHaveBeenCalled();
-    expect(req.body.type_salle).toBeNull();
+    expect(req.body.type_salle).toBe("En ligne");
     expect(req.body.id_salle_reference).toBeNull();
   });
 
@@ -321,6 +345,7 @@ describe("validations cours", () => {
     await validerUpdateCours(req, res, next);
 
     expect(next).toHaveBeenCalled();
+    expect(req.body.duree).toBe(3);
   });
 
   it("validerUpdateCours autorise de retirer la salle de reference", async () => {
@@ -359,7 +384,7 @@ describe("validations cours", () => {
     await validerUpdateCours(req, res, next);
 
     expect(next).toHaveBeenCalled();
-    expect(req.body.type_salle).toBeNull();
+    expect(req.body.type_salle).toBe("En ligne");
     expect(req.body.id_salle_reference).toBeNull();
   });
 

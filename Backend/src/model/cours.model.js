@@ -18,6 +18,9 @@ import pool from "../../db.js";
 import { assurerProgrammeReference } from "./programmes.model.js";
 import { normaliserNomProgramme } from "../utils/programmes.js";
 
+export const DUREE_COURS_FIXE = 3;
+export const MODES_COURS = ["Presentiel", "En ligne"];
+
 /**
  * Normalise un code de cours en majuscules et sans espaces superflus.
  *
@@ -72,6 +75,11 @@ export async function recupererTousLesCours(executor = pool) {
             c.etape_etude,
             c.type_salle,
             c.id_salle_reference,
+            c.est_en_ligne,
+            CASE
+              WHEN c.est_en_ligne = 1 THEN 'En ligne'
+              ELSE 'Presentiel'
+            END AS mode_cours,
             s.code AS salle_code,
             s.type AS salle_type
      FROM cours c
@@ -101,6 +109,11 @@ export async function recupererCoursParId(idCours, executor = pool) {
             c.etape_etude,
             c.type_salle,
             c.id_salle_reference,
+            c.est_en_ligne,
+            CASE
+              WHEN c.est_en_ligne = 1 THEN 'En ligne'
+              ELSE 'Presentiel'
+            END AS mode_cours,
             s.code AS salle_code,
             s.type AS salle_type
      FROM cours c
@@ -153,6 +166,11 @@ export async function recupererCoursParCode(codeCours, executor = pool) {
             c.etape_etude,
             c.type_salle,
             c.id_salle_reference,
+            c.est_en_ligne,
+            CASE
+              WHEN c.est_en_ligne = 1 THEN 'En ligne'
+              ELSE 'Presentiel'
+            END AS mode_cours,
             s.code AS salle_code,
             s.type AS salle_type
      FROM cours c
@@ -186,18 +204,31 @@ export async function recupererCoursParCode(codeCours, executor = pool) {
  * @throws {Error} Si la salle de référence n'existe pas
  */
 export async function ajouterCours(nouveauCours, executor = pool) {
-  const { code, nom, duree, programme, etape_etude, id_salle_reference } =
-    nouveauCours;
-
-  // Valider que la salle existe avant d'insérer
-  const salleReference = await recupererSalleParId(id_salle_reference, executor);
+  const {
+    code,
+    nom,
+    programme,
+    etape_etude,
+    id_salle_reference,
+    est_en_ligne,
+  } = nouveauCours;
   const codeNormalise = normaliserCodeCours(code);
+  const coursEstEnLigne = Number(est_en_ligne) === 1;
 
   // Assurer l'existence du programme dans programmes_reference et récupérer son nom officiel
   const programmeNormalise = await assurerProgrammeReference(programme, executor);
+  let typeSalle = "En ligne";
+  let idSalleReference = null;
 
-  if (!salleReference) {
-    throw new Error("Salle de reference introuvable.");
+  if (!coursEstEnLigne) {
+    const salleReference = await recupererSalleParId(id_salle_reference, executor);
+
+    if (!salleReference) {
+      throw new Error("Salle de reference introuvable.");
+    }
+
+    typeSalle = salleReference.type;
+    idSalleReference = salleReference.id_salle;
   }
 
   const [resultatInsertion] = await executor.query(
@@ -208,18 +239,20 @@ export async function ajouterCours(nouveauCours, executor = pool) {
       programme,
       etape_etude,
       type_salle,
-      id_salle_reference
+      id_salle_reference,
+      est_en_ligne
     )
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       codeNormalise,
       String(nom || "").trim(),
-      duree,
+      DUREE_COURS_FIXE,
       // Priorité : nom officiel via programmes_reference, sinon normalisation locale
       programmeNormalise || normaliserNomProgramme(programme),
       String(etape_etude).trim(),
-      salleReference.type,        // type_salle déduit de la salle choisie
-      salleReference.id_salle,    // on stocke l'ID validé, pas celui reçu brut
+      typeSalle,
+      idSalleReference,
+      coursEstEnLigne ? 1 : 0,
     ]
   );
 
@@ -246,6 +279,7 @@ export async function modifierCours(idCours, donneesModification, executor = poo
   // Construction dynamique de la requête SQL selon les champs fournis
   const champsAModifier = [];
   const valeurs = [];
+  const coursEstEnLigne = Number(donneesModification.est_en_ligne) === 1;
 
   if (donneesModification.code !== undefined) {
     champsAModifier.push("code = ?");
@@ -259,7 +293,7 @@ export async function modifierCours(idCours, donneesModification, executor = poo
 
   if (donneesModification.duree !== undefined) {
     champsAModifier.push("duree = ?");
-    valeurs.push(donneesModification.duree);
+    valeurs.push(DUREE_COURS_FIXE);
   }
 
   if (donneesModification.programme !== undefined) {
@@ -279,7 +313,17 @@ export async function modifierCours(idCours, donneesModification, executor = poo
     valeurs.push(String(donneesModification.etape_etude).trim());
   }
 
-  if (donneesModification.id_salle_reference !== undefined) {
+  if (donneesModification.est_en_ligne !== undefined) {
+    champsAModifier.push("est_en_ligne = ?");
+    valeurs.push(coursEstEnLigne ? 1 : 0);
+  }
+
+  if (coursEstEnLigne) {
+    champsAModifier.push("id_salle_reference = ?");
+    valeurs.push(null);
+    champsAModifier.push("type_salle = ?");
+    valeurs.push("En ligne");
+  } else if (donneesModification.id_salle_reference !== undefined) {
     const salleReference = await recupererSalleParId(
       donneesModification.id_salle_reference,
       executor
@@ -293,6 +337,9 @@ export async function modifierCours(idCours, donneesModification, executor = poo
     valeurs.push(salleReference.id_salle);
     champsAModifier.push("type_salle = ?");
     valeurs.push(salleReference.type); // Synchroniser le type avec la nouvelle salle
+  } else if (donneesModification.type_salle !== undefined) {
+    champsAModifier.push("type_salle = ?");
+    valeurs.push(String(donneesModification.type_salle || "").trim());
   }
 
   // Si aucun champ n'a été fourni → retourner l'état actuel sans modifier

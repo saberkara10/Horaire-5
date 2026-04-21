@@ -21,7 +21,8 @@ import { recupererSalles } from "../services/salles.api.js";
 import "../styles/CrudPages.css";
 
 const ETAPES_DISPONIBLES = ["1", "2", "3", "4", "5", "6", "7", "8"];
-const DUREES_DISPONIBLES = ["1", "2", "3", "4"];
+const DUREE_COURS_FIXE = "3";
+const MODES_COURS_DISPONIBLES = ["Presentiel", "En ligne"];
 const IMPORT_COURS = recupererConfigurationImportExcel("cours");
 
 function formaterDureeHeures(duree) {
@@ -56,7 +57,8 @@ export function CoursPage({ utilisateur, onLogout }) {
   const [formulaire, setFormulaire] = useState({
     code: "",
     nom: "",
-    duree: "1",
+    duree: DUREE_COURS_FIXE,
+    mode_cours: "Presentiel",
     programme: "",
     etape_etude: "1",
     id_salle_reference: "",
@@ -111,6 +113,7 @@ export function CoursPage({ utilisateur, onLogout }) {
         String(element.code || "").toLowerCase().includes(terme) ||
         String(element.nom || "").toLowerCase().includes(terme) ||
         String(element.programme || "").toLowerCase().includes(terme) ||
+        String(element.mode_cours || "").toLowerCase().includes(terme) ||
         String(element.salle_code || "").toLowerCase().includes(terme) ||
         String(element.salle_type || "").toLowerCase().includes(terme) ||
         String(element.etape_etude || "").toLowerCase().includes(terme)
@@ -138,7 +141,10 @@ export function CoursPage({ utilisateur, onLogout }) {
       setFormulaire({
         code: coursAEditer.code || "",
         nom: coursAEditer.nom || "",
-        duree: String(coursAEditer.duree || "1"),
+        duree: DUREE_COURS_FIXE,
+        mode_cours:
+          coursAEditer.mode_cours ||
+          (Number(coursAEditer.est_en_ligne) === 1 ? "En ligne" : "Presentiel"),
         programme: coursAEditer.programme || "",
         etape_etude: String(coursAEditer.etape_etude || "1"),
         id_salle_reference: String(coursAEditer.id_salle_reference || ""),
@@ -147,7 +153,8 @@ export function CoursPage({ utilisateur, onLogout }) {
       setFormulaire({
         code: "",
         nom: "",
-        duree: "1",
+        duree: DUREE_COURS_FIXE,
+        mode_cours: "Presentiel",
         programme: "",
         etape_etude: "1",
         id_salle_reference: "",
@@ -164,7 +171,8 @@ export function CoursPage({ utilisateur, onLogout }) {
     setFormulaire({
       code: "",
       nom: "",
-      duree: "1",
+      duree: DUREE_COURS_FIXE,
+      mode_cours: "Presentiel",
       programme: "",
       etape_etude: "1",
       id_salle_reference: "",
@@ -180,7 +188,12 @@ export function CoursPage({ utilisateur, onLogout }) {
         ...formulaire,
         duree: Number(formulaire.duree),
         etape_etude: String(formulaire.etape_etude),
-        id_salle_reference: Number(formulaire.id_salle_reference),
+        id_salle_reference:
+          formulaire.mode_cours === "En ligne"
+            ? null
+            : formulaire.id_salle_reference
+            ? Number(formulaire.id_salle_reference)
+            : null,
       };
 
       if (edition) {
@@ -260,6 +273,7 @@ export function CoursPage({ utilisateur, onLogout }) {
                   <th>Code</th>
                   <th>Nom</th>
                   <th>Duree</th>
+                  <th>Mode</th>
                   <th>Programme</th>
                   <th>Etape</th>
                   <th>Salle de reference</th>
@@ -270,7 +284,7 @@ export function CoursPage({ utilisateur, onLogout }) {
               <tbody>
                 {coursFiltres.length === 0 ? (
                   <tr>
-                    <td colSpan="7" className="crud-page__empty">
+                    <td colSpan="8" className="crud-page__empty">
                       Aucun cours trouve.
                     </td>
                   </tr>
@@ -280,6 +294,12 @@ export function CoursPage({ utilisateur, onLogout }) {
                       <td>{element.code}</td>
                       <td>{element.nom}</td>
                       <td>{formaterDureeHeures(element.duree)}</td>
+                      <td>
+                        {element.mode_cours ||
+                          (Number(element.est_en_ligne) === 1
+                            ? "En ligne"
+                            : "Presentiel")}
+                      </td>
                       <td>{element.programme}</td>
                       <td>{element.etape_etude}</td>
                       <td>
@@ -374,18 +394,32 @@ export function CoursPage({ utilisateur, onLogout }) {
 
                 <label className="crud-page__field">
                   <span>Duree</span>
+                  <input
+                    type="text"
+                    value="3 heures"
+                    disabled
+                    readOnly
+                  />
+                </label>
+
+                <label className="crud-page__field">
+                  <span>Mode</span>
                   <select
-                    value={formulaire.duree}
+                    value={formulaire.mode_cours}
                     onChange={(event) =>
                       setFormulaire({
                         ...formulaire,
-                        duree: event.target.value,
+                        mode_cours: event.target.value,
+                        id_salle_reference:
+                          event.target.value === "En ligne"
+                            ? ""
+                            : formulaire.id_salle_reference,
                       })
                     }
                   >
-                    {DUREES_DISPONIBLES.map((duree) => (
-                      <option key={duree} value={duree}>
-                        {formaterDureeHeures(duree)}
+                    {MODES_COURS_DISPONIBLES.map((mode) => (
+                      <option key={mode} value={mode}>
+                        {mode}
                       </option>
                     ))}
                   </select>
@@ -431,31 +465,38 @@ export function CoursPage({ utilisateur, onLogout }) {
                   </select>
                 </label>
 
-                <label className="crud-page__field">
-                  <span>Salle de reference</span>
-                  <select
-                    value={formulaire.id_salle_reference}
-                    onChange={(event) =>
-                      setFormulaire({
-                        ...formulaire,
-                        id_salle_reference: event.target.value,
-                      })
-                    }
-                    required
-                    disabled={sallesDisponibles.length === 0}
-                  >
-                    <option value="">
-                      {sallesDisponibles.length === 0
-                        ? "Ajoutez d'abord une salle"
-                        : "Choisir une salle"}
-                    </option>
-                    {sallesDisponibles.map((salle) => (
-                      <option key={salle.id_salle} value={salle.id_salle}>
-                        {formaterSalle(salle)}
+                {formulaire.mode_cours === "Presentiel" ? (
+                  <label className="crud-page__field">
+                    <span>Salle de reference</span>
+                    <select
+                      value={formulaire.id_salle_reference}
+                      onChange={(event) =>
+                        setFormulaire({
+                          ...formulaire,
+                          id_salle_reference: event.target.value,
+                        })
+                      }
+                      required
+                      disabled={sallesDisponibles.length === 0}
+                    >
+                      <option value="">
+                        {sallesDisponibles.length === 0
+                          ? "Ajoutez d'abord une salle"
+                          : "Choisir une salle"}
                       </option>
-                    ))}
-                  </select>
-                </label>
+                      {sallesDisponibles.map((salle) => (
+                        <option key={salle.id_salle} value={salle.id_salle}>
+                          {formaterSalle(salle)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : (
+                  <label className="crud-page__field">
+                    <span>Salle de reference</span>
+                    <input type="text" value="Aucune salle requise" disabled readOnly />
+                  </label>
+                )}
 
                 {erreurFormulaire ? (
                   <div className="crud-page__alert crud-page__alert--error crud-page__form-feedback">

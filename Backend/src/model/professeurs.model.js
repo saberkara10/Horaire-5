@@ -29,6 +29,13 @@ import {
   normaliserDateIso,
 } from "../services/professeurs/availability-temporal.js";
 
+export const TYPES_ABSENCE_PROFESSEUR = [
+  "maladie",
+  "vacances",
+  "formation",
+  "autre",
+];
+
 function normaliserHeure(heure) {
   const valeur = String(heure || "").trim();
 
@@ -106,6 +113,24 @@ async function mettreAJourAbsencesProfesseur(idSource, idCible, executor = pool)
       throw error;
     }
   }
+}
+
+async function assurerTableAbsencesProfesseurs(executor = pool) {
+  await executor.query(
+    `CREATE TABLE IF NOT EXISTS absences_professeurs (
+      id_absence_professeur INT NOT NULL AUTO_INCREMENT,
+      id_professeur INT NOT NULL,
+      date_debut DATE NOT NULL,
+      date_fin DATE NOT NULL,
+      type_absence VARCHAR(80) NOT NULL,
+      motif TEXT NULL,
+      PRIMARY KEY (id_absence_professeur),
+      UNIQUE KEY uniq_absence_professeur_periode (id_professeur, date_debut, date_fin),
+      CONSTRAINT fk_absence_professeur
+        FOREIGN KEY (id_professeur) REFERENCES professeurs (id_professeur)
+        ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`
+  );
 }
 
 async function assurerTableDisponibilites(executor = pool) {
@@ -815,6 +840,25 @@ export async function recupererJournalDisponibilitesProfesseur(
   );
 }
 
+export async function recupererAbsencesProfesseur(idProfesseur, executor = pool) {
+  await assurerTableAbsencesProfesseurs(executor);
+
+  const [absences] = await executor.query(
+    `SELECT id_absence_professeur,
+            id_professeur,
+            DATE_FORMAT(date_debut, '%Y-%m-%d') AS date_debut,
+            DATE_FORMAT(date_fin, '%Y-%m-%d') AS date_fin,
+            type_absence,
+            motif
+     FROM absences_professeurs
+     WHERE id_professeur = ?
+     ORDER BY date_debut ASC, date_fin ASC, id_absence_professeur ASC`,
+    [idProfesseur]
+  );
+
+  return absences;
+}
+
 async function insererDisponibilitesProfesseurDansFenetre(
   executor,
   idProfesseur,
@@ -1091,6 +1135,66 @@ export async function remplacerDisponibilitesProfesseur(
   } finally {
     connection.release();
   }
+}
+
+async function remplacerAbsencesProfesseurAvecExecutor(
+  executor,
+  idProfesseur,
+  absences = []
+) {
+  await assurerTableAbsencesProfesseurs(executor);
+
+  await executor.query(
+    `DELETE FROM absences_professeurs
+     WHERE id_professeur = ?`,
+    [idProfesseur]
+  );
+
+  for (const absence of absences) {
+    await executor.query(
+      `INSERT INTO absences_professeurs (
+        id_professeur,
+        date_debut,
+        date_fin,
+        type_absence,
+        motif
+      )
+      VALUES (?, ?, ?, ?, ?)`,
+      [
+        idProfesseur,
+        normaliserDateIso(absence?.date_debut),
+        normaliserDateIso(absence?.date_fin),
+        String(absence?.type_absence || "").trim(),
+        normaliserTexteOptionnel(absence?.motif),
+      ]
+    );
+  }
+}
+
+export async function remplacerAbsencesProfesseur(
+  idProfesseur,
+  absences = [],
+  executor = pool
+) {
+  if (executor !== pool) {
+    await remplacerAbsencesProfesseurAvecExecutor(executor, idProfesseur, absences);
+    return recupererAbsencesProfesseur(idProfesseur, executor);
+  }
+
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+    await remplacerAbsencesProfesseurAvecExecutor(connection, idProfesseur, absences);
+    await connection.commit();
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+
+  return recupererAbsencesProfesseur(idProfesseur);
 }
 
 async function remplacerCoursProfesseurAvecExecutor(
@@ -1389,10 +1493,16 @@ export async function professeurEstDejaAffecte(idProfesseur) {
 
 export async function supprimerProfesseur(idProfesseur) {
   await assurerTableDisponibilites();
+  await assurerTableAbsencesProfesseurs();
   await assurerTableProfesseurCours();
 
   await pool.query(
     `DELETE FROM disponibilites_professeurs
+     WHERE id_professeur = ?`,
+    [idProfesseur]
+  );
+  await pool.query(
+    `DELETE FROM absences_professeurs
      WHERE id_professeur = ?`,
     [idProfesseur]
   );
