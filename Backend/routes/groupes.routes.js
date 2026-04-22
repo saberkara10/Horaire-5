@@ -115,7 +115,7 @@ export default function groupesRoutes(app) {
   // ══════════════════════════════════════════════════════════════════════════
   // GET /api/groupes  —  Liste des groupes avec détails
   // ══════════════════════════════════════════════════════════════════════════
-  app.get("/api/groupes", async (req, res) => {
+  app.get("/api/groupes", userAuth, userAdminOrResponsable, async (req, res) => {
     try {
       const details = req.query.details === "1";
       const groupes = await recupererGroupes(details, {
@@ -348,7 +348,7 @@ export default function groupesRoutes(app) {
   // ══════════════════════════════════════════════════════════════════════════
   // GET /api/groupes/:id/planning  —  Horaire du groupe
   // ══════════════════════════════════════════════════════════════════════════
-  app.get("/api/groupes/:id/planning", async (req, res) => {
+  app.get("/api/groupes/:id/planning", userAuth, userAdminOrResponsable, async (req, res) => {
     try {
       const idGroupe = Number(req.params.id);
       const modeOptimisation = lireModeOptimisation(req.body || {});

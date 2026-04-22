@@ -183,7 +183,7 @@ app.get("/api/test", (request, response) => {
  * @returns {string[]} 200 - Liste triée des programmes uniques
  * @returns {object}   500 - Message d'erreur en cas de problème SQL
  */
-app.get("/api/programmes", async (request, response) => {
+app.get("/api/programmes", userAuth, async (request, response) => {
   try {
     const [programmes] = await pool.query(
       `SELECT DISTINCT programme

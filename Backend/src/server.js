@@ -15,12 +15,18 @@
  */
 
 import app from "./app.js";
+import https from "node:https";
+import { readFile } from "node:fs/promises";
 
 // Lire le port depuis .env, sinon utiliser 3000 en fallback.
 // En production, ce sera généralement défini par l'hébergeur (ex: Heroku, Railway).
 const PORT = process.env.PORT || 3000;
 
-// Démarrer le serveur HTTP. Le callback confirme dans la console que tout est OK.
-app.listen(PORT, () => {
-  console.log(`Serveur démarré sur http://localhost:${PORT}`);
+const credentials = {
+  key: await readFile("./security/localhost.key"),
+  cert: await readFile("./security/localhost.cert"),
+};
+
+https.createServer(credentials, app).listen(PORT, () => {
+  console.log(`Serveur HTTPS lancé sur https://localhost:${PORT}`);
 });

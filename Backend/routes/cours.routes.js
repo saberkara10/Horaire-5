@@ -40,6 +40,7 @@ import {
   validerDeleteCours,
 } from "../src/validations/cours.validations.js";
 import { televerserFichierImportExcel } from "../src/validations/import-excel.validation.js";
+import { userAdminOrResponsable, userAuth } from "../middlewares/auth.js";
 
 /**
  * Initialise et enregistre les routes des cours sur l'application Express.
@@ -47,6 +48,8 @@ import { televerserFichierImportExcel } from "../src/validations/import-excel.va
  * @param {import("express").Express} app - L'instance de l'application Express
  */
 export default function coursRoutes(app) {
+  const accesCours = [userAuth, userAdminOrResponsable];
+
   /**
    * GET /api/cours
    * Liste complète de tous les cours avec détails de salle de référence.
@@ -54,7 +57,7 @@ export default function coursRoutes(app) {
    * @returns {object[]} 200 - Liste des cours triée par code
    * @returns {object}   500 - Erreur serveur
    */
-  app.get("/api/cours", async (request, response) => {
+  app.get("/api/cours", ...accesCours, async (request, response) => {
     try {
       const cours = await recupererTousLesCours();
       response.status(200).json(cours);
@@ -76,7 +79,7 @@ export default function coursRoutes(app) {
    * @returns {{ types_salle: string[] }} 200 - Types de salles disponibles
    * @returns {object}                   500 - Erreur serveur
    */
-  app.get("/api/cours/options", async (request, response) => {
+  app.get("/api/cours/options", ...accesCours, async (request, response) => {
     try {
       const typesSalleDisponibles = await recupererTypesSalleDisponibles();
       response.status(200).json({ types_salle: typesSalleDisponibles });
@@ -85,7 +88,7 @@ export default function coursRoutes(app) {
     }
   });
 
-  app.get("/api/cours/import/template", async (request, response) => {
+  app.get("/api/cours/import/template", ...accesCours, async (request, response) => {
     try {
       const modele = genererModeleImportExcel("cours");
       response.setHeader("Content-Type", modele.contentType);
@@ -104,6 +107,7 @@ export default function coursRoutes(app) {
 
   app.post(
     "/api/cours/import",
+    ...accesCours,
     televerserFichierImportExcel,
     async (request, response) => {
       try {
@@ -138,6 +142,7 @@ export default function coursRoutes(app) {
    */
   app.get(
     "/api/cours/:id",
+    ...accesCours,
     validerIdCours,
     verifierCoursExiste,
     async (request, response) => {
@@ -163,6 +168,7 @@ export default function coursRoutes(app) {
    */
   app.post(
     "/api/cours",
+    ...accesCours,
     validerCreateCours,
     async (request, response) => {
       try {
@@ -189,6 +195,7 @@ export default function coursRoutes(app) {
    */
   app.put(
     "/api/cours/:id",
+    ...accesCours,
     validerIdCours,
     verifierCoursExiste,
     validerUpdateCours,
@@ -221,6 +228,7 @@ export default function coursRoutes(app) {
    */
   app.delete(
     "/api/cours/:id",
+    ...accesCours,
     validerIdCours,
     verifierCoursExiste,
     validerDeleteCours,

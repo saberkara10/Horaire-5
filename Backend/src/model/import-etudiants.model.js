@@ -124,15 +124,24 @@ function extraireAnneeDepuisSession(valeur) {
   return match ? Number(match[1]) : null;
 }
 
-function normaliserCleSessionEtAnnee(session, annee = null) {
+function normaliserCleSessionEtAnnee(session, annee = null, dateReference = null) {
+  const date =
+    dateReference instanceof Date
+      ? dateReference
+      : dateReference
+        ? new Date(dateReference)
+        : null;
+
   return {
     annee:
       Number.isInteger(Number(annee)) && Number(annee) > 0
         ? Number(annee)
-        : extraireAnneeDepuisSession(session),
+        : date && !Number.isNaN(date.getTime())
+          ? date.getFullYear()
+          : extraireAnneeDepuisSession(session),
     session:
       normaliserNomSession(session) ||
-      devinerNomSession(session) ||
+      devinerNomSession(session, date) ||
       "",
   };
 }
@@ -513,7 +522,8 @@ async function resoudreIdSessionPourNom(
   const correspondances = sessions.filter((session) => {
     const cleSession = normaliserCleSessionEtAnnee(
       session.nom,
-      session.date_debut ? new Date(session.date_debut).getFullYear() : null
+      session.date_debut ? new Date(session.date_debut).getFullYear() : null,
+      session.date_debut
     );
 
     return cleSession.session === sessionNormalisee;

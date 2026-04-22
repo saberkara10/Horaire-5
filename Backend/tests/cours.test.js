@@ -30,6 +30,18 @@ const coursModelMock = {
 
 await jest.unstable_mockModule("../src/model/cours.model.js", () => coursModelMock);
 
+await jest.unstable_mockModule("../middlewares/auth.js", () => ({
+  userAuth: (request, _response, next) => {
+    request.user = { id: 1, roles: ["ADMIN"] };
+    next();
+  },
+  userNotAuth: (_request, _response, next) => next(),
+  userAdmin: (_request, _response, next) => next(),
+  userAdminResponsable: (_request, _response, next) => next(),
+  userResponsable: (_request, _response, next) => next(),
+  userAdminOrResponsable: (_request, _response, next) => next(),
+}));
+
 const { default: app } = await import("../src/app.js");
 
 describe("Tests routes Cours", () => {

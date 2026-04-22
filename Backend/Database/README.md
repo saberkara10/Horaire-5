@@ -17,7 +17,7 @@ Ce script :
 ## Compte par defaut
 
 - Email : `responsable@ecole.ca`
-- Mot de passe : `Resp123!`
+- Mot de passe : a definir localement dans `.env` via `INITIAL_RESPONSABLE_PASSWORD`
 - Role : `ADMIN_RESPONSABLE`
 
 ## Session par defaut

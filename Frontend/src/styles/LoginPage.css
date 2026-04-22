@@ -330,6 +330,8 @@ main.login-page .login-form__submit:disabled {
 }
 
 main.login-page .login-form__error {
+  display: grid;
+  gap: 0.45rem;
   margin: 0.1rem 0 0;
   padding: 0.95rem 1rem;
   border-radius: 16px;
@@ -338,6 +340,17 @@ main.login-page .login-form__error {
   color: #b91c1c;
   font-size: 0.95rem;
   font-weight: 600;
+}
+
+main.login-page .login-form__error p {
+  margin: 0;
+}
+
+main.login-page .login-form__error span {
+  display: block;
+  color: #7f1d1d;
+  font-size: 0.86rem;
+  font-weight: 700;
 }
 
 main.login-page .login-input input[type="password"]::-ms-reveal,

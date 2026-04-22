@@ -17,10 +17,20 @@ function estErreurSchema(error) {
 }
 
 (async () => {
-  const email = "responsable@ecole.ca".toLowerCase().trim();
-  const password = "Resp123!";
-
   try {
+    const email = (
+      process.env.INITIAL_RESPONSABLE_EMAIL || "responsable@ecole.ca"
+    )
+      .toLowerCase()
+      .trim();
+    const password = process.env.INITIAL_RESPONSABLE_PASSWORD;
+
+    if (!password || password.length < 8) {
+      throw new Error(
+        "INITIAL_RESPONSABLE_PASSWORD doit etre defini dans .env avec au moins 8 caracteres."
+      );
+    }
+
     const hash = await bcrypt.hash(password, 10);
 
     try {

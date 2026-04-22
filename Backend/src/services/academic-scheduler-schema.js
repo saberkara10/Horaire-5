@@ -40,14 +40,14 @@ async function ajouterColonneSiAbsente(executor, tableName, columnName, definiti
 
 async function recupererIndexes(executor, tableName) {
   const [rows] = await executor.query(
-    `SELECT index_name,
-            non_unique,
-            seq_in_index,
-            column_name
+    `SELECT INDEX_NAME AS index_name,
+            NON_UNIQUE AS non_unique,
+            SEQ_IN_INDEX AS seq_in_index,
+            COLUMN_NAME AS column_name
      FROM information_schema.statistics
      WHERE table_schema = DATABASE()
        AND table_name = ?
-     ORDER BY index_name ASC, seq_in_index ASC`,
+     ORDER BY INDEX_NAME ASC, SEQ_IN_INDEX ASC`,
     [tableName]
   );
 
@@ -56,7 +56,10 @@ async function recupererIndexes(executor, tableName) {
 
 async function indexExiste(executor, tableName, indexName) {
   const indexes = await recupererIndexes(executor, tableName);
-  return indexes.some((row) => String(row.index_name || "") === indexName);
+  const nomRecherche = String(indexName || "").toLowerCase();
+  return indexes.some(
+    (row) => String(row.index_name || "").toLowerCase() === nomRecherche
+  );
 }
 
 async function creerIndexSiAbsent(executor, tableName, indexName, sqlCreation) {

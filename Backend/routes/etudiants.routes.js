@@ -21,10 +21,13 @@ import {
   listerCoursCommunsEchangeables,
   previsualiserEchangeCoursEtudiants,
 } from "../src/services/etudiants/student-course-exchange.service.js";
+import { userAdminOrResponsable, userAuth } from "../middlewares/auth.js";
 
 export default function etudiantsRoutes(app) {
+  const accesEtudiants = [userAuth, userAdminOrResponsable];
+
   // Consultation globale des etudiants, avec filtre optionnel sur la session active.
-  app.get("/api/etudiants", async (request, response) => {
+  app.get("/api/etudiants", ...accesEtudiants, async (request, response) => {
     try {
       const etudiants = await recupererTousLesEtudiants({
         sessionActive: request.query.session_active === "1",
@@ -38,7 +41,7 @@ export default function etudiantsRoutes(app) {
   });
 
   // Etape 1 du flux d'echange : lister les cours communs potentiellement echangeables.
-  app.get("/api/etudiants/echange-cours/options", async (request, response) => {
+  app.get("/api/etudiants/echange-cours/options", ...accesEtudiants, async (request, response) => {
     try {
       const resultat = await listerCoursCommunsEchangeables(
         Number(request.query.etudiant_a),
@@ -56,7 +59,7 @@ export default function etudiantsRoutes(app) {
   });
 
   // Etape 2 du flux d'echange : construire le diagnostic avant toute ecriture.
-  app.get("/api/etudiants/echange-cours/preview", async (request, response) => {
+  app.get("/api/etudiants/echange-cours/preview", ...accesEtudiants, async (request, response) => {
     try {
       const resultat = await previsualiserEchangeCoursEtudiants({
         idEtudiantA: Number(request.query.etudiant_a),
@@ -75,7 +78,7 @@ export default function etudiantsRoutes(app) {
   });
 
   // Etape 3 du flux d'echange : persister l'echange transactionnel.
-  app.post("/api/etudiants/echange-cours", async (request, response) => {
+  app.post("/api/etudiants/echange-cours", ...accesEtudiants, async (request, response) => {
     try {
       const resultat = await executerEchangeCoursEtudiants({
         idEtudiantA: Number(request.body?.id_etudiant_a),
@@ -93,7 +96,7 @@ export default function etudiantsRoutes(app) {
     }
   });
 
-  app.get("/api/etudiants/:id", async (request, response) => {
+  app.get("/api/etudiants/:id", ...accesEtudiants, async (request, response) => {
     try {
       const etudiant = await recupererEtudiantParId(Number(request.params.id));
 
@@ -110,7 +113,7 @@ export default function etudiantsRoutes(app) {
   });
 
   // Vue aggregatee de l'horaire effectif, incluant reprises et exceptions individuelles.
-  app.get("/api/etudiants/:id/horaire", async (request, response) => {
+  app.get("/api/etudiants/:id/horaire", ...accesEtudiants, async (request, response) => {
     try {
       const resultat = await recupererHoraireCompletEtudiant(Number(request.params.id));
 
@@ -128,6 +131,7 @@ export default function etudiantsRoutes(app) {
 
   app.post(
     "/api/etudiants/import",
+    ...accesEtudiants,
     televerserFichierImportEtudiants,
     async (request, response) => {
       try {
@@ -148,7 +152,7 @@ export default function etudiantsRoutes(app) {
     }
   );
 
-  app.delete("/api/etudiants", async (request, response) => {
+  app.delete("/api/etudiants", ...accesEtudiants, async (request, response) => {
     try {
       await supprimerTousLesEtudiants();
       response.status(200).json({
