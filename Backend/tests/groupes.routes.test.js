@@ -23,6 +23,10 @@ const { default: groupesRoutes } = await import("../routes/groupes.routes.js");
 function creerAppTest() {
   const app = express();
   app.use(express.json());
+  app.use((request, _response, next) => {
+    request.user = { id: 1, roles: ["ADMIN"] };
+    next();
+  });
   groupesRoutes(app);
   return app;
 }

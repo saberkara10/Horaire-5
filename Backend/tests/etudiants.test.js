@@ -48,6 +48,10 @@ const { default: etudiantsRoutes } = await import("../routes/etudiants.routes.js
 function createApp() {
   const app = express();
   app.use(express.json());
+  app.use((request, _response, next) => {
+    request.user = { id: 1, roles: ["ADMIN"] };
+    next();
+  });
   etudiantsRoutes(app);
 
   app.use((error, request, response, next) => {

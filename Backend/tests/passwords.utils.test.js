@@ -50,18 +50,18 @@ describe("password utils", () => {
     );
   });
 
-  test("verifyPassword retombe sur la comparaison directe pour un mot de passe historique", async () => {
+  test("verifyPassword refuse un mot de passe historique en clair", async () => {
     compareMock.mockResolvedValue(false);
 
-    await expect(verifyPassword("legacy-pass", "legacy-pass")).resolves.toBe(true);
+    await expect(verifyPassword("legacy-pass", "legacy-pass")).resolves.toBe(false);
     await expect(verifyPassword("legacy-pass", "autre")).resolves.toBe(false);
+    expect(compareMock).not.toHaveBeenCalled();
   });
 
-  test("verifyPassword garde le fallback direct si bcrypt leve une exception", async () => {
+  test("verifyPassword retourne false si bcrypt leve une exception", async () => {
     compareMock.mockRejectedValue(new Error("invalid salt"));
 
-    await expect(verifyPassword("ancien", "ancien")).resolves.toBe(true);
-    await expect(verifyPassword("ancien", "different")).resolves.toBe(false);
+    await expect(verifyPassword("ancien", "$2b$10$abcdefghijklmnopqrstuuuuuuuuuuuuuuuuuuuuuuuu")).resolves.toBe(false);
   });
 
   test("hashPassword delegue a bcrypt avec un cout de 10", async () => {

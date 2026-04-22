@@ -23,6 +23,69 @@ import {
   replanifierAffectationManuelle,
 } from "../src/model/horaire.js";
 
+const CHAMPS_AFFECTATION_OBLIGATOIRES = [
+  "id_cours",
+  "id_professeur",
+  "id_salle",
+  "id_groupes_etudiants",
+  "date",
+  "heure_debut",
+  "heure_fin",
+];
+const FORMAT_HEURE = /^([01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/;
+
+function champEstVide(valeur) {
+  return (
+    valeur === undefined ||
+    valeur === null ||
+    (typeof valeur === "string" && valeur.trim() === "")
+  );
+}
+
+function heureVersMinutes(heure) {
+  const [heures, minutes] = String(heure).split(":");
+  return Number(heures) * 60 + Number(minutes);
+}
+
+function validerPayloadAffectation(body = {}) {
+  const champsManquants = CHAMPS_AFFECTATION_OBLIGATOIRES.filter((champ) =>
+    champEstVide(body[champ])
+  );
+
+  if (champsManquants.length > 0) {
+    return {
+      valide: false,
+      message: `Champs obligatoires manquants: ${champsManquants.join(", ")}.`,
+    };
+  }
+
+  if (!FORMAT_HEURE.test(String(body.heure_debut)) || !FORMAT_HEURE.test(String(body.heure_fin))) {
+    return {
+      valide: false,
+      message: "Format d'heure invalide. Utilisez HH:MM ou HH:MM:SS.",
+    };
+  }
+
+  const debutMinutes = heureVersMinutes(body.heure_debut);
+  const finMinutes = heureVersMinutes(body.heure_fin);
+
+  if (debutMinutes === finMinutes) {
+    return {
+      valide: false,
+      message: "La duree du creneau doit etre superieure a 0.",
+    };
+  }
+
+  if (finMinutes < debutMinutes) {
+    return {
+      valide: false,
+      message: "L'heure de fin doit etre apres l'heure de debut.",
+    };
+  }
+
+  return { valide: true };
+}
+
 /**
  * Initialiser les routes des horaires.
  *
@@ -31,18 +94,6 @@ import {
 export default function horaireRoutes(app) {
   const accesLectureHoraires = [userAuth, userAdminOrResponsable];
   const accesGestionHoraires = [userAuth, userAdmin];
-
-  function payloadAffectationValide(body = {}) {
-    return (
-      body.id_cours &&
-      body.id_professeur &&
-      body.id_salle &&
-      body.id_groupes_etudiants &&
-      body.date &&
-      body.heure_debut &&
-      body.heure_fin
-    );
-  }
 
   function dateGenerationValide(date) {
     return /^\d{4}-\d{2}-\d{2}$/.test(String(date || ""));
@@ -131,16 +182,10 @@ export default function horaireRoutes(app) {
         heure_fin,
       } = request.body;
 
-      if (
-        !id_cours ||
-        !id_professeur ||
-        !id_salle ||
-        !id_groupes_etudiants ||
-        !date ||
-        !heure_debut ||
-        !heure_fin
-      ) {
-        return response.status(400).json({ message: "Champs manquants." });
+      const validation = validerPayloadAffectation(request.body);
+
+      if (!validation.valide) {
+        return response.status(400).json({ message: validation.message });
       }
 
       const resultat = await planifierAffectationManuelle({
@@ -174,8 +219,10 @@ export default function horaireRoutes(app) {
           return response.status(400).json({ message: "Identifiant invalide." });
         }
 
-        if (!payloadAffectationValide(request.body)) {
-          return response.status(400).json({ message: "Champs manquants." });
+        const validation = validerPayloadAffectation(request.body);
+
+        if (!validation.valide) {
+          return response.status(400).json({ message: validation.message });
         }
 
         const resultat = await replanifierAffectationManuelle(

@@ -50,6 +50,19 @@ await jest.unstable_mockModule("../middlewares/auth.js", () => ({
 
 const { default: app } = await import("../src/app.js");
 
+function payloadHoraire(overrides = {}) {
+  return {
+    id_cours: 1,
+    id_professeur: 2,
+    id_salle: 3,
+    id_groupes_etudiants: 4,
+    date: "2026-03-23",
+    heure_debut: "08:00",
+    heure_fin: "10:00",
+    ...overrides,
+  };
+}
+
 describe("Tests routes Horaires", () => {
   let consoleErrorSpy;
 
@@ -189,7 +202,47 @@ describe("Tests routes Horaires", () => {
     });
 
     expect(response.statusCode).toBe(400);
-    expect(response.body).toEqual({ message: "Champs manquants." });
+    expect(response.body).toEqual({
+      message:
+        "Champs obligatoires manquants: id_salle, id_groupes_etudiants, date, heure_debut, heure_fin.",
+    });
+    expect(horaireModelMock.planifierAffectationManuelle).not.toHaveBeenCalled();
+  });
+
+  test("POST /api/horaires refuse un format d'heure invalide", async () => {
+    const response = await request(app)
+      .post("/api/horaires")
+      .send(payloadHoraire({ heure_debut: "8h00" }));
+
+    expect(response.statusCode).toBe(400);
+    expect(response.body).toEqual({
+      message: "Format d'heure invalide. Utilisez HH:MM ou HH:MM:SS.",
+    });
+    expect(horaireModelMock.planifierAffectationManuelle).not.toHaveBeenCalled();
+  });
+
+  test("POST /api/horaires refuse une heure de fin avant l'heure de debut", async () => {
+    const response = await request(app)
+      .post("/api/horaires")
+      .send(payloadHoraire({ heure_debut: "14:00", heure_fin: "10:00" }));
+
+    expect(response.statusCode).toBe(400);
+    expect(response.body).toEqual({
+      message: "L'heure de fin doit etre apres l'heure de debut.",
+    });
+    expect(horaireModelMock.planifierAffectationManuelle).not.toHaveBeenCalled();
+  });
+
+  test("POST /api/horaires refuse une duree zero", async () => {
+    const response = await request(app)
+      .post("/api/horaires")
+      .send(payloadHoraire({ heure_debut: "10:00", heure_fin: "10:00" }));
+
+    expect(response.statusCode).toBe(400);
+    expect(response.body).toEqual({
+      message: "La duree du creneau doit etre superieure a 0.",
+    });
+    expect(horaireModelMock.planifierAffectationManuelle).not.toHaveBeenCalled();
   });
 
   test("POST /api/horaires retourne 201 quand le creneau est valide", async () => {
@@ -323,7 +376,47 @@ describe("Tests routes Horaires", () => {
     });
 
     expect(response.statusCode).toBe(400);
-    expect(response.body).toEqual({ message: "Champs manquants." });
+    expect(response.body).toEqual({
+      message:
+        "Champs obligatoires manquants: id_professeur, id_salle, id_groupes_etudiants, date, heure_debut, heure_fin.",
+    });
+    expect(horaireModelMock.replanifierAffectationManuelle).not.toHaveBeenCalled();
+  });
+
+  test("PUT /api/horaires/:id refuse un format d'heure invalide", async () => {
+    const response = await request(app)
+      .put("/api/horaires/4")
+      .send(payloadHoraire({ heure_fin: "25:00" }));
+
+    expect(response.statusCode).toBe(400);
+    expect(response.body).toEqual({
+      message: "Format d'heure invalide. Utilisez HH:MM ou HH:MM:SS.",
+    });
+    expect(horaireModelMock.replanifierAffectationManuelle).not.toHaveBeenCalled();
+  });
+
+  test("PUT /api/horaires/:id refuse une heure de fin avant l'heure de debut", async () => {
+    const response = await request(app)
+      .put("/api/horaires/4")
+      .send(payloadHoraire({ heure_debut: "13:00", heure_fin: "11:00" }));
+
+    expect(response.statusCode).toBe(400);
+    expect(response.body).toEqual({
+      message: "L'heure de fin doit etre apres l'heure de debut.",
+    });
+    expect(horaireModelMock.replanifierAffectationManuelle).not.toHaveBeenCalled();
+  });
+
+  test("PUT /api/horaires/:id refuse une duree zero", async () => {
+    const response = await request(app)
+      .put("/api/horaires/4")
+      .send(payloadHoraire({ heure_debut: "11:00", heure_fin: "11:00" }));
+
+    expect(response.statusCode).toBe(400);
+    expect(response.body).toEqual({
+      message: "La duree du creneau doit etre superieure a 0.",
+    });
+    expect(horaireModelMock.replanifierAffectationManuelle).not.toHaveBeenCalled();
   });
 
   test("PUT /api/horaires/:id retourne 200 si mise a jour valide", async () => {

@@ -19,6 +19,7 @@
 
 import passport from "passport";
 import { userAuth, userNotAuth } from "../middlewares/auth.js";
+import { createLoginRateLimit } from "../middlewares/loginRateLimit.js";
 import {
   emailIsValid,
   passwordIsValid,
@@ -30,6 +31,8 @@ import {
  * @param {import("express").Express} app - L'instance de l'application Express
  */
 export default function authRoutes(app) {
+  const loginRateLimit = createLoginRateLimit();
+
   /**
    * POST /auth/login
    * Connexion d'un utilisateur avec email + mot de passe.
@@ -51,6 +54,7 @@ export default function authRoutes(app) {
     userNotAuth,
     emailIsValid,
     passwordIsValid,
+    loginRateLimit,
     (request, response, next) => {
       // Mode "callback" pour contrôler manuellement la réponse
       passport.authenticate("local", (error, user, info) => {
@@ -60,7 +64,23 @@ export default function authRoutes(app) {
 
         if (!user) {
           // Authentification échouée — info contient { error: "wrong_user" } ou "wrong_password"
-          return response.status(401).json(info);
+          const rateLimitInfo =
+            typeof loginRateLimit.enregistrerEchec === "function"
+              ? loginRateLimit.enregistrerEchec(request)
+              : null;
+
+          if (rateLimitInfo?.estBloque) {
+            return response.status(429).json({
+              message: "Trop de tentatives de connexion. Reessayez plus tard.",
+              tentatives_restantes: 0,
+              attente_secondes: rateLimitInfo.attente_secondes,
+            });
+          }
+
+          return response.status(401).json({
+            ...info,
+            tentatives_restantes: rateLimitInfo?.tentatives_restantes ?? null,
+          });
         }
 
         // Authentification réussie → créer la session (sérialise user.id dans le cookie)
@@ -70,6 +90,10 @@ export default function authRoutes(app) {
           }
 
           // 200 sans corps — le frontend appelera /auth/me pour récupérer les données utilisateur
+          if (typeof loginRateLimit.reinitialiser === "function") {
+            loginRateLimit.reinitialiser(request);
+          }
+
           return response.sendStatus(200);
         });
       })(request, response, next);
