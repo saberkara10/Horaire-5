@@ -263,6 +263,30 @@ export function CentreAidePage({ utilisateur, onLogout }) {
     ? filteredContent
     : helpCenter?.featured?.recommendedGuides || [];
 
+  const featuredVideos = useMemo(() => {
+    const sourceVideos = Array.isArray(helpCenter?.videos) ? helpCenter.videos : [];
+
+    if (sourceVideos.length === 0) {
+      return [];
+    }
+
+    const sortedVideos = sortContent(sourceVideos);
+    const readyVideos = sortedVideos.filter((video) => video.hasVideo);
+    const baseVideos = readyVideos.length > 0 ? readyVideos : sortedVideos.slice(0, 6);
+    const seenKeys = new Set();
+
+    return baseVideos.filter((video) => {
+      const uniqueKey = video.backendVideoId || video.streamUrl || video.id;
+
+      if (seenKeys.has(uniqueKey)) {
+        return false;
+      }
+
+      seenKeys.add(uniqueKey);
+      return true;
+    });
+  }, [helpCenter]);
+
   function scrollToSection(sectionId) {
     const refMap = {
       [SECTION_IDS.categories]: categoriesRef,
@@ -425,8 +449,8 @@ export function CentreAidePage({ utilisateur, onLogout }) {
                 <span>documents markdown</span>
               </article>
               <article className="centre-aide__metric-card">
-                <strong>{helpCenter?.summary?.videos || 0}</strong>
-                <span>capsules preparees</span>
+                <strong>{helpCenter?.summary?.videosReady || 0}</strong>
+                <span>capsules disponibles</span>
               </article>
               <article className="centre-aide__metric-card">
                 <strong>{helpCenter?.summary?.faqs || 0}</strong>
@@ -711,12 +735,12 @@ export function CentreAidePage({ utilisateur, onLogout }) {
             >
               <SectionHeader
                 eyebrow="Capsules video"
-                title="Une interface deja prete pour vos videos"
-                description="Les miniatures, etats de disponibilite et emplacements de lecture sont deja integres."
+                title="Tutoriels video disponibles dans le centre d'aide"
+                description="Les capsules actives couvrent deja les horaires, les disponibilites, la gestion des groupes, la generation et le pilotage de session."
               />
 
               <div className="centre-aide__video-grid">
-                {sortContent(helpCenter?.videos || []).slice(0, 6).map((video) => (
+                {featuredVideos.map((video) => (
                   <HelpVideoCard key={video.id} video={video} onOpen={handleOpenContent} />
                 ))}
               </div>

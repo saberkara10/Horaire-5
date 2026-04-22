@@ -67,7 +67,7 @@ function formatDuration(durationSeconds) {
     return `${minutes} min`;
   }
 
-  return `${minutes} min ${seconds} s`;
+  return `${minutes} min ${String(seconds).padStart(2, "0")} s`;
 }
 
 function parseKeywords(rawKeywords) {
