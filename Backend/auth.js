@@ -18,12 +18,17 @@
 
 import passport from "passport";
 import { Strategy } from "passport-local";
+import pool from "./db.js";
 import {
   findByEmail,
   findById,
   findRolesByUserId,
 } from "./src/model/utilisateur.js";
-import { verifyPassword } from "./src/utils/passwords.js";
+import {
+  hashPassword,
+  isBcryptHash,
+  verifyPassword,
+} from "./src/utils/passwords.js";
 
 // Configuration de la stratégie locale.
 // Par défaut, Passport cherche les champs "username" et "password" dans le body.
@@ -32,6 +37,51 @@ const config = {
   usernameField: "email",
   passwordField: "password",
 };
+
+function estErreurSchema(error) {
+  return (
+    error?.code === "ER_BAD_FIELD_ERROR" ||
+    error?.code === "ER_NO_SUCH_TABLE" ||
+    error?.code === "ER_BAD_TABLE_ERROR"
+  );
+}
+
+async function migrerMotDePasseLegacySiNecessaire(user, plainPassword) {
+  const storedPassword = user?.mot_de_passe_hash;
+
+  if (typeof storedPassword !== "string" || typeof plainPassword !== "string") {
+    return false;
+  }
+
+  if (isBcryptHash(storedPassword) || storedPassword !== plainPassword) {
+    return false;
+  }
+
+  const nouveauHash = await hashPassword(plainPassword);
+
+  try {
+    await pool.query(
+      `UPDATE utilisateurs
+       SET mot_de_passe_hash = ?
+       WHERE id = ?`,
+      [nouveauHash, user.id]
+    );
+  } catch (error) {
+    if (!estErreurSchema(error)) {
+      throw error;
+    }
+
+    await pool.query(
+      `UPDATE utilisateurs
+       SET motdepasse = ?
+       WHERE id_utilisateur = ?`,
+      [nouveauHash, user.id]
+    );
+  }
+
+  user.mot_de_passe_hash = nouveauHash;
+  return true;
+}
 
 /**
  * Stratégie d'authentification locale (email + mot de passe).
@@ -55,7 +105,11 @@ passport.use(new Strategy(config, async (email, password, done) => {
     }
 
     // Comparer le mot de passe fourni avec le hash stocké en base (bcrypt)
-    const isValid = await verifyPassword(password, user.mot_de_passe_hash);
+    let isValid = await verifyPassword(password, user.mot_de_passe_hash);
+
+    if (!isValid) {
+      isValid = await migrerMotDePasseLegacySiNecessaire(user, password);
+    }
 
     // Mot de passe incorrect → refus
     if (!isValid) {

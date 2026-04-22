@@ -9,7 +9,7 @@ function listerPidsWindows(port) {
       "if ($connections) {",
       "  $connections | Select-Object -ExpandProperty OwningProcess -Unique",
       "}",
-    ].join(" ");
+    ].join("; ");
     const resultat = execFileSync(
       "powershell.exe",
       ["-NoProfile", "-Command", script],

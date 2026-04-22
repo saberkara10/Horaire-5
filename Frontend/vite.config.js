@@ -4,7 +4,12 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const backendTarget = process.env.VITE_BACKEND_TARGET || "https://localhost:3000";
+const backendProtocol =
+  String(process.env.HTTPS_ENABLED || "false").toLowerCase() === "true"
+    ? "https"
+    : "http";
+const backendTarget =
+  process.env.VITE_BACKEND_TARGET || `${backendProtocol}://localhost:3000`;
 const backendProxy = {
   target: backendTarget,
   changeOrigin: true,
