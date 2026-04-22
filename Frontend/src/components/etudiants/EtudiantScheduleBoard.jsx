@@ -43,7 +43,7 @@ function getPresentationSource(seance) {
     return {
       badge: "Exception",
       badgeCourt: "EXCEPTION",
-      pillClass: "status-pill--busy",
+      pillClass: "status-pill--exception",
       description: `Groupe d'accueil : ${seance.groupe_source || "non renseigne"}`,
       classeSeance: "etudiant-schedule__seance--individuelle",
     };
@@ -168,7 +168,7 @@ export function EtudiantScheduleBoard({
       <div className="etudiant-schedule__legend">
         <span className="status-pill status-pill--success">Cours normal</span>
         <span className="status-pill status-pill--warning">Cours repris</span>
-        <span className="status-pill status-pill--busy">Exception individuelle</span>
+        <span className="status-pill status-pill--exception">Exception individuelle</span>
       </div>
 
       <div className="planning-table-wrapper">

@@ -196,13 +196,13 @@
 .cal-col-heures {
   width: 72px;
   flex-shrink: 0;
-  border-right: 1px solid rgba(217, 226, 221, 0.36);
+  border-right: 1px solid var(--schedule-grid-line-strong);
 }
 
 .cal-entete-vide,
 .cal-entete-jour {
   height: 56px;
-  border-bottom: 1px solid rgba(217, 226, 221, 0.36);
+  border-bottom: 1px solid var(--schedule-grid-line-strong);
 }
 
 .cal-entete-jour {
@@ -227,7 +227,7 @@
 .cal-heure-cell,
 .cal-slot {
   height: 60px;
-  border-bottom: 1px solid rgba(217, 226, 221, 0.22);
+  border-bottom: 1.5px solid var(--schedule-grid-line);
 }
 
 .cal-heure-cell {
@@ -236,12 +236,12 @@
   align-items: flex-start;
   padding-top: 0.35rem;
   font-size: 0.72rem;
-  color: var(--muted);
+  color: var(--muted-strong);
 }
 
 .cal-col-jour {
   flex: 1;
-  border-right: 1px solid rgba(217, 226, 221, 0.36);
+  border-right: 1px solid var(--schedule-grid-line-soft);
 }
 
 .cal-col-jour:last-child {

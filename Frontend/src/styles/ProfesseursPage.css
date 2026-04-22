@@ -202,13 +202,13 @@
 .professeurs-page__hours-column {
   width: 72px;
   flex-shrink: 0;
-  border-right: 1px solid rgba(217, 226, 221, 0.4);
+  border-right: 1px solid var(--schedule-grid-line-strong);
 }
 
 .professeurs-page__calendar-head-empty,
 .professeurs-page__calendar-head {
   height: 56px;
-  border-bottom: 1px solid rgba(217, 226, 221, 0.4);
+  border-bottom: 1px solid var(--schedule-grid-line-strong);
 }
 
 .professeurs-page__calendar-head {
@@ -233,7 +233,7 @@
 .professeurs-page__hour-cell,
 .professeurs-page__slot {
   height: 60px;
-  border-bottom: 1px solid rgba(217, 226, 221, 0.22);
+  border-bottom: 1.5px solid var(--schedule-grid-line);
 }
 
 .professeurs-page__hour-cell {
@@ -242,12 +242,12 @@
   align-items: flex-start;
   padding-top: 0.35rem;
   font-size: 0.72rem;
-  color: var(--muted);
+  color: var(--muted-strong);
 }
 
 .professeurs-page__day-column {
   flex: 1;
-  border-right: 1px solid rgba(217, 226, 221, 0.38);
+  border-right: 1px solid var(--schedule-grid-line-soft);
 }
 
 .professeurs-page__day-column:last-child {

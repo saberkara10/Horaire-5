@@ -254,6 +254,12 @@
   border-color: rgba(15, 138, 67, 0.32);
 }
 
+.status-pill--exception {
+  color: var(--exception-700);
+  background: rgba(239, 246, 255, 0.98);
+  border-color: var(--exception-border);
+}
+
 .status-pill--warning {
   background: rgba(255, 247, 237, 0.98);
   color: #b45309;
@@ -388,8 +394,8 @@
 }
 
 .schedule-preview__item--individuelle {
-  border-color: rgba(45, 212, 191, 0.35);
-  background: rgba(240, 253, 250, 0.94);
+  border-color: var(--exception-border);
+  background: rgba(239, 246, 255, 0.92);
 }
 
 .detail-card__reprise-header {
@@ -402,6 +408,11 @@
 
 .schedule-preview__item span {
   color: var(--muted);
+}
+
+.schedule-preview__item--individuelle strong,
+.schedule-preview__item--individuelle span {
+  color: var(--exception-700);
 }
 
 .schedule-preview__header {
@@ -433,6 +444,12 @@
   font-size: 0.8rem;
 }
 
+.cal-seance .etudiant-schedule__source {
+  margin-top: 0;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 0.72rem;
+}
+
 .etudiant-schedule__grid {
   min-width: 1320px;
 }
@@ -442,7 +459,7 @@
 }
 
 .etudiant-schedule__seance--individuelle {
-  background: linear-gradient(135deg, var(--primary-hover), var(--primary));
+  background: linear-gradient(135deg, var(--exception-600), var(--exception-500));
 }
 
 .etudiant-schedule__seance-badge {
@@ -575,16 +592,26 @@
 }
 
 .button--primary,
-.teacher-avatar,
-.etudiant-schedule__seance--individuelle {
+.teacher-avatar {
   background: linear-gradient(135deg, var(--brand), var(--brand-dark));
   box-shadow: 0 16px 28px rgba(16, 167, 96, 0.18);
+}
+
+.etudiant-schedule__seance--individuelle {
+  background: linear-gradient(135deg, var(--exception-600), var(--exception-500));
+  box-shadow: 0 16px 28px var(--exception-shadow);
 }
 
 .status-pill--busy {
   color: #405464;
   background: rgba(124, 144, 164, 0.12);
   border-color: rgba(124, 144, 164, 0.22);
+}
+
+.status-pill--exception {
+  color: var(--exception-700);
+  background: rgba(239, 246, 255, 0.98);
+  border-color: var(--exception-border);
 }
 
 .detail-card__callout--warning,

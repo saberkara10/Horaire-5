@@ -38,7 +38,8 @@ const EXCEL_WEEKLY_LINE_HEIGHT = 12;
  *
  * Regle metier explicite :
  * - orange reserve aux cours echoues / reprises
- * - tout le reste reste dans une base vert / blanc / noir
+ * - bleu reserve aux exceptions individuelles etudiantes
+ * - vert conserve la planification principale
  */
 const COLORS = {
   ink: "#111827",
@@ -57,6 +58,13 @@ const COLORS = {
   warning: "#EA580C",
   warningSoft: "#FFF1E6",
   warningBorder: "#F7B78A",
+  info: "#2563EB",
+  infoStrong: "#1D4ED8",
+  infoText: "#1E3A8A",
+  infoSoft: "#EFF6FF",
+  infoBorder: "#93C5FD",
+  scheduleGrid: "#95AAA0",
+  scheduleGridSoft: "#B8C7BF",
   white: "#FFFFFF",
 };
 
@@ -77,10 +85,10 @@ const BLOCK_PALETTES = {
     { fill: "#F3FBF5", stroke: "#2F855A", text: COLORS.text, accent: "#2F855A" },
   ],
   individuelle: {
-    fill: "#F4FBF6",
-    stroke: "#166534",
-    text: COLORS.text,
-    accent: "#166534",
+    fill: COLORS.infoSoft,
+    stroke: COLORS.info,
+    text: COLORS.infoText,
+    accent: COLORS.infoStrong,
   },
   reprise: {
     fill: COLORS.warningSoft,
@@ -1082,16 +1090,16 @@ function drawWeekGrid(doc, meta, weekStart, sessions) {
     doc
       .moveTo(x, top)
       .lineTo(x, top + height)
-      .strokeColor(COLORS.borderSoft)
-      .lineWidth(0.8)
+      .strokeColor(COLORS.scheduleGridSoft)
+      .lineWidth(0.9)
       .stroke();
   }
 
   doc
     .moveTo(left, gridBodyTop)
     .lineTo(right, gridBodyTop)
-    .strokeColor(COLORS.border)
-    .lineWidth(0.8)
+    .strokeColor(COLORS.scheduleGrid)
+    .lineWidth(1)
     .stroke();
 
   for (let labelMinutes = bounds.startMinutes; labelMinutes <= bounds.endMinutes; labelMinutes += 60) {
@@ -1101,8 +1109,8 @@ function drawWeekGrid(doc, meta, weekStart, sessions) {
     doc
       .moveTo(left, y)
       .lineTo(right, y)
-      .strokeColor(COLORS.borderSoft)
-      .lineWidth(isLast ? 0.8 : 0.5)
+      .strokeColor(COLORS.scheduleGrid)
+      .lineWidth(isLast ? 1 : 0.8)
       .stroke();
 
     if (!isLast) {
@@ -1112,8 +1120,8 @@ function drawWeekGrid(doc, meta, weekStart, sessions) {
           .moveTo(left + timeColumnWidth, halfHourY)
           .lineTo(right, halfHourY)
           .dash(1, { space: 2 })
-          .strokeColor(COLORS.borderSoft)
-          .lineWidth(0.4)
+          .strokeColor(COLORS.scheduleGridSoft)
+          .lineWidth(0.55)
           .stroke()
           .undash();
       }
@@ -1249,10 +1257,18 @@ function getPdfRowBackground(row, index) {
   }
 
   if (row.variant === "individuelle") {
-    return COLORS.brandSurface;
+    return BLOCK_PALETTES.individuelle.fill;
   }
 
   return index % 2 === 0 ? COLORS.white : COLORS.panelSoft;
+}
+
+function getPdfRowTextColor(row) {
+  if (row.variant === "individuelle") {
+    return COLORS.infoText;
+  }
+
+  return COLORS.text;
 }
 
 function preparePdfTableRow(doc, row, columns) {
@@ -1271,7 +1287,7 @@ function preparePdfTableRow(doc, row, columns) {
       ...column,
       font,
       fontSize,
-      color: column.color?.(row) || COLORS.text,
+      color: column.color?.(row) || getPdfRowTextColor(row),
       text: lines.join("\n"),
       lineCount: Math.max(lines.length, 1),
     };
@@ -1412,9 +1428,9 @@ function getExcelRowTheme(variant) {
 
   if (variant === "individuelle") {
     return {
-      fill: COLORS.brandSurface,
-      border: COLORS.border,
-      text: COLORS.text,
+      fill: COLORS.infoSoft,
+      border: COLORS.infoBorder,
+      text: COLORS.infoText,
     };
   }
 
@@ -1839,7 +1855,8 @@ function buildWorkbookSheet(workbook, options) {
     title,
     subtitle,
     columns.length,
-    legendText || "Vert = planification principale ; orange = reprise a traiter."
+    legendText ||
+      "Bleu = exception individuelle ; orange = reprise a traiter ; vert / blanc = groupe principal."
   );
 
   const headerRow = worksheet.getRow(EXCEL_DETAIL_HEADER_ROW);
@@ -2198,7 +2215,7 @@ function buildEtudiantPdfColumns() {
       value: (row) => row.title,
       maxLines: 2,
       emphasis: () => true,
-      color: (row) => (row.variant === "reprise" ? COLORS.warning : COLORS.text),
+      color: (row) => (row.variant === "reprise" ? COLORS.warning : undefined),
     },
     { label: "Type", ratio: 1.7, value: (row) => row.type, maxLines: 2 },
     { label: "Groupe", ratio: 2.3, value: (row) => row.trackedGroup, maxLines: 2 },
@@ -2266,7 +2283,7 @@ function buildEtudiantExcelColumns() {
       value: (row) => row.title,
       maxLines: 3,
       emphasis: () => true,
-      color: (row) => (row.variant === "reprise" ? COLORS.warning : COLORS.text),
+      color: (row) => (row.variant === "reprise" ? COLORS.warning : undefined),
     },
     { label: "Type", width: 20, value: (row) => row.type, maxLines: 2 },
     { label: "Reprise", width: 11, value: (row) => row.reprise, align: "center", maxLines: 1 },
@@ -2432,7 +2449,8 @@ export async function genererExcelEtudiant({
     columns: buildEtudiantExcelColumns(),
     rows: detailedRows,
     emptyMessage: "Aucune seance detaillee a afficher.",
-    legendText: "Orange = reprise a suivre. Le reste reste volontairement en vert / blanc / noir pour conserver une hierarchie claire.",
+    legendText:
+      "Bleu = exception individuelle ; orange = reprise a suivre ; vert / blanc = groupe principal.",
   });
 
   if (repriseRows.length > 0) {
