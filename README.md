@@ -1,6 +1,7 @@
 <div align="center">
 
 # HORAIRES-5
+### pour le readme principale se trouve sous le dossier document "README.md" ou vous pouvez tout trouvez sur le projet
 
 ### Plateforme intelligente de planification academique
 ## Gestion Des Horaires
