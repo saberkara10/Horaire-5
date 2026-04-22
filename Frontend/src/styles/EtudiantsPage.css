@@ -251,7 +251,7 @@
 .status-pill--busy {
   color: #0f4c81;
   background: rgba(224, 242, 254, 0.98);
-  border-color: rgba(15, 138, 67, 0.32);
+  border-color: rgba(59, 130, 246, 0.28);
 }
 
 .status-pill--warning {
@@ -388,8 +388,8 @@
 }
 
 .schedule-preview__item--individuelle {
-  border-color: rgba(45, 212, 191, 0.35);
-  background: rgba(240, 253, 250, 0.94);
+  border-color: rgba(96, 165, 250, 0.35);
+  background: rgba(239, 246, 255, 0.94);
 }
 
 .detail-card__reprise-header {
@@ -442,7 +442,7 @@
 }
 
 .etudiant-schedule__seance--individuelle {
-  background: linear-gradient(135deg, var(--primary-hover), var(--primary));
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
 }
 
 .etudiant-schedule__seance-badge {
