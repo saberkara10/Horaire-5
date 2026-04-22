@@ -1,0 +1,1 @@
+Backend/uploads/help/videos/*.mp4 filter=lfs diff=lfs merge=lfs -text
