@@ -1,13 +1,13 @@
--- =============================================================================
+
 -- Migration v14 - Integration des capsules video reelles du centre d'aide
--- =============================================================================
+
 --
 -- Objectif:
 --   - raccorder les fichiers video reels aux bons slugs help
 --   - enrichir les metadonnees des capsules principales
 --   - ajouter les entrees manquantes pour Generation, Pilotage session
 --     et Horaires etudiants
--- =============================================================================
+
 
 INSERT IGNORE INTO help_categories (
   name,
