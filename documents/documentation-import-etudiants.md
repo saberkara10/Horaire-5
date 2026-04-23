@@ -27,7 +27,8 @@ Dans la version cible du module, chaque ligne du fichier represente un etudiant.
 Les donnees importees servent a :
 
 - alimenter la liste des etudiants ;
-- rattacher chaque etudiant a un groupe ;
+- conserver la cohorte exacte de chaque etudiant (`programme`, `etape`, `session`, `annee`) ;
+- former automatiquement les groupes au moment de la generation ;
 - permettre plus tard la consultation et l'association avec l'horaire.
 
 ## 3. Formats de fichier acceptes
@@ -53,9 +54,10 @@ Le fichier doit contenir les colonnes suivantes :
 - `matricule`
 - `nom`
 - `prenom`
-- `groupe`
 - `programme`
 - `etape`
+- `session`
+- `annee`
 
 ### 4.2 Signification des colonnes
 
@@ -64,24 +66,26 @@ Le fichier doit contenir les colonnes suivantes :
 | `matricule` | Oui | Identifiant metier de l'etudiant | Doit etre unique |
 | `nom` | Oui | Nom de famille de l'etudiant | Non vide |
 | `prenom` | Oui | Prenom de l'etudiant | Non vide |
-| `groupe` | Oui | Groupe etudiant auquel appartient l'etudiant | Non vide |
 | `programme` | Oui | Programme ou filiere de l'etudiant | Non vide |
 | `etape` | Oui | Etape d'etude de l'etudiant | Entier de `1` a `8` |
+| `session` | Oui | Session academique de la cohorte | `Automne`, `Hiver`, `Printemps` ou `Ete` |
+| `annee` | Oui | Annee de la cohorte | Entier entre `2000` et `2100` |
 
 ### 4.3 Regles de nommage des colonnes
 
 Pour eviter toute ambiguite, les noms de colonnes attendus doivent etre exactement :
 
 ```text
-matricule,nom,prenom,groupe,programme,etape
+matricule,nom,prenom,programme,etape,session,annee
 ```
 
 Recommandations :
 
 - utiliser des noms simples en minuscules ;
 - ne pas ajouter d'espaces au debut ou a la fin des en-tetes ;
-- ne pas renommer `etape` en `niveau`, `session` ou `annee` ;
-- ne pas remplacer `groupe` par `classe` sans adaptation du backend.
+- ne pas renommer `etape` en `niveau` ;
+- ne pas ajouter la colonne `groupe` : elle n'est plus lue par le backend ;
+- conserver `session` et `annee` pour permettre une generation correcte par cohorte.
 
 ### 4.4 Ordre des colonnes
 
@@ -90,9 +94,10 @@ Ordre recommande :
 1. `matricule`
 2. `nom`
 3. `prenom`
-4. `groupe`
-5. `programme`
-6. `etape`
+4. `programme`
+5. `etape`
+6. `session`
+7. `annee`
 
 Le backend peut etre concu pour lire les colonnes par nom, mais pour limiter les erreurs humaines, cet ordre doit etre conserve dans la documentation utilisateur.
 
@@ -101,19 +106,19 @@ Le backend peut etre concu pour lire les colonnes par nom, mais pour limiter les
 ### 5.1 Exemple minimal en CSV
 
 ```csv
-matricule,nom,prenom,groupe,programme,etape
-2026001,Doe,Jane,A1,Informatique,1
-2026002,Dupont,Marc,A1,Informatique,1
-2026003,Ali,Sarah,B2,Reseaux,2
+matricule,nom,prenom,programme,etape,session,annee
+2026001,Doe,Jane,Informatique,1,Automne,2026
+2026002,Dupont,Marc,Informatique,1,Automne,2026
+2026003,Ali,Sarah,Reseaux,2,Hiver,2027
 ```
 
 ### 5.2 Representation equivalente dans Excel
 
-| matricule | nom | prenom | groupe | programme | etape |
-|--------|--------|--------|--------|--------|--------|
-| 2026001 | Doe | Jane | A1 | Informatique | 1 |
-| 2026002 | Dupont | Marc | A1 | Informatique | 1 |
-| 2026003 | Ali | Sarah | B2 | Reseaux | 2 |
+| matricule | nom | prenom | programme | etape | session | annee |
+|--------|--------|--------|--------|--------|--------|--------|
+| 2026001 | Doe | Jane | Informatique | 1 | Automne | 2026 |
+| 2026002 | Dupont | Marc | Informatique | 1 | Automne | 2026 |
+| 2026003 | Ali | Sarah | Reseaux | 2 | Hiver | 2027 |
 
 ### 5.3 Exemple de fichier invalide
 

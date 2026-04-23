@@ -15,6 +15,8 @@ import {
 } from "@jest/globals";
 
 const coursModelMock = {
+  DUREE_COURS_FIXE: 3,
+  MODES_COURS: ["Presentiel", "En ligne"],
   recupererTousLesCours: jest.fn(),
   recupererTypesSalleDisponibles: jest.fn(),
   recupererCoursParId: jest.fn(),
@@ -27,6 +29,18 @@ const coursModelMock = {
 };
 
 await jest.unstable_mockModule("../src/model/cours.model.js", () => coursModelMock);
+
+await jest.unstable_mockModule("../middlewares/auth.js", () => ({
+  userAuth: (request, _response, next) => {
+    request.user = { id: 1, roles: ["ADMIN"] };
+    next();
+  },
+  userNotAuth: (_request, _response, next) => next(),
+  userAdmin: (_request, _response, next) => next(),
+  userAdminResponsable: (_request, _response, next) => next(),
+  userResponsable: (_request, _response, next) => next(),
+  userAdminOrResponsable: (_request, _response, next) => next(),
+}));
 
 const { default: app } = await import("../src/app.js");
 
@@ -129,6 +143,7 @@ describe("Tests routes Cours", () => {
       code: "INF101",
       nom: "Cours Test",
       duree: 2,
+      mode_cours: "Presentiel",
       programme: "Programmation informatique",
       etape_etude: 1,
       id_salle_reference: 5,
@@ -144,7 +159,7 @@ describe("Tests routes Cours", () => {
       id_cours: 2,
       code: "TEST101",
       nom: "Cours Test",
-      duree: 2,
+      duree: 3,
       programme: "Programmation informatique",
       etape_etude: 1,
       id_salle_reference: 5,
@@ -156,6 +171,7 @@ describe("Tests routes Cours", () => {
       code: "TEST101",
       nom: "Cours Test",
       duree: 2,
+      mode_cours: "Presentiel",
       programme: "Programmation informatique",
       etape_etude: 1,
       id_salle_reference: 5,
@@ -163,6 +179,9 @@ describe("Tests routes Cours", () => {
 
     expect(response.statusCode).toBe(201);
     expect(response.body.code).toBe("TEST101");
+    expect(coursModelMock.ajouterCours).toHaveBeenCalledWith(
+      expect.objectContaining({ duree: 3 })
+    );
   });
 
   test("POST /api/cours retourne 400 si salle de reference absente", async () => {
@@ -170,6 +189,7 @@ describe("Tests routes Cours", () => {
       code: "TEST101",
       nom: "Cours Test",
       duree: 2,
+      mode_cours: "Presentiel",
       programme: "Programmation informatique",
       etape_etude: 1,
     });
@@ -186,6 +206,7 @@ describe("Tests routes Cours", () => {
       code: "TEST101",
       nom: "Cours Test",
       duree: 2,
+      mode_cours: "Presentiel",
       programme: "Programmation informatique",
       etape_etude: 1,
       id_salle_reference: 5,
@@ -219,8 +240,10 @@ describe("Tests routes Cours", () => {
       code: "INF101",
       nom: "Programmation",
       duree: 2,
+      mode_cours: "Presentiel",
       programme: "Programmation informatique",
       etape_etude: 1,
+      type_salle: "Laboratoire",
       id_salle_reference: 3,
     });
 
@@ -235,8 +258,10 @@ describe("Tests routes Cours", () => {
       code: "INF101",
       nom: "Programmation",
       duree: 2,
+      mode_cours: "Presentiel",
       programme: "Programmation informatique",
       etape_etude: 1,
+      type_salle: "Laboratoire",
       id_salle_reference: 3,
     });
     coursModelMock.recupererCoursParCode.mockResolvedValue(null);
@@ -252,6 +277,10 @@ describe("Tests routes Cours", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.body.nom).toBe("Cours Modifie");
+    expect(coursModelMock.modifierCours).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({ duree: 3 })
+    );
   });
 
   test("PUT /api/cours/:id retourne 500 si erreur serveur", async () => {
@@ -260,8 +289,10 @@ describe("Tests routes Cours", () => {
       code: "INF101",
       nom: "Programmation",
       duree: 2,
+      mode_cours: "Presentiel",
       programme: "Programmation informatique",
       etape_etude: 1,
+      type_salle: "Laboratoire",
       id_salle_reference: 3,
     });
     coursModelMock.recupererCoursParCode.mockResolvedValue(null);

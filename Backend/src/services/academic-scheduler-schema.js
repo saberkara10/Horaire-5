@@ -40,14 +40,14 @@ async function ajouterColonneSiAbsente(executor, tableName, columnName, definiti
 
 async function recupererIndexes(executor, tableName) {
   const [rows] = await executor.query(
-    `SELECT index_name,
-            non_unique,
-            seq_in_index,
-            column_name
+    `SELECT INDEX_NAME AS index_name,
+            NON_UNIQUE AS non_unique,
+            SEQ_IN_INDEX AS seq_in_index,
+            COLUMN_NAME AS column_name
      FROM information_schema.statistics
      WHERE table_schema = DATABASE()
        AND table_name = ?
-     ORDER BY index_name ASC, seq_in_index ASC`,
+     ORDER BY INDEX_NAME ASC, SEQ_IN_INDEX ASC`,
     [tableName]
   );
 
@@ -56,7 +56,10 @@ async function recupererIndexes(executor, tableName) {
 
 async function indexExiste(executor, tableName, indexName) {
   const indexes = await recupererIndexes(executor, tableName);
-  return indexes.some((row) => String(row.index_name || "") === indexName);
+  const nomRecherche = String(indexName || "").toLowerCase();
+  return indexes.some(
+    (row) => String(row.index_name || "").toLowerCase() === nomRecherche
+  );
 }
 
 async function creerIndexSiAbsent(executor, tableName, indexName, sqlCreation) {
@@ -119,6 +122,33 @@ async function trouverIndexUniqueNomGroupeGlobal(executor) {
   }
 
   return null;
+}
+
+async function assurerSessionScopeGroupesEtudiants(executor) {
+  await ajouterColonneSiAbsente(
+    executor,
+    "groupes_etudiants",
+    "id_session",
+    "INT NULL AFTER etape"
+  );
+
+  await creerIndexSiAbsent(
+    executor,
+    "groupes_etudiants",
+    "idx_groupes_id_session",
+    `CREATE INDEX idx_groupes_id_session
+     ON groupes_etudiants (id_session)`
+  );
+
+  await creerContrainteSiAbsente(
+    executor,
+    "groupes_etudiants",
+    "fk_groupes_session",
+    `ALTER TABLE groupes_etudiants
+     ADD CONSTRAINT fk_groupes_session
+     FOREIGN KEY (id_session) REFERENCES sessions (id_session)
+     ON DELETE SET NULL`
+  );
 }
 
 async function assurerIndexGroupesParSession(executor) {
@@ -398,6 +428,7 @@ async function assurerJournalModificationsAffectationsScheduler(executor) {
 }
 
 async function assurerSchema(executor) {
+  await assurerSessionScopeGroupesEtudiants(executor);
   await assurerTableAffectationEtudiants(executor);
   await assurerEchangesCoursEtudiants(executor);
   await assurerCoursEchouesEvolution(executor);

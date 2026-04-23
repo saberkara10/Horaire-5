@@ -9,6 +9,10 @@ export const IMPORT_EXCEL_MODULES = {
   professeurs: {
     moduleKey: "professeurs",
     moduleLabel: "Professeurs",
+    afficherDescription: false,
+    afficherMeta: false,
+    afficherDescriptionsColonnes: false,
+    afficherNotes: false,
     description:
       "Importez ou mettez a jour les professeurs sans quitter cette page. Les lignes valides sont enregistrees et les lignes en erreur sont detaillees.",
     columns: [
@@ -50,6 +54,10 @@ export const IMPORT_EXCEL_MODULES = {
   salles: {
     moduleKey: "salles",
     moduleLabel: "Salles",
+    afficherDescription: false,
+    afficherMeta: false,
+    afficherDescriptionsColonnes: false,
+    afficherNotes: false,
     description:
       "Importez les salles directement dans le module existant. Le systeme cree ou met a jour les salles a partir de leur code.",
     columns: [
@@ -78,6 +86,10 @@ export const IMPORT_EXCEL_MODULES = {
   cours: {
     moduleKey: "cours",
     moduleLabel: "Cours",
+    afficherDescription: false,
+    afficherMeta: false,
+    afficherDescriptionsColonnes: false,
+    afficherNotes: false,
     description:
       "Importez ou mettez a jour les cours depuis Excel. Les cours references restent ensuite modifiables depuis le formulaire manuel actuel.",
     columns: [
@@ -93,8 +105,8 @@ export const IMPORT_EXCEL_MODULES = {
       },
       {
         key: "duree",
-        required: true,
-        description: "Valeur entiere de 1 a 4 pour rester compatible avec l'UI.",
+        required: false,
+        description: "Valeur fixe a 3 heures. Toute autre valeur est ignoree.",
       },
       {
         key: "programme",

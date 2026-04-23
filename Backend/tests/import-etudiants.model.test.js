@@ -522,6 +522,39 @@ describe("model import-etudiants", () => {
     ]);
   });
 
+  test("reconnait une session generique grace a sa date de debut", async () => {
+    const connexion = creerConnexionImport({
+      sessionsDisponibles: [
+        {
+          id_session: 1,
+          nom: "Session initiale",
+          date_debut: "2026-08-25",
+          active: 1,
+        },
+      ],
+    });
+    getConnectionMock.mockResolvedValue(connexion);
+
+    const resultat = await enregistrerEtudiantsImportes([
+      {
+        numeroLigne: 2,
+        matricule: "INF9001",
+        nom: "Roy",
+        prenom: "Nadia",
+        programme: "Programmation informatique",
+        etape: 1,
+        session: "Automne",
+      },
+    ]);
+
+    expect(resultat).toMatchObject({
+      nombreImportes: 1,
+      nombreEtudiantsIgnores: 0,
+      nombreCohortesIgnorees: 0,
+    });
+    expect(connexion.groupesCrees[0].id_session).toBe(1);
+  });
+
   test("met a jour les etudiants existants et importe leurs cours echoues sans bloquer sur le matricule", async () => {
     const connexion = creerConnexionImport({
       etudiantsExistants: [

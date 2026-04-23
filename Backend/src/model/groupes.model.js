@@ -235,6 +235,10 @@ export async function recupererHoraireGroupe(idGroupe) {
        c.id_cours,
        c.code AS code_cours,
        c.nom AS nom_cours,
+       CASE
+         WHEN COALESCE(c.est_en_ligne, 0) = 1 THEN 'En ligne'
+         ELSE 'Presentiel'
+       END AS mode_cours,
        p.id_professeur,
        p.nom AS nom_professeur,
        p.prenom AS prenom_professeur,

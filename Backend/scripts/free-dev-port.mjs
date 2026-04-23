@@ -1,4 +1,4 @@
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import process from "node:process";
 
 function lirePort() {
@@ -6,47 +6,43 @@ function lirePort() {
   return Number.isInteger(valeur) && valeur > 0 ? valeur : 3000;
 }
 
-function executerSilencieusement(commande) {
+function listerPidsWindows(port) {
   try {
-    return execSync(commande, {
-      stdio: ["ignore", "pipe", "ignore"],
-      encoding: "utf8",
-    });
+    const script = [
+      `$connections = Get-NetTCPConnection -LocalPort ${port} -State Listen -ErrorAction SilentlyContinue`,
+      "if ($connections) {",
+      "  $connections | Select-Object -ExpandProperty OwningProcess -Unique",
+      "}",
+    ].join("; ");
+    const resultat = execFileSync(
+      "powershell.exe",
+      ["-NoProfile", "-Command", script],
+      { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }
+    );
+
+    return resultat
+      .split(/\r?\n/)
+      .map((ligne) => Number(String(ligne).trim()))
+      .filter((pid) => Number.isInteger(pid) && pid > 0 && pid !== process.pid);
   } catch {
-    return "";
+    return [];
   }
 }
 
-function recupererPidsWindows(port) {
-  const sortie = executerSilencieusement(`netstat -ano -p tcp | findstr :${port}`);
-  const lignes = sortie
-    .split(/\r?\n/)
-    .map((ligne) => ligne.trim())
-    .filter(Boolean);
+function listerPidsUnix(port) {
+  try {
+    const resultat = execFileSync("lsof", ["-ti", `tcp:${port}`], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    });
 
-  const pids = new Set();
-
-  for (const ligne of lignes) {
-    const segments = ligne.split(/\s+/);
-    const etat = segments[3];
-    const pid = Number(segments[4]);
-
-    if (etat !== "LISTENING" || !Number.isInteger(pid) || pid <= 0) {
-      continue;
-    }
-
-    pids.add(pid);
+    return resultat
+      .split(/\r?\n/)
+      .map((ligne) => Number(String(ligne).trim()))
+      .filter((pid) => Number.isInteger(pid) && pid > 0 && pid !== process.pid);
+  } catch {
+    return [];
   }
-
-  return [...pids];
-}
-
-function recupererPidsUnix(port) {
-  const sortie = executerSilencieusement(`lsof -ti tcp:${port}`);
-  return sortie
-    .split(/\r?\n/)
-    .map((ligne) => Number(ligne.trim()))
-    .filter((pid) => Number.isInteger(pid) && pid > 0);
 }
 
 function tuerPid(pid) {
@@ -55,22 +51,13 @@ function tuerPid(pid) {
   }
 
   try {
+    if (process.platform === "win32") {
+      execFileSync("taskkill", ["/PID", String(pid), "/T", "/F"], {
+        stdio: ["ignore", "ignore", "ignore"],
+      });
+      return true;
+    }
     process.kill(pid, "SIGTERM");
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function tuerPidWindows(pid) {
-  if (!Number.isInteger(pid) || pid <= 0 || pid === process.pid) {
-    return false;
-  }
-
-  try {
-    execSync(`taskkill /PID ${pid} /F`, {
-      stdio: ["ignore", "ignore", "ignore"],
-    });
     return true;
   } catch {
     return false;
@@ -79,9 +66,10 @@ function tuerPidWindows(pid) {
 
 const port = lirePort();
 const pids =
-  process.platform === "win32" ? recupererPidsWindows(port) : recupererPidsUnix(port);
-const tueur = process.platform === "win32" ? tuerPidWindows : tuerPid;
-const pidsTues = pids.filter((pid) => tueur(pid));
+  process.platform === "win32"
+    ? listerPidsWindows(port)
+    : listerPidsUnix(port);
+const pidsTues = pids.filter((pid) => tuerPid(pid));
 
 if (pidsTues.length > 0) {
   console.log(

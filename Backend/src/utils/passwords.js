@@ -1,14 +1,8 @@
 /**
- * Utilitaires pour la gestion des mots de passe.
+ * Utilitaires pour la gestion securisee des mots de passe.
  *
- * Ce module gère le hachage et la vérification des mots de passe
- * en utilisant bcrypt, l'algorithme standard et recommandé pour
- * cette tâche (résistant aux attaques par force brute).
- *
- * Note sur la compatibilité historique :
- * Le projet a vécu une migration depuis un ancien système qui stockait
- * les mots de passe en clair (plaintext). La fonction verifyPassword
- * gère les deux cas pour ne pas bloquer les anciens comptes.
+ * Les mots de passe stockes doivent toujours etre des hashes bcrypt. Aucune
+ * comparaison directe avec une valeur en clair stockee en base n'est autorisee.
  *
  * @module utils/passwords
  */
@@ -16,78 +10,53 @@
 import bcrypt from "bcrypt";
 
 /**
- * Expression régulière qui reconnaît les hashes bcrypt valides.
- *
- * Un hash bcrypt commence toujours par "$2a$", "$2b$" ou "$2y$" suivi
- * du facteur de coût (ex: $10$), puis du salt et du hash lui-même.
- * Ce pattern permet de détecter si un mot de passe est déjà haché
- * ou s'il est stocké en clair (anciens comptes).
+ * Un hash bcrypt commence par "$2a$", "$2b$" ou "$2y$", suivi du cout.
  *
  * @type {RegExp}
  */
 const BCRYPT_HASH_PATTERN = /^\$2[aby]\$\d{2}\$/;
 
 /**
- * Vérifie si une chaîne est un hash bcrypt valide.
+ * Verifie si une valeur ressemble a un hash bcrypt.
  *
- * Utilisée pour distinguer les mots de passe hachés des mots de passe
- * en clair lors de la migration des anciens comptes.
- *
- * @param {*} value - La valeur à vérifier (n'importe quel type)
- * @returns {boolean} true si la valeur ressemble à un hash bcrypt, false sinon
+ * @param {*} value - Valeur a verifier.
+ * @returns {boolean} true si la valeur est un hash bcrypt, false sinon.
  */
 export function isBcryptHash(value) {
   return typeof value === "string" && BCRYPT_HASH_PATTERN.test(value);
 }
 
 /**
- * Vérifie qu'un mot de passe en clair correspond au mot de passe stocké.
+ * Verifie qu'un mot de passe correspond au hash stocke.
  *
- * Gère deux scénarios :
- *  1. Mot de passe correctement haché (bcrypt) → on utilise bcrypt.compare()
- *  2. Ancien mot de passe en clair (comptes migrés) → comparaison directe
+ * Si la valeur stockee n'est pas un hash bcrypt valide, l'authentification est
+ * refusee. Cela empeche les anciens mots de passe en clair de fonctionner.
  *
- * En cas d'erreur bcrypt (ex: chaîne corrompue), on bascule sur la comparaison
- * directe pour ne pas bloquer des utilisateurs sur des anciens comptes.
- *
- * TODO: Forcer la migration de tous les comptes en clair, puis supprimer
- *       la comparaison directe. Ce chemin de code est une dette technique.
- *
- * @param {string} plainPassword - Le mot de passe en clair soumis par l'utilisateur
- * @param {string} storedPassword - Le mot de passe stocké en base (haché ou en clair)
- * @returns {Promise<boolean>} true si les mots de passe correspondent
+ * @param {string} plainPassword - Mot de passe soumis par l'utilisateur.
+ * @param {string} storedPassword - Hash bcrypt stocke en base.
+ * @returns {Promise<boolean>} true si le mot de passe correspond.
  */
 export async function verifyPassword(plainPassword, storedPassword) {
-  // Refuser immédiatement si les types ne sont pas corrects
   if (typeof plainPassword !== "string" || typeof storedPassword !== "string") {
     return false;
   }
 
-  try {
-    const hashMatch = await bcrypt.compare(plainPassword, storedPassword);
-    // Si bcrypt.compare() a fonctionné (sans erreur), on retourne son résultat
-    if (hashMatch || isBcryptHash(storedPassword)) {
-      return hashMatch;
-    }
-  } catch {
-    // bcrypt a planté — probablement parce que storedPassword n'est pas un hash valide.
-    // C'est le cas pour les anciens comptes migrés qui avaient le mot de passe en clair.
+  if (!isBcryptHash(storedPassword)) {
+    return false;
   }
 
-  // Fallback : comparaison directe pour les comptes historiques non migrés.
-  // À supprimer dès que tous les comptes sont migrés vers bcrypt.
-  return plainPassword === storedPassword;
+  try {
+    return await bcrypt.compare(plainPassword, storedPassword);
+  } catch {
+    return false;
+  }
 }
 
 /**
- * Hache un mot de passe en utilisant bcrypt avec un facteur de coût de 10.
+ * Hache un mot de passe avec bcrypt.
  *
- * Le facteur 10 signifie que bcrypt applique 2^10 = 1024 itérations de hachage,
- * ce qui prend environ 100ms sur un serveur standard. C'est suffisant pour
- * ralentir les attaques par force brute sans pénaliser l'expérience utilisateur.
- *
- * @param {string} password - Le mot de passe en clair à hacher
- * @returns {Promise<string>} Le hash bcrypt (chaîne de 60 caractères)
+ * @param {string} password - Mot de passe a hacher.
+ * @returns {Promise<string>} Hash bcrypt.
  */
 export async function hashPassword(password) {
   return bcrypt.hash(password, 10);

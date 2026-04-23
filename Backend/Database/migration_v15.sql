@@ -1,12 +1,11 @@
--- =============================================================================
+
 -- Migration v15 - Capsule sur la planification des cours echoues
--- =============================================================================
 --
 -- Objectif:
 --   - ajouter la capsule video expliquant le systeme de planification
 --     des cours echoues
 --   - fournir les metadonnees et la duree exactes
--- =============================================================================
+
 
 INSERT INTO help_videos (
   id_category,

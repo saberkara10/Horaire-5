@@ -35,23 +35,21 @@ CORS_ORIGIN=http://localhost:5173
 
 ## 4. Base de donnees
 
-Le mecanisme officiel est maintenant le moteur central de migrations.
+Pour un nouveau testeur, il faut importer directement le fichier :
 
-Depuis la racine du projet :
+`Backend/Database/GDH5.sql`
+
+Exemple :
 
 ```bash
-npm run migrate
+mysql -u root -p < Backend/Database/GDH5.sql
 ```
 
-Cette commande :
+Ce fichier :
 
-- cree la base si elle n'existe pas
-- cree la table `migrations`
-- detecte les versions deja appliquees
-- applique uniquement les migrations manquantes dans le bon ordre
-
-`Backend/Database/GDH5.sql` reste un snapshot historique, mais ce n'est plus
-la procedure normale d'installation.
+- cree la base `gdh5`
+- installe le schema complet attendu par le projet
+- ajoute les donnees initiales utiles pour tester
 
 ## 5. Lancer le projet
 
@@ -78,4 +76,4 @@ du cadre local.
 
 - Verifier que MySQL est demarre.
 - Verifier `Backend/.env`.
-- Relancer `npm run migrate` apres toute nouvelle migration versionnee.
+- Le dossier `Backend/Database` est simplifie pour une installation neuve.

@@ -7,6 +7,7 @@
 import { useEffect, useState } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { LoginPage } from "./pages/LoginPage.jsx";
+import { LoginHelpPage } from "./pages/LoginHelpPage.jsx";
 import { DashboardPage } from "./pages/DashboardPage.jsx";
 import { CoursPage } from "./pages/CoursPage.jsx";
 import { ProfesseursPage } from "./pages/ProfesseursPage.jsx";
@@ -18,6 +19,7 @@ import {
   logoutUtilisateur,
   recupererUtilisateurConnecte,
 } from "./services/auth.api.js";
+import { SESSION_EXPIREE_EVENT } from "./services/api.js";
 import { AffectationsPage } from "./pages/AffectationsPage.jsx";
 import { HorairesProfesseursPage } from "./pages/HorairesProfesseursPage.jsx";
 import { HorairesGroupesPage } from "./pages/HorairesGroupesPage.jsx";
@@ -47,6 +49,19 @@ export default function App() {
     }
 
     verifierSession();
+  }, []);
+
+  useEffect(() => {
+    function handleSessionExpiree() {
+      setUtilisateur(null);
+      setVerificationSession(false);
+    }
+
+    window.addEventListener(SESSION_EXPIREE_EVENT, handleSessionExpiree);
+
+    return () => {
+      window.removeEventListener(SESSION_EXPIREE_EVENT, handleSessionExpiree);
+    };
   }, []);
 
   async function handleLogout() {
@@ -92,6 +107,16 @@ export default function App() {
                 <Navigate to="/dashboard" replace />
               ) : (
                 <LoginPage onLogin={handleLogin} />
+              )
+            }
+          />
+          <Route
+            path="/login/aide"
+            element={
+              utilisateur ? (
+                <Navigate to="/dashboard" replace />
+              ) : (
+                <LoginHelpPage />
               )
             }
           />

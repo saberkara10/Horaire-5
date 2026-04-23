@@ -9,6 +9,29 @@ await jest.unstable_mockModule("../src/services/import-cours.service.js", () => 
   importerCoursDepuisFichier: importServiceMock.importerCoursDepuisFichier,
 }));
 
+await jest.unstable_mockModule("../middlewares/auth.js", () => ({
+  userAuth(request, _response, next) {
+    request.user = {
+      id: 1,
+      email: "admin@ecole.ca",
+      roles: ["ADMIN_RESPONSABLE"],
+    };
+    next();
+  },
+  userNotAuth(_request, _response, next) {
+    next();
+  },
+  userAdmin(_request, _response, next) {
+    next();
+  },
+  userResponsable(_request, _response, next) {
+    next();
+  },
+  userAdminOrResponsable(_request, _response, next) {
+    next();
+  },
+}));
+
 const { ImportExcelError } = await import("../src/services/import-excel.shared.js");
 const { default: app } = await import("../src/app.js");
 

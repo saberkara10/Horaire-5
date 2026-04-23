@@ -4,6 +4,8 @@
 
 import {
   ajouterProfesseur,
+  TYPES_ABSENCE_PROFESSEUR,
+  recupererAbsencesProfesseur,
   modifierProfesseur,
   recupererCoursProfesseur,
   recupererDisponibilitesProfesseur,
@@ -11,6 +13,7 @@ import {
   recupererHoraireProfesseur,
   recupererProfesseurParId,
   recupererTousLesProfesseurs,
+  remplacerAbsencesProfesseur,
   remplacerCoursProfesseur,
   remplacerDisponibilitesProfesseur,
   supprimerProfesseur,
@@ -162,6 +165,50 @@ function validerCoursPayload(coursIds) {
 
   if (new Set(idsValides).size !== idsValides.length) {
     return "Les cours assignes dupliques ne sont pas autorises.";
+  }
+
+  return "";
+}
+
+function dateAbsenceValide(dateAbsence) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(dateAbsence || "").trim());
+}
+
+function validerAbsencesPayload(absences) {
+  if (!Array.isArray(absences)) {
+    return "Le champ absences doit etre un tableau.";
+  }
+
+  const periodesVues = new Set();
+
+  for (const absence of absences) {
+    const dateDebut = String(absence?.date_debut || "").trim();
+    const dateFin = String(absence?.date_fin || "").trim();
+    const typeAbsence = String(absence?.type_absence || "").trim();
+
+    if (!dateAbsenceValide(dateDebut) || !dateAbsenceValide(dateFin)) {
+      return "Chaque absence doit avoir une date de debut et une date de fin valides.";
+    }
+
+    if (dateDebut > dateFin) {
+      return "La date de fin doit etre apres ou egale a la date de debut.";
+    }
+
+    if (!typeAbsence) {
+      return "Chaque absence doit avoir un type d'absence.";
+    }
+
+    if (!TYPES_ABSENCE_PROFESSEUR.includes(typeAbsence)) {
+      return "Le type d'absence est invalide.";
+    }
+
+    const cle = `${dateDebut}-${dateFin}`;
+
+    if (periodesVues.has(cle)) {
+      return "Les absences dupliquees sur la meme periode ne sont pas autorisees.";
+    }
+
+    periodesVues.add(cle);
   }
 
   return "";
@@ -385,6 +432,46 @@ export default function professeursRoutes(app) {
         }
 
         return response.status(error.statusCode || 500).json(payload);
+      }
+    }
+  );
+
+  app.get(
+    "/api/professeurs/:id/absences",
+    ...accesLectureProfesseurs,
+    validerIdProfesseur,
+    verifierProfesseurExiste,
+    async (request, response) => {
+      try {
+        const absences = await recupererAbsencesProfesseur(Number(request.params.id));
+        response.status(200).json(absences);
+      } catch (error) {
+        response.status(500).json({ message: "Erreur serveur." });
+      }
+    }
+  );
+
+  app.put(
+    "/api/professeurs/:id/absences",
+    ...accesGestionProfesseurs,
+    validerIdProfesseur,
+    verifierProfesseurExiste,
+    async (request, response) => {
+      try {
+        const messageErreur = validerAbsencesPayload(request.body?.absences);
+
+        if (messageErreur) {
+          return response.status(400).json({ message: messageErreur });
+        }
+
+        const absences = await remplacerAbsencesProfesseur(
+          Number(request.params.id),
+          request.body.absences
+        );
+
+        return response.status(200).json(absences);
+      } catch (error) {
+        return response.status(500).json({ message: "Erreur serveur." });
       }
     }
   );

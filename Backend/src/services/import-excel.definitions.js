@@ -152,10 +152,10 @@ export const IMPORT_EXCEL_DEFINITIONS = {
       },
       {
         key: "duree",
-        required: true,
+        required: false,
         description:
-          "Duree du cours en heures. Pour rester editable dans l'UI actuelle, seules les valeurs entieres de 1 a 4 sont acceptees.",
-        example: "2",
+          "Duree fixe a 3 heures dans le produit. Si la colonne est presente, sa valeur est ignoree au profit de 3 heures.",
+        example: "3",
         aliases: ["duree_heures", "heures", "nb_heures"],
       },
       {
@@ -197,7 +197,7 @@ export const IMPORT_EXCEL_DEFINITIONS = {
       {
         code: "INF301",
         nom: "Reseaux",
-        duree: "2",
+        duree: "3",
         programme: "Programmation informatique",
         etape_etude: "3",
         salle_reference_code: "B204",
@@ -215,6 +215,7 @@ export const IMPORT_EXCEL_DEFINITIONS = {
     ],
     notes: [
       "La salle de reference doit deja exister dans le module Salles.",
+      "La duree des cours est imposee a 3 heures, meme si une autre valeur est fournie dans le fichier.",
       "Le type de salle du cours est toujours aligne sur la salle de reference reelle.",
       "Si la colonne type_salle est absente, le controle de coherence se fait uniquement via la salle de reference.",
     ],

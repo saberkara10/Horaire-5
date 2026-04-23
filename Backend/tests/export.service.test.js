@@ -264,6 +264,9 @@ function contientTextePdf(contenu, texte) {
   return contenu.includes(texte) || contenu.includes(enHex(texte));
 }
 
+const EXCEPTION_FILL = "FFEFF6FF";
+const EXCEPTION_TEXT = "FF1E3A8A";
+
 describe("ExportService", () => {
   test("genere un PDF groupe avec une vraie structure d'horaire", async () => {
     const buffer = await genererPDFGroupe({ groupe, horaire: horaireGroupe });
@@ -382,7 +385,7 @@ describe("ExportService", () => {
     expect(vueHebdo.getCell("H6").value).toContain("Dimanche");
   });
 
-  test("genere un Excel etudiant avec orange reserve aux reprises et feuille de suivi coherente", async () => {
+  test("genere un Excel etudiant avec exception bleue, reprise orange et feuille de suivi coherente", async () => {
     const buffer = await genererExcelEtudiant({
       etudiant,
       horaire: horaireEtudiantFusionne,
@@ -392,6 +395,7 @@ describe("ExportService", () => {
     });
     const workbookSheetJs = XLSX.read(buffer, { type: "buffer" });
     const workbookExcelJs = await chargerWorkbookExcelJs(buffer);
+    const detailsSheet = workbookExcelJs.getWorksheet("Seances detaillees");
     const detailRows = XLSX.utils.sheet_to_json(workbookSheetJs.Sheets["Seances detaillees"], {
       range: 3,
     });
@@ -401,6 +405,7 @@ describe("ExportService", () => {
     const vueHebdo = workbookExcelJs.getWorksheet("Vue hebdo");
     const reprisesSheet = workbookExcelJs.getWorksheet("Reprises");
     const celluleReprise = trouverCelluleContenant(vueHebdo, "MAT201");
+    const celluleException = trouverCelluleContenant(vueHebdo, "POO302");
 
     expect(workbookSheetJs.SheetNames).toEqual(
       expect.arrayContaining(["Vue hebdo", "Seances detaillees", "Reprises"])
@@ -417,8 +422,13 @@ describe("ExportService", () => {
     expect(repriseRows[0]["Code cours"]).toBe("COM300");
     expect(celluleReprise).not.toBeNull();
     expect(celluleReprise.fill.fgColor.argb).toBe("FFFFF1E6");
+    expect(celluleException).not.toBeNull();
+    expect(celluleException.fill.fgColor.argb).toBe(EXCEPTION_FILL);
     expect(vueHebdo.getCell("G6").value).toContain("Samedi");
     expect(vueHebdo.getCell("H6").value).toContain("Dimanche");
+    expect(detailsSheet.getCell("A3").value).toContain("Bleu = exception individuelle");
+    expect(detailsSheet.getCell("A7").fill.fgColor.argb).toBe(EXCEPTION_FILL);
+    expect(detailsSheet.getCell("A7").font.color.argb).toBe(EXCEPTION_TEXT);
     expect(reprisesSheet.getCell("A4").fill.fgColor.argb).toBe("FF0F3D2E");
     expect(reprisesSheet.getCell("A5").fill.fgColor.argb).toBe("FFFFF1E6");
   });
@@ -468,5 +478,6 @@ describe("ExportService", () => {
     expect(celluleDimanche).not.toBeNull();
     expect(String(celluleDimanche.value)).toContain("COM510");
     expect(String(celluleDimanche.value)).toContain("Groupe suivi : GAD-E1-6");
+    expect(celluleDimanche.fill.fgColor.argb).toBe(EXCEPTION_FILL);
   });
 });

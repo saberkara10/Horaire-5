@@ -8,6 +8,7 @@ import request from "supertest";
 import { jest, describe, test, expect, beforeEach } from "@jest/globals";
 
 const professeursModelMock = {
+  TYPES_ABSENCE_PROFESSEUR: ["maladie", "vacances", "formation", "autre"],
   recupererTousLesProfesseurs: jest.fn(),
   recupererProfesseurParId: jest.fn(),
   recupererProfesseurParNomPrenom: jest.fn(),
@@ -19,9 +20,11 @@ const professeursModelMock = {
   recupererDisponibilitesProfesseur: jest.fn(),
   recupererJournalDisponibilitesProfesseur: jest.fn(),
   recupererDisponibilitesProfesseurs: jest.fn(),
+  recupererAbsencesProfesseur: jest.fn(),
   recupererHoraireProfesseur: jest.fn(),
   remplacerCoursProfesseur: jest.fn(),
   remplacerDisponibilitesProfesseur: jest.fn(),
+  remplacerAbsencesProfesseur: jest.fn(),
   ajouterProfesseur: jest.fn(),
   modifierProfesseur: jest.fn(),
   supprimerProfesseur: jest.fn(),

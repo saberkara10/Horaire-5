@@ -6,6 +6,7 @@
 
 import { userAuth } from "../middlewares/auth.js";
 import pool from "../db.js";
+import { assurerSchemaSchedulerAcademique } from "../src/services/academic-scheduler-schema.js";
 
 const EXISTE_HORAIRE_GROUPE_SQL = `EXISTS (
   SELECT 1
@@ -294,6 +295,7 @@ function construireCasParticuliers({
 export default function dashboardRoutes(app) {
   app.get("/api/dashboard/overview", userAuth, async (request, response) => {
     try {
+      await assurerSchemaSchedulerAcademique();
       const sessionActive = await recupererSessionActive();
       const [
         compteursGlobaux,

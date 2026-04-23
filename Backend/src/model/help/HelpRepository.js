@@ -7,6 +7,18 @@
 
 import pool from "../../../db.js";
 
+function isMissingTableError(error) {
+  const code = String(error?.code || "").toUpperCase();
+  const message = String(error?.message || "").toLowerCase();
+
+  return (
+    code === "ER_NO_SUCH_TABLE" ||
+    message.includes("doesn't exist") ||
+    message.includes("unknown table") ||
+    message.includes("no such table")
+  );
+}
+
 const VIDEO_LIST_SELECT = `
   SELECT
     v.id_video,
@@ -38,88 +50,136 @@ const VISIBLE_VIDEO_WHERE = `
 `;
 
 export async function findAllActiveCategories() {
-  const [rows] = await pool.query(
-    `SELECT
-       id_category,
-       name,
-       slug,
-       description,
-       display_order
-     FROM help_categories
-     WHERE is_active = 1
-     ORDER BY display_order ASC, name ASC`
-  );
+  try {
+    const [rows] = await pool.query(
+      `SELECT
+         id_category,
+         name,
+         slug,
+         description,
+         display_order
+       FROM help_categories
+       WHERE is_active = 1
+       ORDER BY display_order ASC, name ASC`
+    );
 
-  return rows;
+    return rows;
+  } catch (error) {
+    if (isMissingTableError(error)) {
+      return [];
+    }
+
+    throw error;
+  }
 }
 
 export async function findAllActiveVideos() {
-  const [rows] = await pool.query(
-    `${VIDEO_LIST_SELECT}
-     ${VISIBLE_VIDEO_WHERE}
-     ORDER BY c.display_order ASC, v.display_order ASC, v.title ASC`
-  );
+  try {
+    const [rows] = await pool.query(
+      `${VIDEO_LIST_SELECT}
+       ${VISIBLE_VIDEO_WHERE}
+       ORDER BY c.display_order ASC, v.display_order ASC, v.title ASC`
+    );
 
-  return rows;
+    return rows;
+  } catch (error) {
+    if (isMissingTableError(error)) {
+      return [];
+    }
+
+    throw error;
+  }
 }
 
 export async function searchVideos(query) {
   const likeQuery = `%${query}%`;
 
-  const [rows] = await pool.query(
-    `${VIDEO_LIST_SELECT}
-     ${VISIBLE_VIDEO_WHERE}
-       AND (
-         v.title LIKE ?
-         OR COALESCE(v.short_description, '') LIKE ?
-         OR COALESCE(v.full_description, '') LIKE ?
-         OR JSON_SEARCH(v.keywords_json, 'one', ?, NULL, '$[*]') IS NOT NULL
-       )
-     ORDER BY c.display_order ASC, v.display_order ASC, v.title ASC`,
-    [likeQuery, likeQuery, likeQuery, likeQuery]
-  );
+  try {
+    const [rows] = await pool.query(
+      `${VIDEO_LIST_SELECT}
+       ${VISIBLE_VIDEO_WHERE}
+         AND (
+           v.title LIKE ?
+           OR COALESCE(v.short_description, '') LIKE ?
+           OR COALESCE(v.full_description, '') LIKE ?
+           OR JSON_SEARCH(v.keywords_json, 'one', ?, NULL, '$[*]') IS NOT NULL
+         )
+       ORDER BY c.display_order ASC, v.display_order ASC, v.title ASC`,
+      [likeQuery, likeQuery, likeQuery, likeQuery]
+    );
 
-  return rows;
+    return rows;
+  } catch (error) {
+    if (isMissingTableError(error)) {
+      return [];
+    }
+
+    throw error;
+  }
 }
 
 export async function findVideosByCategory(categoryId) {
-  const [rows] = await pool.query(
-    `${VIDEO_LIST_SELECT}
-     ${VISIBLE_VIDEO_WHERE}
-       AND v.id_category = ?
-     ORDER BY v.display_order ASC, v.title ASC`,
-    [categoryId]
-  );
+  try {
+    const [rows] = await pool.query(
+      `${VIDEO_LIST_SELECT}
+       ${VISIBLE_VIDEO_WHERE}
+         AND v.id_category = ?
+       ORDER BY v.display_order ASC, v.title ASC`,
+      [categoryId]
+    );
 
-  return rows;
+    return rows;
+  } catch (error) {
+    if (isMissingTableError(error)) {
+      return [];
+    }
+
+    throw error;
+  }
 }
 
 export async function findVideoById(videoId) {
-  const [rows] = await pool.query(
-    `${VIDEO_LIST_SELECT}
-     ${VISIBLE_VIDEO_WHERE}
-       AND v.id_video = ?
-     LIMIT 1`,
-    [videoId]
-  );
+  try {
+    const [rows] = await pool.query(
+      `${VIDEO_LIST_SELECT}
+       ${VISIBLE_VIDEO_WHERE}
+         AND v.id_video = ?
+       LIMIT 1`,
+      [videoId]
+    );
 
-  return rows[0] || null;
+    return rows[0] || null;
+  } catch (error) {
+    if (isMissingTableError(error)) {
+      return null;
+    }
+
+    throw error;
+  }
 }
 
 export async function findVideoMediaById(videoId) {
-  const [rows] = await pool.query(
-    `SELECT
-       id_video,
-       slug,
-       video_path,
-       thumbnail_path
-     FROM help_videos
-     WHERE id_video = ?
-       AND is_active = 1
-       AND is_published = 1
-     LIMIT 1`,
-    [videoId]
-  );
+  try {
+    const [rows] = await pool.query(
+      `SELECT
+         id_video,
+         slug,
+         video_path,
+         thumbnail_path
+       FROM help_videos
+       WHERE id_video = ?
+         AND is_active = 1
+         AND is_published = 1
+       LIMIT 1`,
+      [videoId]
+    );
 
-  return rows[0] || null;
+    return rows[0] || null;
+  } catch (error) {
+    if (isMissingTableError(error)) {
+      return null;
+    }
+
+    throw error;
+  }
 }

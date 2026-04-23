@@ -7,9 +7,12 @@
 import { jest, describe, test, expect } from "@jest/globals";
 
 const verifyPasswordMock = jest.fn();
+const hashPasswordMock = jest.fn();
+const isBcryptHashMock = jest.fn();
 const findByEmailMock = jest.fn();
 const findByIdMock = jest.fn();
 const findRolesByUserIdMock = jest.fn();
+const poolQueryMock = jest.fn();
 
 let verifyCallback;
 let serializeCallback;
@@ -47,13 +50,46 @@ jest.unstable_mockModule("../src/model/utilisateur.js", () => ({
 }));
 
 jest.unstable_mockModule("../src/utils/passwords.js", () => ({
+  hashPassword: hashPasswordMock,
+  isBcryptHash: isBcryptHashMock,
   verifyPassword: verifyPasswordMock,
+}));
+
+jest.unstable_mockModule("../db.js", () => ({
+  default: {
+    query: poolQueryMock,
+  },
 }));
 
 // ⚠️ IMPORTANT : importer APRÈS les mocks
 await import("../auth.js");
 
 describe("auth.js (passport config)", () => {
+  test("login OK si mot de passe legacy en clair puis migre en hash", async () => {
+    const user = { id: 7, mot_de_passe_hash: "Resp123!" };
+
+    findByEmailMock.mockResolvedValue(user);
+    verifyPasswordMock.mockResolvedValue(false);
+    isBcryptHashMock.mockReturnValue(false);
+    hashPasswordMock.mockResolvedValue("hash-migre");
+    poolQueryMock
+      .mockRejectedValueOnce({ code: "ER_BAD_FIELD_ERROR" })
+      .mockResolvedValueOnce([{ affectedRows: 1 }]);
+
+    const done = jest.fn();
+
+    await verifyCallback("responsable@ecole.ca", "Resp123!", done);
+
+    expect(hashPasswordMock).toHaveBeenCalledWith("Resp123!");
+    expect(poolQueryMock).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining("SET motdepasse = ?"),
+      ["hash-migre", 7]
+    );
+    expect(user.mot_de_passe_hash).toBe("hash-migre");
+    expect(done).toHaveBeenCalledWith(null, user);
+  });
+
   test("wrong_user si utilisateur inexistant", async () => {
     findByEmailMock.mockResolvedValue(null);
     const done = jest.fn();

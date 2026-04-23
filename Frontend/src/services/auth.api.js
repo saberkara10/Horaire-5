@@ -73,7 +73,13 @@ export async function loginUtilisateur({ email, password }) {
     });
   } catch (error) {
     // Convertir l'erreur technique en message lisible pour l'utilisateur final
-    throw new Error(traduireErreurConnexion(error.message));
+    const translatedError = new Error(traduireErreurConnexion(error.message));
+    translatedError.status = error.status;
+    translatedError.details = error.details || [];
+    translatedError.payload = error.payload || null;
+    translatedError.data = error.payload || null;
+    translatedError.cause = error;
+    throw translatedError;
   }
 
   // Récupérer les données complètes de l'utilisateur maintenant que la session existe

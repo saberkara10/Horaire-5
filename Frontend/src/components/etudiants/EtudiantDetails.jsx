@@ -356,7 +356,7 @@ export function EtudiantDetails({
                 >
                   <div className="detail-card__reprise-header">
                     <strong>{exception.code_cours}</strong>
-                    <span className="status-pill status-pill--busy">EXCEPTION</span>
+                    <span className="status-pill status-pill--exception">EXCEPTION</span>
                   </div>
                   <span>{exception.nom_cours}</span>
                   <span>{formaterLibelleException(exception)}</span>

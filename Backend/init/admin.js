@@ -7,10 +7,18 @@ import bcrypt from "bcrypt";
 import pool from "../db.js";
 
 (async () => {
-  const email = "admin@ecole.ca".toLowerCase().trim();
-  const password = "Admin123!";
-
   try {
+    const email = (process.env.INITIAL_ADMIN_EMAIL || "admin@ecole.ca")
+      .toLowerCase()
+      .trim();
+    const password = process.env.INITIAL_ADMIN_PASSWORD;
+
+    if (!password || password.length < 8) {
+      throw new Error(
+        "INITIAL_ADMIN_PASSWORD doit etre defini dans .env avec au moins 8 caracteres."
+      );
+    }
+
     const hash = await bcrypt.hash(password, 10);
 
     await pool.query(

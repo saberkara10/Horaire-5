@@ -4,7 +4,7 @@
  * Cette page gere l'authentification
  * des utilisateurs de l'application.
  */
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { loginUtilisateur } from "../services/auth.api.js";
 import laciteCampus from "../assets/1733872234400.jpg";
@@ -49,18 +49,74 @@ function EyeOffIcon() {
   );
 }
 
+function formaterTemps(secondes) {
+  const totalSecondes = Math.max(0, Number(secondes) || 0);
+  const minutes = Math.floor(totalSecondes / 60);
+  const secondesRestantes = totalSecondes % 60;
+
+  if (minutes <= 0) {
+    return `${secondesRestantes}s`;
+  }
+
+  return `${minutes}m ${String(secondesRestantes).padStart(2, "0")}s`;
+}
+
 export function LoginPage({ onLogin }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [tentativesRestantes, setTentativesRestantes] = useState(null);
+  const [compteurBlocage, setCompteurBlocage] = useState(0);
+  const compteurRef = useRef(null);
 
   const navigate = useNavigate();
+  const connexionBloquee = compteurBlocage > 0;
+
+  useEffect(() => {
+    if (!connexionBloquee) {
+      if (compteurRef.current) {
+        window.clearInterval(compteurRef.current);
+        compteurRef.current = null;
+      }
+
+      return undefined;
+    }
+
+    compteurRef.current = window.setInterval(() => {
+      setCompteurBlocage((valeur) => {
+        if (valeur <= 1) {
+          window.clearInterval(compteurRef.current);
+          compteurRef.current = null;
+          setTentativesRestantes(null);
+          setError("");
+          return 0;
+        }
+
+        return valeur - 1;
+      });
+    }, 1000);
+
+    return () => {
+      if (compteurRef.current) {
+        window.clearInterval(compteurRef.current);
+        compteurRef.current = null;
+      }
+    };
+  }, [connexionBloquee]);
 
   async function handleSubmit(event) {
     event.preventDefault();
     setError("");
+
+    if (connexionBloquee) {
+      setError(
+        `Trop de tentatives. Reessayez dans ${formaterTemps(compteurBlocage)}.`
+      );
+      return;
+    }
+
     setLoading(true);
 
     const emailNettoye = email.trim();
@@ -81,7 +137,23 @@ export function LoginPage({ onLogin }) {
       onLogin?.(utilisateur || { email: emailNettoye });
       navigate("/dashboard", { replace: true });
     } catch (erreur) {
-      setError(erreur.message || "Impossible de se connecter.");
+      const data = erreur.data || erreur.payload || {};
+
+      if (erreur.status === 429) {
+        const attenteSecondes = Number(data.attente_secondes) || 60;
+        setCompteurBlocage(attenteSecondes);
+        setTentativesRestantes(0);
+        setError(
+          data.message ||
+            `Trop de tentatives. Reessayez dans ${formaterTemps(attenteSecondes)}.`
+        );
+      } else {
+        const tentatives = data.tentatives_restantes;
+        setTentativesRestantes(
+          Number.isFinite(Number(tentatives)) ? Number(tentatives) : null
+        );
+        setError(erreur.message || "Impossible de se connecter.");
+      }
     } finally {
       setLoading(false);
     }
@@ -99,6 +171,16 @@ export function LoginPage({ onLogin }) {
 
       <section className="login-page__content">
         <div className="login-card">
+          <div className="login-card__topbar">
+            <button
+              type="button"
+              className="login-card__help-button"
+              onClick={() => navigate("/login/aide")}
+            >
+              Aide
+            </button>
+          </div>
+
           <div className="login-card__brand">
             <img
               className="login-page__logo"
@@ -131,6 +213,7 @@ export function LoginPage({ onLogin }) {
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
                   autoComplete="email"
+                  disabled={loading || connexionBloquee}
                   required
                 />
               </div>
@@ -154,6 +237,7 @@ export function LoginPage({ onLogin }) {
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
                   autoComplete="current-password"
+                  disabled={loading || connexionBloquee}
                   required
                 />
 
@@ -161,6 +245,7 @@ export function LoginPage({ onLogin }) {
                   type="button"
                   className="login-input__toggle"
                   onClick={() => setShowPassword((value) => !value)}
+                  disabled={loading || connexionBloquee}
                   aria-label={
                     showPassword
                       ? "Masquer le mot de passe"
@@ -172,11 +257,33 @@ export function LoginPage({ onLogin }) {
               </div>
             </div>
 
-            <button className="login-form__submit" type="submit" disabled={loading}>
-              {loading ? "Connexion..." : "Se connecter"}
+            <button
+              className="login-form__submit"
+              type="submit"
+              disabled={loading || connexionBloquee}
+            >
+              {connexionBloquee
+                ? `Reessayer dans ${formaterTemps(compteurBlocage)}`
+                : loading
+                  ? "Connexion..."
+                  : "Se connecter"}
             </button>
 
-            {error ? <p className="login-form__error">{error}</p> : null}
+            {error ? (
+              <div className="login-form__error" role="alert">
+                <p>{error}</p>
+                {connexionBloquee ? (
+                  <span>
+                    Compte a rebours : {formaterTemps(compteurBlocage)}
+                  </span>
+                ) : null}
+                {!connexionBloquee && tentativesRestantes !== null ? (
+                  <span>
+                    Tentatives restantes : {tentativesRestantes}
+                  </span>
+                ) : null}
+              </div>
+            ) : null}
           </form>
         </div>
       </section>

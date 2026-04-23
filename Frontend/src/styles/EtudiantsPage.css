@@ -254,6 +254,12 @@
   border-color: rgba(59, 130, 246, 0.28);
 }
 
+.status-pill--exception {
+  color: var(--exception-700);
+  background: rgba(239, 246, 255, 0.98);
+  border-color: var(--exception-border);
+}
+
 .status-pill--warning {
   background: rgba(255, 247, 237, 0.98);
   color: #b45309;
@@ -388,8 +394,8 @@
 }
 
 .schedule-preview__item--individuelle {
-  border-color: rgba(96, 165, 250, 0.35);
-  background: rgba(239, 246, 255, 0.94);
+  border-color: var(--exception-border);
+  background: rgba(239, 246, 255, 0.92);
 }
 
 .detail-card__reprise-header {
@@ -402,6 +408,11 @@
 
 .schedule-preview__item span {
   color: var(--muted);
+}
+
+.schedule-preview__item--individuelle strong,
+.schedule-preview__item--individuelle span {
+  color: var(--exception-700);
 }
 
 .schedule-preview__header {
@@ -433,6 +444,12 @@
   font-size: 0.8rem;
 }
 
+.cal-seance .etudiant-schedule__source {
+  margin-top: 0;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 0.72rem;
+}
+
 .etudiant-schedule__grid {
   min-width: 1320px;
 }
@@ -442,7 +459,7 @@
 }
 
 .etudiant-schedule__seance--individuelle {
-  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  background: linear-gradient(135deg, var(--exception-600), var(--exception-500));
 }
 
 .etudiant-schedule__seance-badge {
@@ -548,4 +565,65 @@
   .detail-panel--immersive {
     padding: 1rem;
   }
+}
+
+/* Login-driven visual alignment */
+.panel,
+.hero-panel,
+.detail-grid div,
+.detail-card__callout,
+.schedule-preview__item,
+.course-exchange__card,
+.stat-card,
+.status-pill {
+  border-color: var(--line);
+  background: var(--surface-strong);
+}
+
+.hero-panel {
+  background:
+    radial-gradient(circle at top right, rgba(16, 167, 96, 0.1), transparent 26%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(246, 249, 246, 0.95));
+}
+
+.hero-panel__section,
+.eyebrow {
+  color: var(--brand-dark);
+}
+
+.button--primary,
+.teacher-avatar {
+  background: linear-gradient(135deg, var(--brand), var(--brand-dark));
+  box-shadow: 0 16px 28px rgba(16, 167, 96, 0.18);
+}
+
+.etudiant-schedule__seance--individuelle {
+  background: linear-gradient(135deg, var(--exception-600), var(--exception-500));
+  box-shadow: 0 16px 28px var(--exception-shadow);
+}
+
+.status-pill--busy {
+  color: #405464;
+  background: rgba(124, 144, 164, 0.12);
+  border-color: rgba(124, 144, 164, 0.22);
+}
+
+.status-pill--exception {
+  color: var(--exception-700);
+  background: rgba(239, 246, 255, 0.98);
+  border-color: var(--exception-border);
+}
+
+.detail-card__callout--warning,
+.schedule-preview__item--reprise {
+  border-color: rgba(184, 111, 18, 0.24);
+}
+
+.teachers-table thead tr {
+  background: rgba(16, 167, 96, 0.08);
+}
+
+.teachers-table tbody tr:hover,
+.teachers-table tbody tr.is-selected {
+  background: rgba(16, 167, 96, 0.06);
 }

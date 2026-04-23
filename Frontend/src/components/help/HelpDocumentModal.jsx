@@ -60,6 +60,9 @@ export function HelpDocumentModal({
                 <p>{documentDetail.summary}</p>
 
                 <div className="help-doc-modal__meta">
+                  {documentDetail.categoryName ? (
+                    <span className="help-doc-modal__badge">{documentDetail.categoryName}</span>
+                  ) : null}
                   {documentDetail.kindLabel ? (
                     <span className="help-doc-modal__badge">{documentDetail.kindLabel}</span>
                   ) : null}
@@ -113,6 +116,27 @@ export function HelpDocumentModal({
                         {tag}
                       </span>
                     ))}
+                  </div>
+                </section>
+              ) : null}
+
+              {documentDetail.lastModifiedAt || documentDetail.path ? (
+                <section className="help-doc-modal__aside-card">
+                  <h3>Informations</h3>
+                  <div className="help-doc-modal__linked-guides">
+                    {documentDetail.lastModifiedAt ? (
+                      <div className="help-doc-modal__linked-guide">
+                        <strong>Derniere mise a jour</strong>
+                        <span>{new Date(documentDetail.lastModifiedAt).toLocaleString("fr-CA")}</span>
+                      </div>
+                    ) : null}
+
+                    {documentDetail.path ? (
+                      <div className="help-doc-modal__linked-guide">
+                        <strong>Source</strong>
+                        <span>{documentDetail.path}</span>
+                      </div>
+                    ) : null}
                   </div>
                 </section>
               ) : null}

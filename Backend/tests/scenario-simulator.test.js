@@ -9,9 +9,10 @@
  * - les contraintes dures restent preservees.
  */
 
-import { describe, expect, test } from "@jest/globals";
+import { describe, expect, jest, test } from "@jest/globals";
 import { ScenarioSimulator } from "../src/services/scheduler/simulation/ScenarioSimulator.js";
 import { ScheduleSnapshot } from "../src/services/scheduler/simulation/ScheduleSnapshot.js";
+import { ScheduleMutationValidator } from "../src/services/scheduler/planning/ScheduleMutationValidator.js";
 
 /**
  * Normalise un horaire en cles stables.
@@ -587,5 +588,138 @@ describe("ScenarioSimulator", () => {
       )
     ).toBe(true);
     expect(normalizePlacementKeys(snapshot.clonePlacements())).toEqual(beforeKeys);
+  });
+
+  test("rejette un type de scenario non supporte", () => {
+    const snapshot = buildSnapshotFixture();
+
+    expect(() =>
+      ScenarioSimulator.simulate({
+        snapshot,
+        scenario: {
+          type: "MUTATION_EXOTIQUE",
+        },
+      })
+    ).toThrow("Le type de scenario demande n'est pas supporte en V1.");
+  });
+
+  test("CHANGER_SALLE echoue si la salle cible est absente", () => {
+    const snapshot = buildSnapshotFixture();
+
+    expect(() =>
+      ScenarioSimulator.simulate({
+        snapshot,
+        scenario: {
+          type: "CHANGER_SALLE",
+          id_affectation_cours: 1,
+          id_salle: 999,
+        },
+      })
+    ).toThrow("La salle cible est introuvable.");
+  });
+
+  test("CHANGER_PROF exige un professeur cible valide", () => {
+    const snapshot = buildSnapshotFixture();
+
+    expect(() =>
+      ScenarioSimulator.simulate({
+        snapshot,
+        scenario: {
+          type: "CHANGER_PROF",
+          id_affectation_cours: 1,
+        },
+      })
+    ).toThrow("Le scenario CHANGER_PROF exige un professeur cible valide.");
+  });
+
+  test("simulatePlacementMutations applique plusieurs mutations faisables", () => {
+    const snapshot = buildSnapshotFixture();
+    const validateSpy = jest
+      .spyOn(ScheduleMutationValidator, "validate")
+      .mockReturnValue({
+        feasible: true,
+        reasons: [],
+        participantIds: [1, 2],
+      });
+
+    try {
+      const result = ScenarioSimulator.simulatePlacementMutations({
+        snapshot,
+        optimizationMode: "equilibre",
+        scope: "ALL_OCCURRENCES",
+        placementsByAssignmentId: {
+          1: {
+            id_professeur: 10,
+            id_salle: 3,
+            id_groupe: 1,
+            date: "2026-09-07",
+            heure_debut: "08:00:00",
+            heure_fin: "11:00:00",
+          },
+        },
+      });
+
+      expect(result.faisable).toBe(true);
+      expect(result.mutationAppliquee).toBe(true);
+      expect(result.portee).toBe("ALL_OCCURRENCES");
+      expect(result.mutations.avant).toHaveLength(1);
+      expect(result.mutations.apres).toHaveLength(1);
+      expect(result.validation.detailsParAffectation).toHaveLength(1);
+    } finally {
+      validateSpy.mockRestore();
+    }
+  });
+
+  test("simulatePlacementMutations retourne un rapport infaisable a la premiere occurrence bloquee", () => {
+    const snapshot = buildSnapshotFixture();
+
+    const result = ScenarioSimulator.simulatePlacementMutations({
+      snapshot,
+      optimizationMode: "equilibre",
+      scope: "THIS_OCCURRENCE",
+      placementsByAssignmentId: {
+        1: {
+          id_professeur: 10,
+          id_salle: 1,
+          id_groupe: 1,
+          date: "2026-09-07",
+          heure_debut: "17:00:00",
+          heure_fin: "20:00:00",
+        },
+      },
+    });
+
+    expect(result.faisable).toBe(false);
+    expect(result.mutationAppliquee).toBe(false);
+    expect(result.scoreApres).toBeNull();
+    expect(result.validation.detailsParAffectation[0].id_affectation_cours).toBe(1);
+  });
+
+  test("simulateOfficialScenario charge le snapshot puis delegue a simulate", async () => {
+    const snapshot = buildSnapshotFixture();
+    const loadSpy = jest
+      .spyOn(ScheduleSnapshot, "load")
+      .mockResolvedValue(snapshot);
+    const simulateSpy = jest
+      .spyOn(ScenarioSimulator, "simulate")
+      .mockReturnValue({ faisable: true, resume: "ok" });
+
+    try {
+      const result = await ScenarioSimulator.simulateOfficialScenario({
+        idSession: 7,
+        scenario: { type: "REEVALUER_MODE", mode_cible: "professeur" },
+      });
+
+      expect(result).toEqual({ faisable: true, resume: "ok" });
+      expect(loadSpy).toHaveBeenCalledWith({ idSession: 7 }, expect.anything());
+      expect(simulateSpy).toHaveBeenCalledWith({
+        snapshot,
+        scenario: { type: "REEVALUER_MODE", mode_cible: "professeur" },
+        optimizationMode: "legacy",
+      });
+    } finally {
+      loadSpy.mockRestore();
+      simulateSpy.mockRestore();
+    }
   });
 });

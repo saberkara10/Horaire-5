@@ -1,26 +1,70 @@
 /**
- * Point d'entrée du serveur backend Express.
+ * Point d'entree du serveur backend Express.
  *
- * Ce fichier fait une seule chose : démarrer le serveur HTTP sur le port
- * configuré dans les variables d'environnement (ou 3000 par défaut).
- * Toute la configuration de l'application (middlewares, routes, etc.)
- * est dans app.js — on sépare les deux pour faciliter les tests.
- *
- * Pourquoi séparer server.js et app.js ?
- * Parce que dans les tests automatisés, on importe app.js directement
- * sans démarrer un vrai serveur. Si tout était dans server.js, on ne
- * pourrait pas tester sans lancer l'application entière.
+ * Le backend demarre en HTTP local par defaut, ce qui correspond au flux
+ * `npm run dev` du depot. Un demarrage HTTPS reste possible si
+ * `HTTPS_ENABLED=true` et que les certificats locaux sont disponibles.
  *
  * @module server
  */
 
+import http from "node:http";
+import https from "node:https";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { readFile } from "node:fs/promises";
+
 import app from "./app.js";
 
-// Lire le port depuis .env, sinon utiliser 3000 en fallback.
-// En production, ce sera généralement défini par l'hébergeur (ex: Heroku, Railway).
-const PORT = process.env.PORT || 3000;
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-// Démarrer le serveur HTTP. Le callback confirme dans la console que tout est OK.
-app.listen(PORT, () => {
-  console.log(`Serveur démarré sur http://localhost:${PORT}`);
+const PORT = Number(process.env.PORT || 3000);
+const HTTPS_ENABLED = String(process.env.HTTPS_ENABLED || "false").toLowerCase() === "true";
+const DEFAULT_KEY_PATH = path.resolve(__dirname, "../security/localhost.key");
+const DEFAULT_CERT_PATH = path.resolve(__dirname, "../security/localhost.cert");
+
+function resolveHttpsPath(envValue, fallbackPath) {
+  if (!envValue) {
+    return fallbackPath;
+  }
+
+  return path.isAbsolute(envValue)
+    ? envValue
+    : path.resolve(process.cwd(), envValue);
+}
+
+async function loadHttpsCredentials() {
+  const keyPath = resolveHttpsPath(process.env.HTTPS_KEY_PATH, DEFAULT_KEY_PATH);
+  const certPath = resolveHttpsPath(process.env.HTTPS_CERT_PATH, DEFAULT_CERT_PATH);
+
+  try {
+    const [key, cert] = await Promise.all([readFile(keyPath), readFile(certPath)]);
+    return { key, cert };
+  } catch (error) {
+    error.message =
+      `Impossible de demarrer en HTTPS: certificat local introuvable ou illisible ` +
+      `(${keyPath}, ${certPath}). ${error.message}`;
+    throw error;
+  }
+}
+
+async function startServer() {
+  let protocol = "http";
+  let server = http.createServer(app);
+
+  if (HTTPS_ENABLED) {
+    const credentials = await loadHttpsCredentials();
+    protocol = "https";
+    server = https.createServer(credentials, app);
+  }
+
+  server.listen(PORT, () => {
+    console.log(`Serveur ${protocol.toUpperCase()} lance sur ${protocol}://localhost:${PORT}`);
+  });
+}
+
+startServer().catch((error) => {
+  console.error(error);
+  process.exit(1);
 });

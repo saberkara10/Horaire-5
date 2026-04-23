@@ -1082,3 +1082,76 @@
     justify-content: flex-start;
   }
 }
+
+/* Login-driven visual alignment */
+.affectations-page__hero-card,
+.affectations-page__panel,
+.affectations-page__stat-card,
+.affectations-page__cohort-preview,
+.affectations-page__student-search-control,
+.affectations-page__student-search-dropdown,
+.affectations-page__selection-stat,
+.affectations-page__manual-summary,
+.affectations-page__scope-card,
+.affectations-page__rooms-panel,
+.affectations-page__room-card,
+.affectations-page__simulation-card,
+.affectations-page__simulation-empty,
+.affectations-page__simulation-block,
+.affectations-page__simulation-summary,
+.affectations-page__simulation-impact,
+.affectations-page__simulation-metric,
+.affectations-page__group-chip {
+  border-color: var(--line);
+  background: var(--surface-strong);
+}
+
+.affectations-page__hero-card {
+  background:
+    radial-gradient(circle at top right, rgba(16, 167, 96, 0.1), transparent 26%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(246, 249, 246, 0.95));
+}
+
+.affectations-page__eyebrow,
+.affectations-page__count,
+.affectations-page__student-badge--warning,
+.affectations-page__student-badge--neutral {
+  background: var(--brand-soft);
+  color: var(--brand-dark);
+}
+
+.affectations-page__student-search--open .affectations-page__student-search-control,
+.affectations-page__student-option--selected,
+.affectations-page__room-card--selected,
+.affectations-page__group-chip--active {
+  border-color: rgba(16, 167, 96, 0.32) !important;
+  box-shadow: 0 0 0 3px rgba(16, 167, 96, 0.12);
+}
+
+.affectations-page__student-option--selected,
+.affectations-page__room-card--selected,
+.affectations-page__group-chip--active {
+  background: rgba(235, 249, 241, 0.96) !important;
+}
+
+.affectations-page__radio input,
+.affectations-page__option input {
+  accent-color: var(--brand);
+}
+
+.affectations-page__room-badge--available,
+.affectations-page__room-selected-info--ok,
+.affectations-page__simulation-badge--success {
+  background: rgba(16, 167, 96, 0.12);
+  color: #0d7c50;
+}
+
+.affectations-page__room-card--available {
+  border-color: rgba(16, 167, 96, 0.26);
+  background: rgba(240, 252, 246, 0.98);
+}
+
+.affectations-page__scope-note {
+  border-color: rgba(16, 167, 96, 0.2);
+  background: rgba(255, 255, 255, 0.92);
+}
