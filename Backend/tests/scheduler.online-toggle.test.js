@@ -9,7 +9,7 @@ function construireContexte() {
       code: "PHY101",
       nom: "Physiologie appliquee",
       programme: "Soins infirmiers auxiliaires",
-      est_en_ligne: 0,
+      est_en_ligne: 1,
       type_salle: "Laboratoire clinique",
     },
     groupe: {
@@ -63,7 +63,35 @@ describe("SchedulerEngine online toggle", () => {
     expect(resultat).toBeNull();
   });
 
-  test("reactive le fallback en ligne quand le flag global est vrai", () => {
+  test("planifie un cours explicitement en ligne par defaut", () => {
+    const { cours, groupe, professeurs, datesParJourSemaine, creneaux } = construireContexte();
+
+    const resultat = SchedulerEngine._trouverSerieAssouplie({
+      cours,
+      groupe,
+      idGroupe: 1,
+      professeurs,
+      salles: [],
+      datesParJourSemaine,
+      creneaux,
+      matrix: new ConstraintMatrix(),
+      dispParProf: new Map(),
+      absencesParProf: new Map(),
+      indispoParSalle: new Map(),
+      chargeSeriesParProf: new Map(),
+      chargeSeriesParJour: new Map(),
+      chargeSeriesParGroupeJour: new Map(),
+      chargeSeriesParProfJour: new Map(),
+      slotsParGroupeJour: new Map(),
+      slotsParProfJour: new Map(),
+      effectifGroupe: groupe.etudiants.length,
+    });
+
+    expect(resultat?.placements).toHaveLength(2);
+    expect(resultat.placements.every((placement) => placement.est_en_ligne)).toBe(true);
+  });
+
+  test("autorise toujours un cours explicitement en ligne quand le flag est vrai", () => {
     process.env.ENABLE_ONLINE_COURSES = "true";
     const { cours, groupe, professeurs, datesParJourSemaine, creneaux } = construireContexte();
 

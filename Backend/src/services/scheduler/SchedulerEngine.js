@@ -227,7 +227,11 @@ export class SchedulerEngine {
         }
       );
 
-      for (const coursActuel of coursTries) {
+      for (const [indexCours, coursActuel] of coursTries.entries()) {
+        if (indexCours > 0 && indexCours % 25 === 0) {
+          await SchedulerEngine._maintenirConnexionActive(connection);
+        }
+
         const creneauxCours =
           courseTimeCandidateMap.get(Number(coursActuel.id_cours)) ||
           SchedulerEngine._normaliserCreneauxCours(coursActuel, creneaux);
@@ -508,6 +512,7 @@ export class SchedulerEngine {
 
       solution.push(...placementsGarantie);
       nonPlanifies.push(...diagnosticsGarantie);
+      await SchedulerEngine._maintenirConnexionActive(connection);
 
       SchedulerEngine._progress(
         onProgress,
@@ -596,6 +601,7 @@ export class SchedulerEngine {
       rapport.nb_groupes_speciaux = groupesReprisesGeneres.length;
       rapport.nb_resolutions_manuelles = conflitsReprises.length;
       rapport.resolutions_manuelles = conflitsReprises;
+      await SchedulerEngine._maintenirConnexionActive(connection);
 
       SchedulerEngine._progress(
         onProgress,
@@ -754,32 +760,26 @@ export class SchedulerEngine {
       });
       rapport.details.rapport_metier = snapshotRapportMetier;
 
-      await connection.query(
-        `INSERT INTO rapports_generation
-         (id_session, genere_par, score_qualite, nb_cours_planifies,
-          nb_cours_non_planifies, nb_cours_echoues_traites, nb_cours_en_ligne_generes,
-          nb_groupes_speciaux, nb_resolutions_manuelles, details)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          SchedulerEngine._safeNum(session.id_session) || null,
-          SchedulerEngine._safeNum(idUtilisateur) || null,
-          SchedulerEngine._safeNum(rapport.score_qualite, 0),
-          SchedulerEngine._safeNum(rapport.nb_cours_planifies, 0),
-          SchedulerEngine._safeNum(rapport.nb_cours_non_planifies, 0),
-          SchedulerEngine._safeNum(rapport.nb_cours_echoues_traites, 0),
-          SchedulerEngine._safeNum(rapport.nb_cours_en_ligne_generes, 0),
-          SchedulerEngine._safeNum(rapport.nb_groupes_speciaux, 0),
-          SchedulerEngine._safeNum(rapport.nb_resolutions_manuelles, 0),
-          JSON.stringify({
-            non_planifies: nonPlanifies,
-            resolutions_manuelles: conflitsReprises,
-            details: rapport.details,
-            rapport_metier: snapshotRapportMetier,
-          }),
-        ]
-      );
-
       await connection.commit();
+
+      try {
+        await SchedulerEngine._persisterRapportGeneration({
+          idSession: session.id_session,
+          idUtilisateur,
+          rapport,
+          nonPlanifies,
+          conflitsReprises,
+          snapshotRapportMetier,
+        });
+      } catch (error) {
+        const message =
+          error?.message || "Impossible de persister le rapport de generation.";
+        console.warn(
+          `[SchedulerEngine] Persistance du rapport impossible: ${message}`
+        );
+        rapport.details.avertissement_persistance_rapport = message;
+      }
+
       SchedulerEngine._progress(onProgress, "DONE", "Generation terminee.", 100);
 
       return rapport;
@@ -2313,6 +2313,291 @@ export class SchedulerEngine {
     return Number.isFinite(number) ? number : fallback;
   }
 
+  static async _maintenirConnexionActive(connection) {
+    if (!connection || typeof connection.ping !== "function") {
+      return;
+    }
+
+    await connection.ping();
+  }
+
+  static _resumerRaisonsRapport(items = [], reasonKey = "raison_code") {
+    const counts = new Map();
+
+    for (const item of Array.isArray(items) ? items : []) {
+      const code = String(item?.[reasonKey] || "INCONNU").trim() || "INCONNU";
+      counts.set(code, (counts.get(code) || 0) + 1);
+    }
+
+    return [...counts.entries()]
+      .map(([code, total]) => ({ code, total }))
+      .sort((left, right) => right.total - left.total || left.code.localeCompare(right.code, "fr"));
+  }
+
+  static _normaliserNonPlanifiesPourRapportPersistant(nonPlanifies = []) {
+    return (Array.isArray(nonPlanifies) ? nonPlanifies : []).map((item) => ({
+      id_cours: SchedulerEngine._safeNum(item?.id_cours),
+      code: item?.code || null,
+      nom: item?.nom || null,
+      groupe: item?.groupe || null,
+      seance: SchedulerEngine._safeNum(item?.seance),
+      raison_code: item?.raison_code || null,
+      raison: item?.raison || null,
+      suggestion: item?.suggestion || null,
+    }));
+  }
+
+  static _normaliserGroupesTentesPourRapportPersistant(groupesTentes = []) {
+    return (Array.isArray(groupesTentes) ? groupesTentes : [])
+      .slice(0, 12)
+      .map((groupe) => ({
+        id_groupe: SchedulerEngine._safeNum(groupe?.id_groupe),
+        nom_groupe: groupe?.nom_groupe || null,
+        raison_code: groupe?.raison_code || null,
+        raison: groupe?.raison || null,
+      }));
+  }
+
+  static _normaliserResolutionsPourRapportPersistant(conflitsReprises = []) {
+    return (Array.isArray(conflitsReprises) ? conflitsReprises : []).map((conflit) => ({
+      id_cours_echoue: SchedulerEngine._safeNum(conflit?.id_cours_echoue),
+      id_etudiant: SchedulerEngine._safeNum(conflit?.id_etudiant),
+      id_cours: SchedulerEngine._safeNum(conflit?.id_cours),
+      code_cours: conflit?.code_cours || null,
+      nom_cours: conflit?.nom_cours || null,
+      groupe_principal: conflit?.groupe_principal || null,
+      nom_groupe: conflit?.nom_groupe || conflit?.groupe_principal || null,
+      raison_code: conflit?.raison_code || null,
+      raison: conflit?.raison || null,
+      recommandation: conflit?.recommandation || null,
+      groupes_tentes: SchedulerEngine._normaliserGroupesTentesPourRapportPersistant(
+        conflit?.groupes_tentes
+      ),
+    }));
+  }
+
+  static _construireDetailsRapportPersistant(details = {}) {
+    const reprises = details?.reprises || {};
+    const optim = details?.optimisation_locale || {};
+
+    return {
+      mode_planification: details?.mode_planification || null,
+      modeOptimisationUtilise: details?.modeOptimisationUtilise || null,
+      semaine_type_repliquee: Boolean(details?.semaine_type_repliquee),
+      optimisation_simulated_annealing: Boolean(
+        details?.optimisation_simulated_annealing
+      ),
+      weekend_autorise: Boolean(details?.weekend_autorise),
+      cours_en_ligne_actifs: Boolean(details?.cours_en_ligne_actifs),
+      raison: details?.raison || null,
+      sa_params_recus: details?.sa_params_recus || {},
+      qualite: details?.qualite || null,
+      preference_stabilite_referencees: SchedulerEngine._safeNum(
+        details?.preference_stabilite_referencees,
+        0
+      ),
+      reprises: {
+        ...Object.fromEntries(
+          Object.entries(reprises).filter(([, value]) =>
+            value == null || ["string", "number", "boolean"].includes(typeof value)
+          )
+        ),
+        groupes_generes: (Array.isArray(reprises?.groupes_generes)
+          ? reprises.groupes_generes
+          : []
+        ).map((groupe) => ({
+          nom_groupe: groupe?.nom_groupe || null,
+          id_groupe: SchedulerEngine._safeNum(groupe?.id_groupe),
+          programme: groupe?.programme || null,
+          etape: SchedulerEngine._safeNum(groupe?.etape),
+        })),
+        conflits_details_total: Array.isArray(reprises?.conflits_details)
+          ? reprises.conflits_details.length
+          : SchedulerEngine._safeNum(reprises?.conflits_details_total, 0),
+        transferts_globaux_total: Array.isArray(reprises?.transferts_globaux)
+          ? reprises.transferts_globaux.length
+          : SchedulerEngine._safeNum(reprises?.transferts_globaux_total, 0),
+        affectations_individuelles_dernier_recours_total: Array.isArray(
+          reprises?.affectations_individuelles_dernier_recours
+        )
+          ? reprises.affectations_individuelles_dernier_recours.length
+          : SchedulerEngine._safeNum(
+              reprises?.affectations_individuelles_dernier_recours_total,
+              0
+            ),
+        diagnostic_etudiants_total: Array.isArray(reprises?.diagnostic_etudiants)
+          ? reprises.diagnostic_etudiants.length
+          : SchedulerEngine._safeNum(reprises?.diagnostic_etudiants_total, 0),
+      },
+      optimisation_locale: {
+        modeOptimisationUtilise: optim?.modeOptimisationUtilise || null,
+        modeScoringReference: optim?.modeScoringReference || null,
+        scoreAvantOptimisationLocale: SchedulerEngine._safeNum(
+          optim?.scoreAvantOptimisationLocale,
+          0
+        ),
+        scoreApresOptimisationLocale: SchedulerEngine._safeNum(
+          optim?.scoreApresOptimisationLocale,
+          0
+        ),
+        nombreAmeliorationsRetenues: SchedulerEngine._safeNum(
+          optim?.nombreAmeliorationsRetenues,
+          0
+        ),
+        principauxGainsConstates: optim?.principauxGainsConstates || {},
+        fallbackLectureSeule: Boolean(optim?.fallbackLectureSeule),
+        erreur: optim?.erreur || null,
+      },
+      scoring_v1: details?.scoring_v1 || null,
+    };
+  }
+
+  static _construirePayloadRapportPersistant({
+    rapport,
+    nonPlanifies,
+    conflitsReprises,
+    snapshotRapportMetier,
+  }) {
+    const nonPlanifiesPersistes =
+      SchedulerEngine._normaliserNonPlanifiesPourRapportPersistant(nonPlanifies);
+    const resolutionsPersistees =
+      SchedulerEngine._normaliserResolutionsPourRapportPersistant(conflitsReprises);
+
+    return {
+      non_planifies: nonPlanifiesPersistes,
+      resolutions_manuelles: resolutionsPersistees,
+      details: SchedulerEngine._construireDetailsRapportPersistant(rapport?.details || {}),
+      rapport_metier: snapshotRapportMetier || null,
+      resume_metier: {
+        raisons_non_planifiees: SchedulerEngine._resumerRaisonsRapport(
+          nonPlanifiesPersistes
+        ),
+        raisons_reprises: SchedulerEngine._resumerRaisonsRapport(
+          resolutionsPersistees
+        ),
+      },
+      meta_persistance: {
+        non_planifies_total: nonPlanifiesPersistes.length,
+        resolutions_manuelles_total: resolutionsPersistees.length,
+      },
+    };
+  }
+
+  static _serialiserPayloadRapportPersistant(payload) {
+    const maxBytes = 1024 * 1024;
+    const mesurer = (value) =>
+      Buffer.byteLength(JSON.stringify(value), "utf8");
+
+    if (mesurer(payload) <= maxBytes) {
+      return JSON.stringify(payload);
+    }
+
+    const compactPayload = {
+      ...payload,
+      non_planifies: Array.isArray(payload?.non_planifies)
+        ? payload.non_planifies.slice(0, 200)
+        : [],
+      resolutions_manuelles: Array.isArray(payload?.resolutions_manuelles)
+        ? payload.resolutions_manuelles.slice(0, 200)
+        : [],
+      meta_persistance: {
+        ...(payload?.meta_persistance || {}),
+        payload_compacte: true,
+        mode_compactage: "liste_limitee",
+        non_planifies_persistes: Math.min(
+          Array.isArray(payload?.non_planifies) ? payload.non_planifies.length : 0,
+          200
+        ),
+        resolutions_manuelles_persistes: Math.min(
+          Array.isArray(payload?.resolutions_manuelles)
+            ? payload.resolutions_manuelles.length
+            : 0,
+          200
+        ),
+      },
+    };
+
+    if (mesurer(compactPayload) <= maxBytes) {
+      return JSON.stringify(compactPayload);
+    }
+
+    const minimalPayload = {
+      non_planifies: Array.isArray(compactPayload?.non_planifies)
+        ? compactPayload.non_planifies.slice(0, 50)
+        : [],
+      resolutions_manuelles: Array.isArray(compactPayload?.resolutions_manuelles)
+        ? compactPayload.resolutions_manuelles.slice(0, 50)
+        : [],
+      details: {
+        mode_planification: compactPayload?.details?.mode_planification || null,
+        modeOptimisationUtilise:
+          compactPayload?.details?.modeOptimisationUtilise || null,
+        qualite: compactPayload?.details?.qualite || null,
+        optimisation_locale: compactPayload?.details?.optimisation_locale || {},
+        scoring_v1: compactPayload?.details?.scoring_v1 || null,
+      },
+      rapport_metier: compactPayload?.rapport_metier || null,
+      resume_metier: compactPayload?.resume_metier || {},
+      meta_persistance: {
+        ...(compactPayload?.meta_persistance || {}),
+        payload_compacte: true,
+        mode_compactage: "minimal",
+        non_planifies_persistes: Math.min(
+          Array.isArray(compactPayload?.non_planifies)
+            ? compactPayload.non_planifies.length
+            : 0,
+          50
+        ),
+        resolutions_manuelles_persistes: Math.min(
+          Array.isArray(compactPayload?.resolutions_manuelles)
+            ? compactPayload.resolutions_manuelles.length
+            : 0,
+          50
+        ),
+      },
+    };
+
+    return JSON.stringify(minimalPayload);
+  }
+
+  static async _persisterRapportGeneration({
+    idSession,
+    idUtilisateur,
+    rapport,
+    nonPlanifies,
+    conflitsReprises,
+    snapshotRapportMetier,
+  }) {
+    const payload = SchedulerEngine._construirePayloadRapportPersistant({
+      rapport,
+      nonPlanifies,
+      conflitsReprises,
+      snapshotRapportMetier,
+    });
+    const detailsSerialises =
+      SchedulerEngine._serialiserPayloadRapportPersistant(payload);
+
+    await pool.query(
+      `INSERT INTO rapports_generation
+       (id_session, genere_par, score_qualite, nb_cours_planifies,
+        nb_cours_non_planifies, nb_cours_echoues_traites, nb_cours_en_ligne_generes,
+        nb_groupes_speciaux, nb_resolutions_manuelles, details)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        SchedulerEngine._safeNum(idSession) || null,
+        SchedulerEngine._safeNum(idUtilisateur) || null,
+        SchedulerEngine._safeNum(rapport?.score_qualite, 0),
+        SchedulerEngine._safeNum(rapport?.nb_cours_planifies, 0),
+        SchedulerEngine._safeNum(rapport?.nb_cours_non_planifies, 0),
+        SchedulerEngine._safeNum(rapport?.nb_cours_echoues_traites, 0),
+        SchedulerEngine._safeNum(rapport?.nb_cours_en_ligne_generes, 0),
+        SchedulerEngine._safeNum(rapport?.nb_groupes_speciaux, 0),
+        SchedulerEngine._safeNum(rapport?.nb_resolutions_manuelles, 0),
+        detailsSerialises,
+      ]
+    );
+  }
+
   static _construireSnapshotRapportMetier({
     etudiants,
     affectationsEtudiantGroupe,
@@ -2551,7 +2836,9 @@ export class SchedulerEngine {
    * Passe 2 assouplie avec stabilite partielle.
    * Utilise le filtrage par date (meme approche que Phase 4) avec un seuil
    * de couverture plus bas (40%) pour maximiser la recuperation.
-   * Cascade : in-person complet → hybride → entierement en ligne.
+   * Le mode de diffusion reste strictement piloté par la donnee metier :
+   * - un cours presentiel reste presentiel ;
+   * - un cours en ligne reste en ligne, sans salle.
    */
   static _trouverSerieAssouplie({
     cours, groupe, idGroupe, professeurs, salles,
@@ -2695,85 +2982,8 @@ export class SchedulerEngine {
             }
           }
 
-          // Tentative 2 : hybride (in-person quand salle dispo, en ligne sinon)
-          if (onlineEnabled && !cours.est_en_ligne && sallesCompat.length > 0) {
-            const placements = datesDisponibles.map((date) => {
-              let sa = null;
-              for (const s of sallesCompat) {
-                if (
-                  matrix.salleLibre(s.id_salle, date, timeWindow.debut, timeWindow.fin) &&
-                  AvailabilityChecker.salleDisponible(s.id_salle, date, indispoParSalle)
-                ) { sa = s; break; }
-              }
-              return {
-                id_cours: cours.id_cours, code_cours: cours.code, nom_cours: cours.nom,
-                id_professeur: prof.id_professeur,
-                nom_professeur: `${prof.prenom} ${prof.nom}`,
-                id_salle: sa ? sa.id_salle : null,
-                code_salle: sa ? sa.code : "EN LIGNE",
-                date, heure_debut: timeWindow.debut, heure_fin: timeWindow.fin,
-                dureeHeures: timeWindow.dureeHeures,
-                slotStartIndex: timeWindow.slotStartIndex,
-                slotEndIndex: timeWindow.slotEndIndex,
-                nom_groupe: groupe.nomGroupe, id_groupe: idGroupe,
-                est_en_ligne: !sa,
-                est_cours_cle: Boolean(cours.est_cours_cle),
-                est_groupe_special: false,
-              };
-            });
-            meilleurCandidat = SchedulerEngine._enregistrerMeilleurCandidatSerie({
-              meilleurCandidat,
-              score: SchedulerEngine._scoreCandidatSerie({
-                cours,
-                groupe,
-                idGroupe,
-                professeur: prof,
-                salle: null,
-                jourSemaine,
-                creneau: timeWindow,
-                slotIndex: slotIdx,
-                slotStartIndex: timeWindow.slotStartIndex,
-                slotEndIndex: timeWindow.slotEndIndex,
-                dureeHeures: timeWindow.dureeHeures,
-                chargeSeriesParJour,
-                chargeSeriesParGroupeJour,
-                chargeSeriesParProfJour,
-                slotsParGroupeJour,
-                slotsParProfJour,
-                indexJour,
-                indexProfesseur,
-                indexCreneau,
-                fallbackTypeIndex: 1,
-                coverageRatio: datesDisponibles.length / datesToutes.length,
-                roomCoverageRatio:
-                  placements.filter((placement) => Number(placement.id_salle || 0) > 0).length /
-                  datesToutes.length,
-                optimizationMode,
-                phase: "fallback",
-              }),
-              payload: {
-                reservationType: "placements",
-                placements,
-                professeur: prof,
-                salle: null,
-                jourSemaine,
-                matrix,
-                chargeSeriesParProf,
-                chargeSeriesParJour,
-                chargeSeriesParGroupeJour,
-                chargeSeriesParProfJour,
-                slotsParGroupeJour,
-                slotsParProfJour,
-                slotIdx,
-                cours,
-                groupe,
-                resourcePlacementIndex,
-              },
-            });
-          }
-
-          // Tentative 3 : entierement en ligne
-          if (onlineEnabled) {
+          // Tentative 2 : entierement en ligne pour les cours explicitement marques
+          if (onlineEnabled && cours.est_en_ligne) {
             const placements = datesDisponibles.map((date) => ({
               id_cours: cours.id_cours, code_cours: cours.code, nom_cours: cours.nom,
               id_professeur: prof.id_professeur,
@@ -2810,7 +3020,7 @@ export class SchedulerEngine {
                 indexJour,
                 indexProfesseur,
                 indexCreneau,
-                fallbackTypeIndex: 2,
+                fallbackTypeIndex: 1,
                 coverageRatio: datesDisponibles.length / datesToutes.length,
                 roomCoverageRatio: 0,
                 optimizationMode,

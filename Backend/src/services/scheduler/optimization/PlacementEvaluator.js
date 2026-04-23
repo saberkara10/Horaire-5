@@ -561,8 +561,8 @@ function scoreLegacyFallbackCandidate(candidate) {
  * @returns {number} Base de score fallback pour les modes opt-in.
  *
  * Effets secondaires : aucun.
- * Cas particuliers : le presentiel integral reste prefere a l'hybride, lui-meme
- * prefere au tout en ligne.
+ * Cas particuliers : le presentiel integral reste prefere au mode en ligne
+ * explicite, qui reste lui-meme penalise via `fallbackTypeIndex`.
  */
 function scoreAdaptiveFallbackCandidate(candidate) {
   return (

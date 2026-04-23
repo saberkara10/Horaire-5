@@ -138,6 +138,25 @@ describe("Tests modele Horaire", () => {
     ).toBe(false);
   });
 
+  test("professeurEstCompatibleAvecCours accepte un cours en ligne meme sans assignation explicite", () => {
+    const map = new Map([[1, new Set([99])]]);
+
+    expect(
+      professeurEstCompatibleAvecCours(
+        {
+          id_professeur: 1,
+          specialite: "Comptabilite",
+        },
+        {
+          id_cours: 10,
+          programme: "Programmation informatique",
+          est_en_ligne: 1,
+        },
+        map
+      )
+    ).toBe(true);
+  });
+
   test("salleEstCompatibleAvecCours retourne true pour une salle du meme type meme si la salle de reference differe", () => {
     expect(
       salleEstCompatibleAvecCours(
@@ -168,6 +187,16 @@ describe("Tests modele Horaire", () => {
         }
       )
     ).toBe(false);
+  });
+
+  test("salleEstCompatibleAvecCours accepte un cours en ligne sans salle", () => {
+    expect(
+      salleEstCompatibleAvecCours(null, {
+        id_cours: 1,
+        type_salle: "Laboratoire",
+        est_en_ligne: 1,
+      })
+    ).toBe(true);
   });
 
   test("verifierDisponibiliteProfesseur retourne false quand le professeur n'est pas disponible", async () => {
@@ -395,6 +424,100 @@ describe("Tests modele Horaire", () => {
       expect.stringContaining("INSERT INTO affectation_groupes"),
       [4, 22]
     );
+  });
+
+  test("creerAffectationValidee accepte un cours en ligne sans salle", async () => {
+    connectionMock.query.mockImplementation(async (sql, params) => {
+      const sessionResult = mockSessionActiveQuery(sql);
+      if (sessionResult) {
+        return sessionResult;
+      }
+
+      if (sql.includes("FROM cours")) {
+        return [[
+          {
+            id_cours: 1,
+            code: "INF101",
+            nom: "Programmation",
+            programme: "Programmation informatique",
+            etape_etude: "1",
+            type_salle: "Laboratoire",
+            id_salle_reference: null,
+            est_en_ligne: 1,
+          },
+        ]];
+      }
+
+      if (sql.includes("FROM professeurs")) {
+        return [[
+          {
+            id_professeur: 2,
+            matricule: "MAT002",
+            nom: "Martin",
+            prenom: "Lea",
+            specialite: "Comptabilite et gestion",
+          },
+        ]];
+      }
+
+      if (sql.includes("FROM salles")) {
+        throw new Error(`Aucune requete salle attendue pour un cours en ligne: ${sql}`);
+      }
+
+      if (sql.includes("FROM groupes_etudiants ge")) {
+        return [[
+          {
+            id_groupes_etudiants: 4,
+            nom_groupe: "Programmation informatique - E1 - Automne - G1",
+            programme: "Programmation informatique",
+            etape: "1",
+            session: "Automne",
+            effectif: 24,
+          },
+        ]];
+      }
+
+      if (sql.includes("FROM affectation_groupes ag")) {
+        return [[{ conflits: 0 }]];
+      }
+
+      if (sql.includes("WHERE ac.id_professeur = ?")) {
+        return [[{ conflits: 0 }]];
+      }
+
+      if (sql.includes("INSERT INTO plages_horaires")) {
+        return [{ insertId: 11 }];
+      }
+
+      if (sql.includes("INSERT INTO affectation_cours")) {
+        expect(params).toEqual([1, 2, null, 11]);
+        return [{ insertId: 22 }];
+      }
+
+      if (sql.includes("INSERT INTO affectation_groupes")) {
+        return [{ insertId: 33 }];
+      }
+
+      return [[]];
+    });
+
+    recupererIndexCoursProfesseursMock.mockResolvedValue(new Map());
+    recupererDisponibilitesProfesseursMock.mockResolvedValue(new Map());
+
+    const resultat = await creerAffectationValidee({
+      idCours: 1,
+      idProfesseur: 2,
+      idSalle: null,
+      idGroupeEtudiants: 4,
+      date: "2026-03-23",
+      heureDebut: "08:00",
+      heureFin: "10:00",
+    });
+
+    expect(resultat).toEqual({
+      id_affectation_cours: 22,
+      id_plage_horaires: 11,
+    });
   });
 
   test("creerAffectationValidee rejette un groupe deja occupe sur le meme creneau", async () => {
@@ -1231,6 +1354,104 @@ describe("Tests modele Horaire", () => {
     });
 
     expect(resultat.affectations[0].date).toBe("2026-03-28");
+  });
+
+  test("genererHoraireAutomatiquement peut planifier un cours en ligne sans salle", async () => {
+    connectionMock.query.mockImplementation(async (sql) => {
+      if (sql.includes("FROM cours")) {
+        return [[
+          {
+            id_cours: 1,
+            code: "INF101",
+            nom: "Programmation",
+            duree: 2,
+            programme: "Programmation informatique",
+            etape_etude: "1",
+            type_salle: "Laboratoire",
+            id_salle_reference: null,
+            est_en_ligne: 1,
+          },
+        ]];
+      }
+
+      if (sql.includes("FROM professeurs")) {
+        return [[
+          {
+            id_professeur: 2,
+            matricule: "P-001",
+            nom: "Martin",
+            prenom: "Lea",
+            specialite: "Comptabilite",
+          },
+        ]];
+      }
+
+      if (sql.includes("FROM salles")) {
+        return [[]];
+      }
+
+      if (
+        sql.includes(
+          "SELECT id_etudiant, id_groupes_etudiants, programme, etape, session"
+        )
+      ) {
+        return [[
+          {
+            id_etudiant: 10,
+            id_groupes_etudiants: null,
+            programme: "Programmation informatique",
+            etape: 1,
+            session: "Automne",
+          },
+        ]];
+      }
+
+      if (sql.includes("INSERT INTO groupes_etudiants")) {
+        return [{ insertId: 4 }];
+      }
+
+      if (sql.includes("UPDATE etudiants")) {
+        return [{ affectedRows: 1 }];
+      }
+
+      if (sql.includes("FROM affectation_groupes ag")) {
+        return [[{ conflits: 0 }]];
+      }
+
+      if (sql.includes("WHERE ac.id_professeur = ?")) {
+        return [[{ conflits: 0 }]];
+      }
+
+      if (sql.includes("INSERT INTO plages_horaires")) {
+        return [{ insertId: 11 }];
+      }
+
+      if (sql.includes("INSERT INTO affectation_cours")) {
+        return [{ insertId: 22 }];
+      }
+
+      if (sql.includes("INSERT INTO affectation_groupes")) {
+        return [{ insertId: 33 }];
+      }
+
+      return [[]];
+    });
+
+    recupererDisponibilitesProfesseursMock.mockResolvedValue(new Map());
+    recupererIndexCoursProfesseursMock.mockResolvedValue(new Map());
+
+    const resultat = await genererHoraireAutomatiquement({
+      programme: "Programmation informatique",
+      etape: "1",
+      session: "Automne",
+    });
+
+    expect(resultat.affectations).toHaveLength(1);
+    expect(resultat.affectations[0]).toMatchObject({
+      id_affectation_cours: 22,
+      salle: "En ligne",
+    });
+    expect(resultat.non_planifies).toEqual([]);
   });
 });
 /**

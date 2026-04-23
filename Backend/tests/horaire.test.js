@@ -204,9 +204,42 @@ describe("Tests routes Horaires", () => {
     expect(response.statusCode).toBe(400);
     expect(response.body).toEqual({
       message:
-        "Champs obligatoires manquants: id_salle, id_groupes_etudiants, date, heure_debut, heure_fin.",
+        "Champs obligatoires manquants: id_groupes_etudiants, date, heure_debut, heure_fin.",
     });
     expect(horaireModelMock.planifierAffectationManuelle).not.toHaveBeenCalled();
+  });
+
+  test("POST /api/horaires accepte une affectation en ligne sans salle", async () => {
+    horaireModelMock.planifierAffectationManuelle.mockResolvedValue({
+      id_affectation_cours: 8,
+      id_plage_horaires: 4,
+    });
+
+    const response = await request(app).post("/api/horaires").send({
+      id_cours: 1,
+      id_professeur: 2,
+      id_salle: null,
+      id_groupes_etudiants: 4,
+      date: "2026-03-23",
+      heure_debut: "08:00",
+      heure_fin: "10:00",
+    });
+
+    expect(response.statusCode).toBe(201);
+    expect(horaireModelMock.planifierAffectationManuelle).toHaveBeenCalledWith({
+      idCours: 1,
+      idProfesseur: 2,
+      idSalle: null,
+      idGroupeEtudiants: 4,
+      date: "2026-03-23",
+      heureDebut: "08:00",
+      heureFin: "10:00",
+      portee: {
+        mode: "single",
+        date_debut: null,
+        date_fin: null,
+      },
+    });
   });
 
   test("POST /api/horaires refuse un format d'heure invalide", async () => {
@@ -378,9 +411,42 @@ describe("Tests routes Horaires", () => {
     expect(response.statusCode).toBe(400);
     expect(response.body).toEqual({
       message:
-        "Champs obligatoires manquants: id_professeur, id_salle, id_groupes_etudiants, date, heure_debut, heure_fin.",
+        "Champs obligatoires manquants: id_professeur, id_groupes_etudiants, date, heure_debut, heure_fin.",
     });
     expect(horaireModelMock.replanifierAffectationManuelle).not.toHaveBeenCalled();
+  });
+
+  test("PUT /api/horaires/:id accepte une replanification en ligne sans salle", async () => {
+    horaireModelMock.replanifierAffectationManuelle.mockResolvedValue({
+      id_affectation_cours: 4,
+      id_salle: null,
+    });
+
+    const response = await request(app).put("/api/horaires/4").send({
+      id_cours: 1,
+      id_professeur: 2,
+      id_salle: null,
+      id_groupes_etudiants: 6,
+      date: "2026-03-24",
+      heure_debut: "09:00",
+      heure_fin: "11:00",
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(horaireModelMock.replanifierAffectationManuelle).toHaveBeenCalledWith(4, {
+      idCours: 1,
+      idProfesseur: 2,
+      idSalle: null,
+      idGroupeEtudiants: 6,
+      date: "2026-03-24",
+      heureDebut: "09:00",
+      heureFin: "11:00",
+      portee: {
+        mode: "single",
+        date_debut: null,
+        date_fin: null,
+      },
+    });
   });
 
   test("PUT /api/horaires/:id refuse un format d'heure invalide", async () => {

@@ -6,7 +6,7 @@
  * des variables d'environnement dans le fichier .env du projet.
  *
  * Variables d'environnement supportées :
- *  - ENABLE_ONLINE_COURSES             → "true"/"1"/"yes"/"on" pour activer les cours en ligne
+ *  - ENABLE_ONLINE_COURSES             → "false"/"0"/"no"/"off" pour desactiver explicitement les cours en ligne
  *  - SCHEDULER_TARGET_GROUP_SIZE       → taille cible d'un groupe (ex: 26)
  *  - SCHEDULER_MAX_GROUP_CAPACITY      → capacité maximale d'un groupe (ex: 30)
  *  - SCHEDULER_MAX_GROUPS_PER_PROFESSOR → nombre max de groupes par professeur (ex: 16)
@@ -25,6 +25,7 @@
  * @type {Set<string>}
  */
 const TRUE_VALUES = new Set(["1", "true", "yes", "on"]);
+const FALSE_VALUES = new Set(["0", "false", "no", "off"]);
 
 /**
  * Taille cible d'un groupe d'étudiants.
@@ -70,39 +71,48 @@ function readPositiveInteger(rawValue, fallback) {
 /**
  * Vérifie si la planification des cours en ligne est activée.
  *
- * Par défaut, les cours marqués `est_en_ligne = 1` sont exclus de la planification
- * (ils n'ont pas besoin de salle physique). Ce comportement peut être désactivé
- * pour les tests ou les configurations spéciales via ENABLE_ONLINE_COURSES.
+ * Les cours en ligne font maintenant partie du comportement metier standard :
+ * ils sont planifies par defaut avec les memes contraintes pedagogiques que les
+ * cours presentiels, mais sans consommer de salle.
  *
- * @returns {boolean} true si ENABLE_ONLINE_COURSES est défini à une valeur "vraie"
+ * Un flag d'environnement subsiste uniquement comme garde-fou de repli pour
+ * des diagnostics ou tests de non-regression.
+ *
+ * @returns {boolean} true sauf si ENABLE_ONLINE_COURSES desactive explicitement le support
  */
 export function isOnlineCourseSchedulingEnabled() {
   const brute = String(process.env.ENABLE_ONLINE_COURSES || "").trim().toLowerCase();
   if (!brute) {
-    return false; // Non défini → comportement par défaut : cours en ligne exclus
+    return true;
   }
 
-  return TRUE_VALUES.has(brute);
+  if (FALSE_VALUES.has(brute)) {
+    return false;
+  }
+
+  return TRUE_VALUES.has(brute) || !FALSE_VALUES.has(brute);
 }
 
 /**
- * Détermine si un cours donné peut être planifié par le moteur.
+ * Détermine si un cours donne peut etre planifie par le moteur.
  *
- * Règle : les cours en ligne sont exclus sauf si ENABLE_ONLINE_COURSES est activé.
- * Cela permet d'inclure les cours en ligne dans les tests sans supprimer la logique
- * de filtrage pour la production.
+ * Les cours en ligne sont planifiables comme les cours presentiels. Le flag
+ * global ne sert plus qu'au rollback explicite.
  *
- * @param {object|null} cours - L'objet cours à évaluer
+ * @param {object|null} cours - L'objet cours a evaluer
  * @param {number|string} [cours.est_en_ligne] - 1 si le cours est en ligne
- * @returns {boolean} true si ce cours doit être planifié
+ * @returns {boolean} true si ce cours doit etre planifie
  */
 export function isCourseSchedulable(cours) {
-  if (isOnlineCourseSchedulingEnabled()) {
-    return true; // Mode test : tous les cours sont planifiables
+  if (!cours) {
+    return false;
   }
 
-  // Un cours avec est_en_ligne = 1 est exclu de la planification physique
-  return !Boolean(Number(cours?.est_en_ligne || 0));
+  if (Number(cours.est_en_ligne || 0) === 1) {
+    return isOnlineCourseSchedulingEnabled();
+  }
+
+  return true;
 }
 
 /**

@@ -54,7 +54,7 @@ disponibilites.
 
 | Variable | Valeur par defaut | Effet |
 |---|---:|---|
-| `ENABLE_ONLINE_COURSES` | `false` | Active les cours en ligne dans le moteur principal, le fallback et les reprises |
+| `ENABLE_ONLINE_COURSES` | `true` | Laisse actifs les cours explicitement marques en ligne; mettre `false` ne sert qu'au repli ou aux tests |
 | `SCHEDULER_TARGET_GROUP_SIZE` | `26` | Taille cible des groupes formes par `GroupFormer` |
 | `SCHEDULER_MAX_GROUP_CAPACITY` | `30` | Capacite operationnelle maximale d'un groupe |
 | `SCHEDULER_MAX_GROUPS_PER_PROFESSOR` | `16` | Plafond de groupes distincts par professeur dans le moteur principal |
@@ -243,7 +243,7 @@ La reponse HTTP est de type :
 | `nb_cours_planifies` | Nombre total de placements persistables |
 | `nb_cours_non_planifies` | Nombre de cas restes sans solution |
 | `nb_cours_echoues_traites` | Nombre de demandes de reprises analysees |
-| `nb_cours_en_ligne_generes` | Nombre de placements en ligne ou hybrides retenus |
+| `nb_cours_en_ligne_generes` | Nombre de placements explicitement en ligne retenus |
 | `nb_groupes_speciaux` | Reserve pour les groupes speciaux, actuellement `0` dans le flux principal |
 | `nb_resolutions_manuelles` | Nombre de reprises restees sans solution automatique |
 | `affectations` | Placements retenus et enrichis avec `id_affectation_cours` |
@@ -417,7 +417,7 @@ Symptome :
 Actions :
 
 - verifier les cours non archives ;
-- verifier `ENABLE_ONLINE_COURSES` si le catalogue cible contient des cours en ligne ;
+- verifier qu'un rollback explicite `ENABLE_ONLINE_COURSES=false` n'a pas ete active si le catalogue cible contient des cours en ligne ;
 - verifier le bootstrap du catalogue.
 
 ### Beaucoup de `AUCUN_PROFESSEUR_COMPATIBLE`

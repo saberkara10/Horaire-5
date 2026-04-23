@@ -272,6 +272,12 @@
   border-color: rgba(15, 138, 67, 0.24);
 }
 
+.status-pill--online {
+  background: linear-gradient(135deg, rgba(239, 248, 211, 0.98), rgba(218, 238, 151, 0.98));
+  color: #365314;
+  border-color: rgba(95, 139, 46, 0.3);
+}
+
 .detail-card {
   display: grid;
   gap: 1.1rem;

@@ -20,6 +20,24 @@ describe("scheduler constraints", () => {
     );
   });
 
+  test("considere tous les professeurs compatibles pour un cours en ligne", () => {
+    expect(
+      AvailabilityChecker.profCompatible(
+        {
+          id_professeur: 7,
+          specialite: "Comptabilite",
+          cours_ids: [],
+        },
+        {
+          id_cours: 42,
+          programme: "Programmation informatique",
+          nom: "Services web",
+          est_en_ligne: 1,
+        }
+      )
+    ).toBe(true);
+  });
+
   test("limite un professeur a dix groupes distincts sur la session", () => {
     const matrix = new ConstraintMatrix();
 

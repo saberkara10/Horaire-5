@@ -97,6 +97,15 @@ function normaliserTexte(texte) {
 }
 
 function calculerScoreProfesseur(professeur, cours, coursParProfesseur = null) {
+  if (Number(cours?.est_en_ligne || 0) === 1) {
+    const coursAutorises = coursParProfesseur?.get(Number(professeur.id_professeur));
+    if (coursAutorises?.has(Number(cours.id_cours))) {
+      return 2;
+    }
+
+    return programmesCorrespondent(professeur.specialite, cours.programme) ? 2 : 1;
+  }
+
   const coursAutorises = coursParProfesseur?.get(Number(professeur.id_professeur));
 
   if (!coursAutorises || !coursAutorises.has(Number(cours.id_cours))) {
@@ -161,6 +170,10 @@ function trierProfesseursPourCours(
 }
 
 export function salleEstCompatibleAvecCours(salle, cours) {
+  if (Number(cours?.est_en_ligne || 0) === 1) {
+    return true;
+  }
+
   return normaliserTexte(salle?.type) === normaliserTexte(cours?.type_salle);
 }
 
@@ -385,10 +398,17 @@ function construireFiltreAffectationExclue(idAffectationExclue) {
   };
 }
 
+function normaliserIdentifiantOptionnel(value) {
+  const identifiant = Number(value);
+  return Number.isInteger(identifiant) && identifiant > 0 ? identifiant : null;
+}
+
 async function recupererContexteAffectation(idCours, idProfesseur, idSalle, executor = pool) {
+  const idSalleNormalise = normaliserIdentifiantOptionnel(idSalle);
   const [[coursRows], [professeurRows], [salleRows]] = await Promise.all([
     executor.query(
-      `SELECT id_cours, code, nom, programme, etape_etude, type_salle, id_salle_reference
+      `SELECT id_cours, code, nom, programme, etape_etude, type_salle,
+              id_salle_reference, COALESCE(est_en_ligne, 0) AS est_en_ligne
        FROM cours
        WHERE id_cours = ?
        LIMIT 1`,
@@ -401,13 +421,15 @@ async function recupererContexteAffectation(idCours, idProfesseur, idSalle, exec
        LIMIT 1`,
       [idProfesseur]
     ),
-    executor.query(
-      `SELECT id_salle, code, type, capacite
-       FROM salles
-       WHERE id_salle = ?
-       LIMIT 1`,
-      [idSalle]
-    ),
+    idSalleNormalise
+      ? executor.query(
+          `SELECT id_salle, code, type, capacite
+           FROM salles
+           WHERE id_salle = ?
+           LIMIT 1`,
+          [idSalleNormalise]
+        )
+      : Promise.resolve([[]]),
   ]);
 
   return {
@@ -643,10 +665,21 @@ export async function getAllAffectations(options = {}, executor = pool) {
             c.code AS cours_code,
             c.nom AS cours_nom,
             c.duree AS cours_duree,
+            COALESCE(c.est_en_ligne, 0) AS est_en_ligne,
+            CASE
+              WHEN COALESCE(c.est_en_ligne, 0) = 1 THEN 'En ligne'
+              ELSE 'Presentiel'
+            END AS mode_cours,
             p.nom AS professeur_nom,
             p.prenom AS professeur_prenom,
-            s.code AS salle_code,
-            s.capacite AS salle_capacite,
+            CASE
+              WHEN COALESCE(c.est_en_ligne, 0) = 1 THEN 'En ligne'
+              ELSE s.code
+            END AS salle_code,
+            CASE
+              WHEN COALESCE(c.est_en_ligne, 0) = 1 THEN NULL
+              ELSE s.capacite
+            END AS salle_capacite,
             DATE_FORMAT(ph.date, '%Y-%m-%d') AS date,
             ph.heure_debut,
             ph.heure_fin,
@@ -671,6 +704,7 @@ export async function getAllAffectations(options = {}, executor = pool) {
               c.code,
               c.nom,
               c.duree,
+              c.est_en_ligne,
               p.nom,
               p.prenom,
               s.code,
@@ -699,9 +733,17 @@ export async function getAffectationById(idAffectation, executor = pool) {
             ac.id_planification_serie,
             c.code AS cours_code,
             c.nom AS cours_nom,
+            COALESCE(c.est_en_ligne, 0) AS est_en_ligne,
+            CASE
+              WHEN COALESCE(c.est_en_ligne, 0) = 1 THEN 'En ligne'
+              ELSE 'Presentiel'
+            END AS mode_cours,
             p.nom AS professeur_nom,
             p.prenom AS professeur_prenom,
-            s.code AS salle_code,
+            CASE
+              WHEN COALESCE(c.est_en_ligne, 0) = 1 THEN 'En ligne'
+              ELSE s.code
+            END AS salle_code,
             DATE_FORMAT(ph.date, '%Y-%m-%d') AS date,
             ph.heure_debut,
             ph.heure_fin,
@@ -726,6 +768,7 @@ export async function getAffectationById(idAffectation, executor = pool) {
               ac.id_planification_serie,
               c.code,
               c.nom,
+              c.est_en_ligne,
               p.nom,
               p.prenom,
               s.code,
@@ -1348,11 +1391,12 @@ export async function creerAffectationValidee(affectation, executor = pool) {
       heureFin,
     } = affectation;
     const idGroupeNumerique = Number(idGroupeEtudiants);
+    const idSalleNormalise = normaliserIdentifiantOptionnel(idSalle);
 
     const { cours, professeur, salle } = await recupererContexteAffectation(
       idCours,
       idProfesseur,
-      idSalle,
+      idSalleNormalise,
       transactionExecutor
     );
 
@@ -1367,7 +1411,9 @@ export async function creerAffectationValidee(affectation, executor = pool) {
       throw creerErreurHoraire("Professeur introuvable.", 404);
     }
 
-    if (!salle) {
+    const coursEstEnLigne = Number(cours.est_en_ligne || 0) === 1;
+
+    if (!coursEstEnLigne && !salle) {
       throw creerErreurHoraire("Salle introuvable.", 404);
     }
 
@@ -1387,7 +1433,7 @@ export async function creerAffectationValidee(affectation, executor = pool) {
         );
       }
 
-      if (!sallePeutAccueillirGroupe(salle, groupe)) {
+      if (!coursEstEnLigne && !sallePeutAccueillirGroupe(salle, groupe)) {
         throw creerErreurHoraire(
           "La salle ne peut pas accueillir l'effectif de ce groupe.",
           409
@@ -1399,7 +1445,7 @@ export async function creerAffectationValidee(affectation, executor = pool) {
       throw creerErreurHoraire("Professeur non compatible avec ce cours.", 409);
     }
 
-    if (!salleEstCompatibleAvecCours(salle, cours)) {
+    if (!coursEstEnLigne && !salleEstCompatibleAvecCours(salle, cours)) {
       throw creerErreurHoraire("Salle non compatible avec ce cours.", 409);
     }
 
@@ -1490,17 +1536,19 @@ export async function creerAffectationValidee(affectation, executor = pool) {
       }
     }
 
-    const conflitSalle = await verifierConflitSalle(
-      idSalle,
-      date,
-      heureDebut,
-      heureFin,
-      null,
-      transactionExecutor
-    );
+    if (!coursEstEnLigne) {
+      const conflitSalle = await verifierConflitSalle(
+        idSalleNormalise,
+        date,
+        heureDebut,
+        heureFin,
+        null,
+        transactionExecutor
+      );
 
-    if (conflitSalle > 0) {
-      throw creerErreurHoraire("Salle deja occupee sur ce creneau.", 409);
+      if (conflitSalle > 0) {
+        throw creerErreurHoraire("Salle deja occupee sur ce creneau.", 409);
+      }
     }
 
     const conflitProfesseur = await verifierConflitProfesseur(
@@ -1525,7 +1573,7 @@ export async function creerAffectationValidee(affectation, executor = pool) {
     const affectationResultat = await addAffectation(
       idCours,
       idProfesseur,
-      idSalle,
+      coursEstEnLigne ? null : idSalleNormalise,
       plageResultat.insertId,
       transactionExecutor
     );
@@ -1578,11 +1626,12 @@ export async function updateAffectationValidee(
       heureFin,
     } = affectation;
     const idGroupeNumerique = Number(idGroupeEtudiants);
+    const idSalleNormalise = normaliserIdentifiantOptionnel(idSalle);
 
     const { cours, professeur, salle } = await recupererContexteAffectation(
       idCours,
       idProfesseur,
-      idSalle,
+      idSalleNormalise,
       transactionExecutor
     );
     const coursParProfesseur =
@@ -1596,7 +1645,9 @@ export async function updateAffectationValidee(
       throw creerErreurHoraire("Professeur introuvable.", 404);
     }
 
-    if (!salle) {
+    const coursEstEnLigne = Number(cours.est_en_ligne || 0) === 1;
+
+    if (!coursEstEnLigne && !salle) {
       throw creerErreurHoraire("Salle introuvable.", 404);
     }
 
@@ -1616,7 +1667,7 @@ export async function updateAffectationValidee(
         );
       }
 
-      if (!sallePeutAccueillirGroupe(salle, groupe)) {
+      if (!coursEstEnLigne && !sallePeutAccueillirGroupe(salle, groupe)) {
         throw creerErreurHoraire(
           "La salle ne peut pas accueillir l'effectif de ce groupe.",
           409
@@ -1628,7 +1679,7 @@ export async function updateAffectationValidee(
       throw creerErreurHoraire("Professeur non compatible avec ce cours.", 409);
     }
 
-    if (!salleEstCompatibleAvecCours(salle, cours)) {
+    if (!coursEstEnLigne && !salleEstCompatibleAvecCours(salle, cours)) {
       throw creerErreurHoraire("Salle non compatible avec ce cours.", 409);
     }
 
@@ -1644,17 +1695,19 @@ export async function updateAffectationValidee(
       throw creerErreurHoraire("Professeur indisponible sur ce creneau.", 409);
     }
 
-    const conflitSalle = await verifierConflitSalle(
-      idSalle,
-      date,
-      heureDebut,
-      heureFin,
-      idAffectationNumerique,
-      transactionExecutor
-    );
+    if (!coursEstEnLigne) {
+      const conflitSalle = await verifierConflitSalle(
+        idSalleNormalise,
+        date,
+        heureDebut,
+        heureFin,
+        idAffectationNumerique,
+        transactionExecutor
+      );
 
-    if (conflitSalle > 0) {
-      throw creerErreurHoraire("Salle deja occupee sur ce creneau.", 409);
+      if (conflitSalle > 0) {
+        throw creerErreurHoraire("Salle deja occupee sur ce creneau.", 409);
+      }
     }
 
     const conflitProfesseur = await verifierConflitProfesseur(
@@ -1813,7 +1866,12 @@ export async function updateAffectationValidee(
       `UPDATE affectation_cours
        SET id_cours = ?, id_professeur = ?, id_salle = ?
        WHERE id_affectation_cours = ?`,
-      [idCours, idProfesseur, idSalle, idAffectationNumerique]
+      [
+        idCours,
+        idProfesseur,
+        coursEstEnLigne ? null : idSalleNormalise,
+        idAffectationNumerique,
+      ]
     );
 
     if (groupe) {
@@ -1861,6 +1919,7 @@ export async function genererHoraireAutomatiquement(options = {}) {
               programme,
               etape_etude,
               type_salle,
+              COALESCE(est_en_ligne, 0) AS est_en_ligne,
               id_salle_reference
        FROM cours
        WHERE archive = 0
@@ -1877,9 +1936,9 @@ export async function genererHoraireAutomatiquement(options = {}) {
        ORDER BY code ASC;`
     );
 
-    if (cours.length === 0 || professeurs.length === 0 || salles.length === 0) {
+    if (cours.length === 0 || professeurs.length === 0) {
       throw creerErreurHoraire(
-        "Il faut au moins 1 cours, 1 professeur et 1 salle.",
+        "Il faut au moins 1 cours et 1 professeur.",
         400
       );
     }
@@ -1923,8 +1982,14 @@ export async function genererHoraireAutomatiquement(options = {}) {
     const nonPlanifies = [];
 
     const coursTries = [...(coursSelectionnes.length > 0 ? coursSelectionnes : cours)].sort((coursA, coursB) => {
-      const sallesCoursA = trierSallesCompatibles(coursA, salles).length;
-      const sallesCoursB = trierSallesCompatibles(coursB, salles).length;
+      const sallesCoursA =
+        Number(coursA.est_en_ligne || 0) === 1
+          ? Number.MAX_SAFE_INTEGER
+          : trierSallesCompatibles(coursA, salles).length;
+      const sallesCoursB =
+        Number(coursB.est_en_ligne || 0) === 1
+          ? Number.MAX_SAFE_INTEGER
+          : trierSallesCompatibles(coursB, salles).length;
 
       if (sallesCoursA !== sallesCoursB) {
         return sallesCoursA - sallesCoursB;
@@ -1934,6 +1999,7 @@ export async function genererHoraireAutomatiquement(options = {}) {
     });
 
     for (const coursActuel of coursTries) {
+      const coursEstEnLigne = Number(coursActuel.est_en_ligne || 0) === 1;
       const groupesCompatibles = trouverGroupesCompatibles(
         coursActuel,
         groupesSelectionnes
@@ -1972,13 +2038,15 @@ export async function genererHoraireAutomatiquement(options = {}) {
       );
 
       for (const groupe of groupesCompatibles) {
-        const sallesCompatibles = trierSallesCompatibles(
-          coursActuel,
-          salles,
-          Number(groupe.effectif) || 0
-        );
+        const sallesCompatibles = coursEstEnLigne
+          ? [null]
+          : trierSallesCompatibles(
+              coursActuel,
+              salles,
+              Number(groupe.effectif) || 0
+            );
 
-        if (sallesCompatibles.length === 0) {
+        if (!coursEstEnLigne && sallesCompatibles.length === 0) {
           nonPlanifies.push({
             id_cours: coursActuel.id_cours,
             code_cours: coursActuel.code,
@@ -2040,24 +2108,26 @@ export async function genererHoraireAutomatiquement(options = {}) {
               }
 
               for (const salle of sallesCompatibles) {
-                const conflitSalle = await verifierConflitSalle(
-                  salle.id_salle,
-                  date,
-                  heureDebut,
-                  heureFin,
-                  null,
-                  connection
-                );
+                if (!coursEstEnLigne) {
+                  const conflitSalle = await verifierConflitSalle(
+                    salle.id_salle,
+                    date,
+                    heureDebut,
+                    heureFin,
+                    null,
+                    connection
+                  );
 
-                if (conflitSalle > 0) {
-                  continue;
+                  if (conflitSalle > 0) {
+                    continue;
+                  }
                 }
 
                 const resultat = await creerAffectationValidee(
                   {
                     idCours: coursActuel.id_cours,
                     idProfesseur: professeur.id_professeur,
-                    idSalle: salle.id_salle,
+                    idSalle: salle?.id_salle ?? null,
                     date,
                     heureDebut,
                     heureFin,
@@ -2080,7 +2150,7 @@ export async function genererHoraireAutomatiquement(options = {}) {
                   id_affectation_cours: resultat.id_affectation_cours,
                   cours: `${coursActuel.code} - ${coursActuel.nom}`,
                   professeur: `${professeur.prenom} ${professeur.nom}`,
-                  salle: salle.code,
+                  salle: coursEstEnLigne ? "En ligne" : salle.code,
                   date,
                   heure_debut: heureDebut,
                   heure_fin: heureFin,
@@ -2112,7 +2182,9 @@ export async function genererHoraireAutomatiquement(options = {}) {
             id_cours: coursActuel.id_cours,
             code_cours: coursActuel.code,
             groupe: groupe.nom_groupe,
-            raison: "Aucun creneau disponible avec un professeur et une salle libres.",
+            raison: coursEstEnLigne
+              ? "Aucun creneau disponible avec un professeur libre."
+              : "Aucun creneau disponible avec un professeur et une salle libres.",
           });
         }
       }

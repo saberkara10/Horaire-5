@@ -18,6 +18,7 @@ function createPoolQueryMock() {
       ],
       ["cours_echoues", new Set(["id"])],
       ["affectation_cours", new Set(["id_affectation_cours", "id_plage_horaires"])],
+      ["rapports_generation", new Set()],
     ]),
     indexesByTable: new Map(),
     constraintsByTable: new Map(),

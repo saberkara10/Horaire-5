@@ -266,16 +266,16 @@ motif stable incomplet mais robuste a un ensemble de placements fragiles.
 #### Etape 4B - Passe assouplie
 
 Si la recherche principale echoue, le moteur lance
-`_trouverSerieAssouplie()` avec une cascade de secours :
+`_trouverSerieAssouplie()` avec une strategie de secours qui conserve le mode du cours :
 
-- presentiel complet si une salle reste disponible ;
-- hybride si certaines dates doivent basculer en ligne ;
-- entierement en ligne si `ENABLE_ONLINE_COURSES` est active.
+- presentiel assoupli si le cours est presentiel et qu'une salle reste disponible ;
+- entierement en ligne si le cours est explicitement marque en ligne ;
+- jamais de bascule automatique d'un cours presentiel vers l'en ligne.
 
 La couverture minimale descend a `40%`.
 
-Le mode en ligne est donc un mecanisme d'assouplissement controle, pas la
-strategie nominale.
+Le mode en ligne est donc une propriete metier du cours, pas une conversion
+technique de derniere minute.
 
 #### Etape 4C - Garantie metier de 7 cours
 
@@ -498,7 +498,8 @@ Deux particularites sont structurantes :
   constantes du catalogue et des variables d'environnement ;
 - `professeur_cours` est la source de verite pour la compatibilite
   professeur/cours ; a defaut, la specialite texte sert de fallback ;
-- les cours en ligne sont desactives par defaut ;
+- les cours en ligne sont actives par defaut et ne peuvent etre coupes que par
+  un rollback explicite ;
 - les reprises privilegient les groupes reels existants plutot que des groupes
   dedies ;
 - le rapport final doit expliquer les echecs et proposer une action manuelle

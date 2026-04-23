@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { construireQueryGenerationScheduler } from "../services/scheduler.api.js";
 import {
   OPTIMIZATION_MODE_OPTIONS,
@@ -49,6 +50,12 @@ const SCORING_SCORE_ITEMS = [
   { key: "scoreProfesseur", label: "Score professeur" },
   { key: "scoreGroupe", label: "Score groupe" },
 ];
+const SCHEDULER_TABS = ["generation", "sessions", "historique"];
+
+function lireOngletScheduler(search) {
+  const onglet = new URLSearchParams(search).get("tab");
+  return SCHEDULER_TABS.includes(onglet) ? onglet : "generation";
+}
 
 function formaterValeurScoring(value) {
   const numericValue = Number(value);
@@ -179,6 +186,8 @@ function ScoringSummaryCard({ scoringSummary, scoringMode, subtitle, className =
 }
 
 export function SchedulerPage({ utilisateur, onLogout }) {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [sessions, setSessions]             = useState([]);
   const [rapports, setRapports]             = useState([]);
   const [selectedSession, setSelectedSession] = useState("");
@@ -195,7 +204,7 @@ export function SchedulerPage({ utilisateur, onLogout }) {
   const [rapportHistoriqueDetail, setRapportHistoriqueDetail] = useState(null);
   const [rapportHistoriqueLoading, setRapportHistoriqueLoading] = useState(false);
   const [erreur, setErreur]                 = useState("");
-  const [onglet, setOnglet]                 = useState("generation");
+  const [onglet, setOnglet]                 = useState(() => lireOngletScheduler(location.search));
   const [bootstrapMsg, setBootstrapMsg]     = useState(null);
 
   // Nouvelles sessions
@@ -220,6 +229,11 @@ export function SchedulerPage({ utilisateur, onLogout }) {
     chargerDonnees();
     return () => { if (sseRef.current) sseRef.current.close(); };
   }, []);
+
+  useEffect(() => {
+    const prochainOnglet = lireOngletScheduler(location.search);
+    setOnglet((courant) => (courant === prochainOnglet ? courant : prochainOnglet));
+  }, [location.search]);
 
   useEffect(() => {
     if (rapports.length === 0) {
@@ -257,6 +271,26 @@ export function SchedulerPage({ utilisateur, onLogout }) {
     } finally {
       setRapportHistoriqueLoading(false);
     }
+  }
+
+  function handleChangerOnglet(prochainOnglet) {
+    setOnglet(prochainOnglet);
+
+    const params = new URLSearchParams(location.search);
+    if (prochainOnglet === "generation") {
+      params.delete("tab");
+    } else {
+      params.set("tab", prochainOnglet);
+    }
+
+    const search = params.toString();
+    navigate(
+      {
+        pathname: location.pathname,
+        search: search ? `?${search}` : "",
+      },
+      { replace: true }
+    );
   }
 
   async function handleBootstrap() {
@@ -386,7 +420,7 @@ export function SchedulerPage({ utilisateur, onLogout }) {
             <button
               key={t}
               className={`scheduler-tab ${onglet === t ? "active" : ""}`}
-              onClick={() => setOnglet(t)}
+              onClick={() => handleChangerOnglet(t)}
             >
               {t === "generation" && "Generation"}
               {t === "sessions" && "Sessions"}
@@ -657,14 +691,46 @@ export function SchedulerPage({ utilisateur, onLogout }) {
                 )}
 
                 {!rapport && !generating && !erreur && (
-                  <div className="empty-state">
-                    <h3>Pret a generer</h3>
-                    <p>Configurez les paramètres et lancez la génération optimisée.</p>
+                  <div className="empty-state empty-state--ready">
+                    <h3>Moteur prêt à générer</h3>
+                    <p className="empty-state__lead">
+                      Vérifiez ces préalables avant de lancer la génération.
+                    </p>
                     <ul className="empty-tips">
-                      <li>Assurez-vous d'avoir une session active</li>
-                      <li>Importez vos etudiants avant de generer</li>
-                      <li>Verifiez les disponibilites des professeurs</li>
+                      <li>
+                        <span className="empty-tips__index">01</span>
+                        <span>Assurez-vous d'avoir tous les cours nécessaires.</span>
+                      </li>
+                      <li>
+                        <span className="empty-tips__index">02</span>
+                        <span>
+                          Assurez-vous d'avoir les professeurs compatibles et nécessaires
+                          pour couvrir tous les cours.
+                        </span>
+                      </li>
+                      <li>
+                        <span className="empty-tips__index">03</span>
+                        <span>
+                          Assurez-vous que les disponibilités de vos professeurs couvrent
+                          suffisamment toutes les affectations.
+                        </span>
+                      </li>
+                      <li>
+                        <span className="empty-tips__index">04</span>
+                        <span>
+                          Assurez-vous d'ajouter toutes les salles compatibles pour les
+                          cours que vous avez.
+                        </span>
+                      </li>
+                      <li>
+                        <span className="empty-tips__index">05</span>
+                        <span>Assurez-vous d'importer vos étudiants avant la génération.</span>
+                      </li>
                     </ul>
+                    <p className="empty-state__closing">
+                      Merci de respecter soigneusement ces critères pour avoir un très bon
+                      résultat satisfaisant.
+                    </p>
                   </div>
                 )}
               </div>

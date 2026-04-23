@@ -18,6 +18,22 @@ const EXISTE_HORAIRE_GROUPE_SQL = `EXISTS (
   WHERE ag.id_groupes_etudiants = ge.id_groupes_etudiants
 )`;
 
+function parseDashboardJson(value, fallback = null) {
+  if (!value) {
+    return fallback;
+  }
+
+  if (typeof value === "object") {
+    return value;
+  }
+
+  try {
+    return JSON.parse(value);
+  } catch {
+    return fallback;
+  }
+}
+
 async function recupererSessionActive(executor = pool) {
   const [rows] = await executor.query(
     `SELECT id_session, nom, date_debut, date_fin
@@ -115,7 +131,8 @@ async function recupererDernierRapportGeneration(executor = pool) {
          score_qualite,
          nb_cours_planifies,
          nb_cours_non_planifies,
-         date_generation
+         date_generation,
+         details
        FROM rapports_generation
        ORDER BY date_generation DESC
        LIMIT 1`
@@ -130,6 +147,7 @@ async function recupererDernierRapportGeneration(executor = pool) {
       nb_cours_planifies: Number(rows[0].nb_cours_planifies || 0),
       nb_cours_non_planifies: Number(rows[0].nb_cours_non_planifies || 0),
       date_generation: rows[0].date_generation,
+      details_bruts: parseDashboardJson(rows[0].details),
     };
   } catch (error) {
     if (error.code === "ER_NO_SUCH_TABLE") {

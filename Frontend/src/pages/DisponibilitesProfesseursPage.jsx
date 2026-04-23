@@ -1192,11 +1192,11 @@ export function DisponibilitesProfesseursPage({ utilisateur, onLogout }) {
                         Disponibilite
                       </span>
                       <span className="professeurs-page__legend-pill professeurs-page__legend-pill--occupied">
-                        Cours occupe
+                        Cours planifie
                       </span>
                       <p className="professeurs-page__schedule-note">
-                        Vert = disponibilites effectives sur la semaine cible. Bleu = cours
-                        planifies sur cette meme semaine.
+                        Vert = disponibilites du professeur. Bleu = cases deja occupees par des
+                        cours planifies sur cette semaine.
                       </p>
                     </div>
 

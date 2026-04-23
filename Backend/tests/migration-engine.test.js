@@ -8,17 +8,17 @@ import {
 describe("migration engine", () => {
   test("parseMigrationVersion extrait correctement la version", () => {
     expect(parseMigrationVersion("migration_v1.sql")).toBe(1);
-    expect(parseMigrationVersion("migration_v13.sql")).toBe(13);
+    expect(parseMigrationVersion("migration_v16.sql")).toBe(16);
     expect(() => parseMigrationVersion("foo.sql")).toThrow(
       "Invalid migration filename"
     );
   });
 
-  test("discoverMigrations retourne une sequence continue de v1 a v13", async () => {
+  test("discoverMigrations retourne une sequence continue de v1 a v16", async () => {
     const migrations = await discoverMigrations();
 
     expect(migrations.map((migration) => migration.version)).toEqual([
-      1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13,
+      1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
     ]);
     expect(migrations.every((migration) => migration.checksum.length === 64)).toBe(
       true

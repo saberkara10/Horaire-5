@@ -18,6 +18,7 @@ function createExecutorState(overrides = {}) {
         ],
         cours_echoues: ["id"],
         affectation_cours: ["id_affectation_cours", "id_plage_horaires"],
+        rapports_generation: [],
         ...(overrides.columnsByTable || {}),
       }).map(([table, columns]) => [table, new Set(columns)])
     ),
@@ -173,6 +174,10 @@ describe("academic-scheduler-schema", () => {
     expect(
       state.columnsByTable.get("affectation_cours").has("id_planification_serie")
     ).toBe(true);
+    expect(
+      state.columnsByTable.get("rapports_generation").has("nb_resolutions_manuelles")
+    ).toBe(true);
+    expect(state.columnsByTable.get("rapports_generation").has("details")).toBe(true);
 
     expect(
       state.constraintsByTable.get("groupes_etudiants")?.has("fk_groupes_session")
@@ -186,6 +191,12 @@ describe("academic-scheduler-schema", () => {
       state.constraintsByTable
         .get("cours_echoues")
         ?.has("fk_cours_echoues_groupe_reprise")
+    ).toBe(true);
+    expect(
+      state.constraintsByTable.get("rapports_generation")?.has("fk_rg_session")
+    ).toBe(true);
+    expect(
+      state.constraintsByTable.get("rapports_generation")?.has("fk_rg_user")
     ).toBe(true);
 
     const groupesIndexes = state.indexesByTable.get("groupes_etudiants") || [];
@@ -217,6 +228,11 @@ describe("academic-scheduler-schema", () => {
       )
     ).toBe(true);
     expect(
+      state.executedSql.some(({ sql }) =>
+        sql.startsWith("CREATE TABLE IF NOT EXISTS rapports_generation")
+      )
+    ).toBe(true);
+    expect(
       state.executedSql.some(({ sql }) => sql.includes("DROP INDEX"))
     ).toBe(false);
   });
@@ -242,6 +258,19 @@ describe("academic-scheduler-schema", () => {
           "id_affectation_cours",
           "id_plage_horaires",
           "id_planification_serie",
+        ],
+        rapports_generation: [
+          "id_session",
+          "genere_par",
+          "date_generation",
+          "score_qualite",
+          "nb_cours_planifies",
+          "nb_cours_non_planifies",
+          "nb_cours_echoues_traites",
+          "nb_cours_en_ligne_generes",
+          "nb_groupes_speciaux",
+          "nb_resolutions_manuelles",
+          "details",
         ],
       },
       indexesByTable: {
@@ -301,6 +330,7 @@ describe("academic-scheduler-schema", () => {
         affectation_etudiants: ["fk_affectation_etudiants_echange_cours"],
         cours_echoues: ["fk_cours_echoues_groupe_reprise"],
         affectation_cours: ["fk_affectation_cours_planification_serie"],
+        rapports_generation: ["fk_rg_session", "fk_rg_user"],
       },
     });
     const executor = createSchemaExecutor(state);

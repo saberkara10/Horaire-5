@@ -67,10 +67,24 @@ describe("SchedulerEngine fallback paths", () => {
 
   test("_trouverSerieAssouplie retourne null pour un cours en ligne si l'option est desactivee", () => {
     const fixture = createBaseFixture();
+    process.env.ENABLE_ONLINE_COURSES = "false";
 
     const result = SchedulerEngine._trouverSerieAssouplie({
       ...fixture,
       cours: { ...fixture.cours, est_en_ligne: 1 },
+      ...createIndexes(),
+      effectifGroupe: 3,
+    });
+
+    expect(result).toBeNull();
+  });
+
+  test("_trouverSerieAssouplie ne convertit plus un cours presentiel en cours en ligne", () => {
+    const fixture = createBaseFixture();
+
+    const result = SchedulerEngine._trouverSerieAssouplie({
+      ...fixture,
+      salles: [],
       ...createIndexes(),
       effectifGroupe: 3,
     });

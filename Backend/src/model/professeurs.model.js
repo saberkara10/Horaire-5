@@ -1532,9 +1532,16 @@ export async function recupererHoraireProfesseur(idProfesseur) {
         c.programme,
         c.etape_etude,
         c.duree,
+        COALESCE(c.est_en_ligne, 0) AS est_en_ligne,
         s.id_salle,
-        s.code AS code_salle,
-        s.type AS type_salle,
+        CASE
+          WHEN COALESCE(c.est_en_ligne, 0) = 1 THEN 'En ligne'
+          ELSE s.code
+        END AS code_salle,
+        CASE
+          WHEN COALESCE(c.est_en_ligne, 0) = 1 THEN 'En ligne'
+          ELSE s.type
+        END AS type_salle,
         ph.id_plage_horaires,
         DATE_FORMAT(ph.date, '%Y-%m-%d') AS date,
         ph.heure_debut,
@@ -1569,6 +1576,7 @@ export async function recupererHoraireProfesseur(idProfesseur) {
               c.programme,
               c.etape_etude,
               c.duree,
+              c.est_en_ligne,
               s.id_salle,
               s.code,
               s.type,

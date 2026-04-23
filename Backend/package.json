@@ -10,7 +10,7 @@
     "sync:capacity": "node scripts/synchroniser-capacite-academique.mjs",
     "test": "node scripts/clean-coverage.mjs && node --disable-warning=ExperimentalWarning --experimental-vm-modules node_modules/jest/bin/jest.js --coverage --runInBand",
     "test:coverage": "npm run test",
-    "migrate": "echo Import Backend/Database/GDH5.sql manually. See Backend/Database/README.md"
+    "migrate": "node Database/apply-schema-migrations.js"
   },
   "keywords": [],
   "author": "",

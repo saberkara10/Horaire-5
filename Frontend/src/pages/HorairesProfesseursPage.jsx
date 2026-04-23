@@ -18,6 +18,10 @@ import {
   getDebutSemaine,
   getIndexJourCalendrier,
 } from "../utils/calendar.js";
+import {
+  getCourseLocationLabel,
+  isOnlineCourseLike,
+} from "../utils/courseDelivery.js";
 import { ecouterSynchronisationPlanning } from "../utils/planningSync.js";
 import { usePopup } from "../components/feedback/PopupProvider.jsx";
 import "../styles/ProfesseursPage.css";
@@ -371,6 +375,7 @@ export function HorairesProfesseursPage({ utilisateur, onLogout }) {
                                   const seances = seancesMap[key] || [];
 
                                   return seances.map((seance) => {
+                                    const seanceEnLigne = isOnlineCourseLike(seance);
                                     const hauteur = getHauteurBloc(seance.heure_debut, seance.heure_fin);
                                     const debut = heureEnMinutes(seance.heure_debut);
                                     const heureRef = heureEnMinutes(HEURES[0]);
@@ -379,7 +384,11 @@ export function HorairesProfesseursPage({ utilisateur, onLogout }) {
                                     return (
                                       <motion.div
                                         key={seance.id_affectation_cours}
-                                        className="professeurs-page__session"
+                                        className={`professeurs-page__session ${
+                                          seanceEnLigne
+                                            ? "professeurs-page__session--online"
+                                            : ""
+                                        }`}
                                         style={{ top: `${top}px`, height: `${hauteur}px` }}
                                         whileHover={{ scale: 1.015 }}
                                         transition={{ duration: 0.15 }}
@@ -387,7 +396,12 @@ export function HorairesProfesseursPage({ utilisateur, onLogout }) {
                                         <strong>{seance.code_cours}</strong>
                                         <span>{seance.nom_cours}</span>
                                         <small>{seance.groupes || "Aucun groupe"}</small>
-                                        <small>{seance.code_salle}</small>
+                                        <small>{getCourseLocationLabel(seance)}</small>
+                                        {seanceEnLigne ? (
+                                          <small className="professeurs-page__session-mode">
+                                            En ligne
+                                          </small>
+                                        ) : null}
                                         <small>
                                           {normaliserHeure(seance.heure_debut)} -{" "}
                                           {normaliserHeure(seance.heure_fin)}
@@ -422,7 +436,14 @@ export function HorairesProfesseursPage({ utilisateur, onLogout }) {
                               </thead>
                               <tbody>
                                 {horaireProfesseur.map((seance) => (
-                                  <tr key={seance.id_affectation_cours}>
+                                  <tr
+                                    key={seance.id_affectation_cours}
+                                    className={
+                                      isOnlineCourseLike(seance)
+                                        ? "professeurs-page__schedule-row--online"
+                                        : ""
+                                    }
+                                  >
                                     <td>{formaterDateLongue(seance.date)}</td>
                                     <td>
                                       {normaliserHeure(seance.heure_debut)} -{" "}
@@ -432,7 +453,7 @@ export function HorairesProfesseursPage({ utilisateur, onLogout }) {
                                       {seance.code_cours} - {seance.nom_cours}
                                     </td>
                                     <td>{seance.groupes || "-"}</td>
-                                    <td>{seance.code_salle}</td>
+                                    <td>{getCourseLocationLabel(seance)}</td>
                                   </tr>
                                 ))}
                               </tbody>

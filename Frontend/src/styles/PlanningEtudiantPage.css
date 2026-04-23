@@ -114,15 +114,48 @@
   font-size: 0.9rem;
 }
 
+.planning-mode-badge {
+  display: inline-flex;
+  width: fit-content;
+  margin-top: 0.45rem;
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.planning-mode-badge--online {
+  background: linear-gradient(135deg, #eef8c9, #d9ee96);
+  color: #365314;
+  border: 1px solid rgba(95, 139, 46, 0.24);
+}
+
 .planning-salle {
   display: block;
   font-weight: 600;
+}
+
+.planning-salle--online {
+  color: #4d7c0f;
 }
 
 .planning-type-salle {
   display: block;
   font-size: 0.75rem;
   color: var(--muted);
+}
+
+.planning-type-salle--online {
+  color: #65a30d;
+}
+
+.planning-table__row--online td {
+  background: rgba(239, 248, 211, 0.56);
+}
+
+.planning-table__row--online .planning-code {
+  color: #4d7c0f;
 }
 
 .planning-message {
@@ -265,6 +298,18 @@
   color: #ffffff;
   overflow: hidden;
   box-shadow: 0 12px 24px rgba(15, 138, 67, 0.18);
+}
+
+.cal-seance--online {
+  background: linear-gradient(135deg, #d8f08e, #b8db63 52%, #eef8c9 100%);
+  color: #30460b;
+  box-shadow: 0 14px 28px rgba(132, 171, 52, 0.22);
+}
+
+.cal-seance--online .cal-seance-salle,
+.cal-seance--online .cal-seance-prof,
+.cal-seance--online .etudiant-schedule__source {
+  color: rgba(48, 70, 11, 0.88);
 }
 
 .cal-seance-code {

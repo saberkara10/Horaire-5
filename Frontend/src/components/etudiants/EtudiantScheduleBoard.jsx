@@ -6,6 +6,10 @@ import {
   getDebutSemaine,
   getIndexJourCalendrier,
 } from "../../utils/calendar.js";
+import {
+  getCourseLocationLabel,
+  isOnlineCourseLike,
+} from "../../utils/courseDelivery.js";
 
 const HEURES = Array.from({ length: 15 }, (_, index) =>
   `${String(index + 8).padStart(2, "0")}:00`
@@ -169,6 +173,7 @@ export function EtudiantScheduleBoard({
         <span className="status-pill status-pill--success">Cours normal</span>
         <span className="status-pill status-pill--warning">Cours repris</span>
         <span className="status-pill status-pill--exception">Exception individuelle</span>
+        <span className="status-pill status-pill--online">Cours en ligne</span>
       </div>
 
       <div className="planning-table-wrapper">
@@ -188,6 +193,7 @@ export function EtudiantScheduleBoard({
             {seances.map((seance) => (
               <tr
                 key={`${seance.source_horaire}-${seance.id_affectation_cours}-${seance.id_plage_horaires}`}
+                className={isOnlineCourseLike(seance) ? "planning-table__row--online" : ""}
               >
                 <td>{formaterDateLongue(seance.date)}</td>
                 <td>{formaterHeure(seance.heure_debut)}</td>
@@ -195,6 +201,11 @@ export function EtudiantScheduleBoard({
                 <td>
                   <span className="planning-code">{seance.code_cours}</span>
                   <span className="planning-nom-cours">{seance.nom_cours}</span>
+                  {isOnlineCourseLike(seance) ? (
+                    <span className="planning-mode-badge planning-mode-badge--online">
+                      En ligne
+                    </span>
+                  ) : null}
                 </td>
                 <td>
                   <span className={`status-pill ${getPresentationSource(seance).pillClass}`}>
@@ -208,8 +219,12 @@ export function EtudiantScheduleBoard({
                   {formaterNomProfesseur(seance) || "A confirmer"}
                 </td>
                 <td>
-                  <span className="planning-salle">
-                    {seance.code_salle || "Salle a confirmer"}
+                  <span
+                    className={`planning-salle ${
+                      isOnlineCourseLike(seance) ? "planning-salle--online" : ""
+                    }`}
+                  >
+                    {getCourseLocationLabel(seance)}
                   </span>
                 </td>
               </tr>
@@ -279,6 +294,7 @@ export function EtudiantScheduleBoard({
                   const seancesHeure = seancesMap[cle] || [];
 
                   return seancesHeure.map((seance) => {
+                    const seanceEnLigne = isOnlineCourseLike(seance);
                     const hauteur = getHauteur(seance.heure_debut, seance.heure_fin);
                     const debut = heureEnMinutes(formaterHeure(seance.heure_debut));
                     const heureReference = heureEnMinutes(HEURES[0]);
@@ -287,7 +303,11 @@ export function EtudiantScheduleBoard({
                     return (
                       <div
                         key={`${seance.source_horaire}-${seance.id_affectation_cours}-${seance.id_plage_horaires}-grid`}
-                        className={`cal-seance ${getPresentationSource(seance).classeSeance}`}
+                        className={`cal-seance ${
+                          seanceEnLigne
+                            ? "cal-seance--online"
+                            : getPresentationSource(seance).classeSeance
+                        }`}
                         style={{ top: `${top}px`, height: `${hauteur}px` }}
                       >
                         <span className="cal-seance-code">{seance.code_cours}</span>
@@ -296,7 +316,7 @@ export function EtudiantScheduleBoard({
                         </span>
                         <span className="cal-seance-nom">{seance.nom_cours}</span>
                         <span className="cal-seance-salle">
-                          {seance.code_salle || "Salle a confirmer"}
+                          {getCourseLocationLabel(seance)}
                         </span>
                         <span className="cal-seance-prof">
                           {formaterNomProfesseur(seance) || "Prof a confirmer"}

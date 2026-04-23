@@ -25,6 +25,11 @@ import {
   getDebutSemaine,
   getIndexJourCalendrier,
 } from "../utils/calendar.js";
+import {
+  getCourseLocationLabel,
+  getCourseRoomTypeLabel,
+  isOnlineCourseLike,
+} from "../utils/courseDelivery.js";
 import { ecouterSynchronisationPlanning } from "../utils/planningSync.js";
 import { usePopup } from "../components/feedback/PopupProvider.jsx";
 import { formaterLibelleCohorte } from "../utils/sessions.js";
@@ -458,20 +463,44 @@ export function HorairesGroupesPage({ utilisateur, onLogout }) {
                   </thead>
                   <tbody>
                     {horaire.map((seance) => (
-                      <tr key={seance.id_affectation_cours}>
+                      <tr
+                        key={seance.id_affectation_cours}
+                        className={
+                          isOnlineCourseLike(seance) ? "planning-table__row--online" : ""
+                        }
+                      >
                         <td>{formaterDateLongue(seance.date)}</td>
                         <td>{formaterHeure(seance.heure_debut)}</td>
                         <td>{formaterHeure(seance.heure_fin)}</td>
                         <td>
                           <span className="planning-code">{seance.code_cours}</span>
                           <span className="planning-nom-cours">{seance.nom_cours}</span>
+                          {isOnlineCourseLike(seance) ? (
+                            <span className="planning-mode-badge planning-mode-badge--online">
+                              En ligne
+                            </span>
+                          ) : null}
                         </td>
                         <td>
                           {seance.prenom_professeur} {seance.nom_professeur}
                         </td>
                         <td>
-                          <span className="planning-salle">{seance.code_salle}</span>
-                          <span className="planning-type-salle">{seance.type_salle}</span>
+                          <span
+                            className={`planning-salle ${
+                              isOnlineCourseLike(seance) ? "planning-salle--online" : ""
+                            }`}
+                          >
+                            {getCourseLocationLabel(seance)}
+                          </span>
+                          <span
+                            className={`planning-type-salle ${
+                              isOnlineCourseLike(seance)
+                                ? "planning-type-salle--online"
+                                : ""
+                            }`}
+                          >
+                            {getCourseRoomTypeLabel(seance)}
+                          </span>
                         </td>
                       </tr>
                     ))}
@@ -548,6 +577,7 @@ export function HorairesGroupesPage({ utilisateur, onLogout }) {
                         const seances = seancesMap[cle] || [];
 
                         return seances.map((seance) => {
+                          const seanceEnLigne = isOnlineCourseLike(seance);
                           const hauteur = getHauteur(seance.heure_debut, seance.heure_fin);
                           const debut = heureEnMinutes(formaterHeure(seance.heure_debut));
                           const heureReference = heureEnMinutes(HEURES[0]);
@@ -556,14 +586,16 @@ export function HorairesGroupesPage({ utilisateur, onLogout }) {
                           return (
                             <motion.div
                               key={seance.id_affectation_cours}
-                              className="cal-seance"
+                              className={`cal-seance ${seanceEnLigne ? "cal-seance--online" : ""}`}
                               style={{ top: `${top}px`, height: `${hauteur}px` }}
                               whileHover={{ scale: 1.015 }}
                               transition={{ duration: 0.15 }}
                             >
                               <span className="cal-seance-code">{seance.code_cours}</span>
                               <span className="cal-seance-nom">{seance.nom_cours}</span>
-                              <span className="cal-seance-salle">{seance.code_salle}</span>
+                              <span className="cal-seance-salle">
+                                {getCourseLocationLabel(seance)}
+                              </span>
                               <span className="cal-seance-prof">{seance.nom_professeur}</span>
                             </motion.div>
                           );

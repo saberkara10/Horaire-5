@@ -46,6 +46,12 @@ function buildReasonBreakdown(items, reasonKey = "raison_code") {
     .sort((a, b) => b.total - a.total || a.code.localeCompare(b.code, "fr"));
 }
 
+function readPersistedReasonBreakdown(payload, key) {
+  return Array.isArray(payload?.resume_metier?.[key])
+    ? payload.resume_metier[key]
+    : null;
+}
+
 function readNumeric(value, fallback = 0) {
   const number = Number(value);
   return Number.isFinite(number) ? number : fallback;
@@ -158,8 +164,12 @@ export class SchedulerReportService {
         ...row,
         resume_scoring_v1: buildScoringSummary(payload, row),
         resume_metier: {
-          raisons_non_planifiees: buildReasonBreakdown(nonPlanifies),
-          raisons_reprises: buildReasonBreakdown(reprises),
+          raisons_non_planifiees:
+            readPersistedReasonBreakdown(payload, "raisons_non_planifiees") ||
+            buildReasonBreakdown(nonPlanifies),
+          raisons_reprises:
+            readPersistedReasonBreakdown(payload, "raisons_reprises") ||
+            buildReasonBreakdown(reprises),
         },
       };
     });
@@ -236,8 +246,12 @@ export class SchedulerReportService {
       reprises_non_resolues: reprisesNonResolues,
       cours_non_planifies: coursNonPlanifies,
       resume_metier: {
-        raisons_non_planifiees: buildReasonBreakdown(coursNonPlanifies),
-        raisons_reprises: buildReasonBreakdown(reprisesNonResolues),
+        raisons_non_planifiees:
+          readPersistedReasonBreakdown(payload, "raisons_non_planifiees") ||
+          buildReasonBreakdown(coursNonPlanifies),
+        raisons_reprises:
+          readPersistedReasonBreakdown(payload, "raisons_reprises") ||
+          buildReasonBreakdown(reprisesNonResolues),
       },
     };
   }

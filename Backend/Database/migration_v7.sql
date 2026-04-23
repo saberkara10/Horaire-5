@@ -1,0 +1,11 @@
+-- ============================================================================
+-- ROLE DU FICHIER
+-- Fichier SQL indicatif pour la version de schema v7.
+--
+-- IMPACT SUR LE PROJET
+-- - le vrai travail se trouve dans `migration_v7.js`
+-- - v7 ajoute une plage de dates d'effet aux disponibilites professeurs
+-- ============================================================================
+-- migration_v7.sql
+-- Extension temporelle des disponibilites professeurs.
+-- L'execution detaillee est geree par migration_v7.js.

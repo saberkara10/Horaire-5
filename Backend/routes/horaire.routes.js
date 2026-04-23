@@ -26,7 +26,6 @@ import {
 const CHAMPS_AFFECTATION_OBLIGATOIRES = [
   "id_cours",
   "id_professeur",
-  "id_salle",
   "id_groupes_etudiants",
   "date",
   "heure_debut",
@@ -45,6 +44,11 @@ function champEstVide(valeur) {
 function heureVersMinutes(heure) {
   const [heures, minutes] = String(heure).split(":");
   return Number(heures) * 60 + Number(minutes);
+}
+
+function normaliserIdentifiantOptionnel(value) {
+  const identifiant = Number(value);
+  return Number.isInteger(identifiant) && identifiant > 0 ? identifiant : null;
 }
 
 function validerPayloadAffectation(body = {}) {
@@ -191,7 +195,7 @@ export default function horaireRoutes(app) {
       const resultat = await planifierAffectationManuelle({
         idCours: Number(id_cours),
         idProfesseur: Number(id_professeur),
-        idSalle: Number(id_salle),
+        idSalle: normaliserIdentifiantOptionnel(id_salle),
         idGroupeEtudiants: Number(id_groupes_etudiants),
         date,
         heureDebut: heure_debut,
@@ -230,7 +234,7 @@ export default function horaireRoutes(app) {
           {
             idCours: Number(request.body.id_cours),
             idProfesseur: Number(request.body.id_professeur),
-            idSalle: Number(request.body.id_salle),
+            idSalle: normaliserIdentifiantOptionnel(request.body.id_salle),
             idGroupeEtudiants: Number(request.body.id_groupes_etudiants),
             date: request.body.date,
             heureDebut: request.body.heure_debut,

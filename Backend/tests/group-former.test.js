@@ -1,4 +1,4 @@
-import { describe, expect, test } from "@jest/globals";
+import { afterEach, describe, expect, test } from "@jest/globals";
 import { GroupFormer } from "../src/services/scheduler/GroupFormer.js";
 
 function construireEtudiants(effectif, programme = "Programmation informatique", etape = 2) {
@@ -22,6 +22,10 @@ function construireReprises(effectif, idCours) {
 }
 
 describe("GroupFormer", () => {
+  afterEach(() => {
+    delete process.env.ENABLE_ONLINE_COURSES;
+  });
+
   test("cree des groupes supplementaires quand les reprises augmentent la charge reelle du cours", () => {
     const etudiants = construireEtudiants(52);
     const cours = [
@@ -69,7 +73,48 @@ describe("GroupFormer", () => {
     ).toBe(true);
   });
 
-  test("ignore les reprises d'un cours en ligne lorsque la planification en ligne est desactivee", () => {
+  test("reserve aussi les reprises d'un cours en ligne quand la planification en ligne reste active", () => {
+    const etudiants = construireEtudiants(26, "Programmation informatique", 1);
+    const cours = [
+      {
+        id_cours: 101,
+        code: "INF101",
+        programme: "Programmation informatique",
+        etape_etude: "1",
+        est_en_ligne: 0,
+      },
+      {
+        id_cours: 150,
+        code: "INF150",
+        programme: "Programmation informatique",
+        etape_etude: "1",
+        est_en_ligne: 1,
+      },
+    ];
+
+    const { groupesFormes } = GroupFormer.formerGroupes(
+      etudiants,
+      cours,
+      construireReprises(8, 150)
+    );
+
+    expect(groupesFormes).toHaveLength(2);
+    const reprisesReservees = groupesFormes.reduce(
+      (total, groupe) =>
+        total + Number(groupe.reprises_reservees_par_cours?.["150"] || 0),
+      0
+    );
+    expect(reprisesReservees).toBe(8);
+    expect(
+      groupesFormes.every(
+        (groupe) => GroupFormer.lireEffectifProjeteMax(groupe) <= 30
+      )
+    ).toBe(true);
+  });
+
+  test("ignore les reprises d'un cours en ligne lorsque la planification en ligne est explicitement desactivee", () => {
+    process.env.ENABLE_ONLINE_COURSES = "false";
+
     const etudiants = construireEtudiants(26, "Programmation informatique", 1);
     const cours = [
       {

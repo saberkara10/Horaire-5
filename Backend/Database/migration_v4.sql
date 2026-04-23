@@ -1,0 +1,12 @@
+-- ============================================================================
+-- ROLE DU FICHIER
+-- Fichier SQL indicatif pour la version de schema v4.
+--
+-- IMPACT SUR LE PROJET
+-- - le vrai travail se trouve dans `migration_v4.js`
+-- - v4 fusionne les professeurs en doublon puis impose l'unicite `(nom, prenom)`
+-- ============================================================================
+-- migration_v4.sql
+-- Fusion des professeurs en doublon et ajout de l'unicite (nom, prenom).
+-- L'execution est geree par migration_v4.js pour conserver un comportement
+-- transactionnel et robuste sur les donnees existantes.

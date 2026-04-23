@@ -525,7 +525,8 @@ Si la recherche stricte echoue :
 
 - le moteur lance une **passe assouplie** via `_trouverSerieAssouplie()` ;
 - il peut accepter une couverture plus faible ;
-- il peut basculer vers un mode hybride ou en ligne si la configuration l'autorise.
+- il conserve le mode du cours : un cours presentiel reste presentiel, et un
+  cours marque en ligne reste en ligne, sans salle.
 
 Ensuite, une **passe de garantie** tente de rapprocher chaque groupe de la cible de 7 seances par semaine.
 

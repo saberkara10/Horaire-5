@@ -222,11 +222,19 @@ export async function recupererSeancesGroupeEffectivesEtudiant(
        c.id_cours,
        c.code AS code_cours,
        c.nom AS nom_cours,
+       COALESCE(c.est_en_ligne, 0) AS est_en_ligne,
        p.id_professeur,
        p.nom AS nom_professeur,
        p.prenom AS prenom_professeur,
        s.id_salle,
-       s.code AS code_salle,
+       CASE
+         WHEN COALESCE(c.est_en_ligne, 0) = 1 THEN 'En ligne'
+         ELSE s.code
+       END AS code_salle,
+       CASE
+         WHEN COALESCE(c.est_en_ligne, 0) = 1 THEN 'En ligne'
+         ELSE s.type
+       END AS type_salle,
        ph.id_plage_horaires,
        DATE_FORMAT(ph.date, '%Y-%m-%d') AS date,
        ph.heure_debut,
@@ -315,11 +323,19 @@ async function recupererSeancesGroupeSimuleesEtudiantDansGroupe(
        c.id_cours,
        c.code AS code_cours,
        c.nom AS nom_cours,
+       COALESCE(c.est_en_ligne, 0) AS est_en_ligne,
        p.id_professeur,
        p.nom AS nom_professeur,
        p.prenom AS prenom_professeur,
        s.id_salle,
-       s.code AS code_salle,
+       CASE
+         WHEN COALESCE(c.est_en_ligne, 0) = 1 THEN 'En ligne'
+         ELSE s.code
+       END AS code_salle,
+       CASE
+         WHEN COALESCE(c.est_en_ligne, 0) = 1 THEN 'En ligne'
+         ELSE s.type
+       END AS type_salle,
        ph.id_plage_horaires,
        DATE_FORMAT(ph.date, '%Y-%m-%d') AS date,
        ph.heure_debut,
@@ -416,11 +432,19 @@ export async function recupererSeancesIndividuellesEtudiant(
        c.id_cours,
        c.code AS code_cours,
        c.nom AS nom_cours,
+       COALESCE(c.est_en_ligne, 0) AS est_en_ligne,
        p.id_professeur,
        p.nom AS nom_professeur,
        p.prenom AS prenom_professeur,
        s.id_salle,
-       s.code AS code_salle,
+       CASE
+         WHEN COALESCE(c.est_en_ligne, 0) = 1 THEN 'En ligne'
+         ELSE s.code
+       END AS code_salle,
+       CASE
+         WHEN COALESCE(c.est_en_ligne, 0) = 1 THEN 'En ligne'
+         ELSE s.type
+       END AS type_salle,
        ph.id_plage_horaires,
        DATE_FORMAT(ph.date, '%Y-%m-%d') AS date,
        ph.heure_debut,
@@ -574,8 +598,10 @@ function agregerCoursDepuisSeances(seances = []) {
       id_professeur: Number(seance.id_professeur || 0) || null,
       nom_professeur: seance.nom_professeur || null,
       prenom_professeur: seance.prenom_professeur || null,
+      est_en_ligne: Number(seance.est_en_ligne || 0) === 1,
       id_salle: Number(seance.id_salle || 0) || null,
       code_salle: seance.code_salle || null,
+      type_salle: seance.type_salle || null,
       id_groupe_source: Number(seance.id_groupe_source || 0) || null,
       groupe_source: seance.groupe_source || null,
     });

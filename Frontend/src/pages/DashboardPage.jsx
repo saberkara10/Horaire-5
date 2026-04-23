@@ -4,6 +4,7 @@
  * Tableau de bord de pilotage academique.
  */
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { recupererDashboardOverview } from "../services/dashboard.api.js";
 import { usePopup } from "../components/feedback/PopupProvider.jsx";
 import {
@@ -12,13 +13,49 @@ import {
 } from "../utils/schedulerScoring.js";
 import "../styles/DashboardPage.css";
 
-function DashboardCard({ label, value, accent, detail }) {
+function DashboardChip({ children, to, ariaLabel }) {
+  const Component = to ? Link : "span";
+
   return (
-    <div className={`dashboard-card dashboard-card--${accent}`}>
+    <Component
+      {...(to ? { to, "aria-label": ariaLabel } : {})}
+      className={`dashboard-chip${to ? " dashboard-chip--interactive" : ""}`}
+    >
+      {children}
+    </Component>
+  );
+}
+
+function DashboardCard({ label, value, accent, detail, to, ariaLabel }) {
+  const Component = to ? Link : "div";
+
+  return (
+    <Component
+      {...(to ? { to, "aria-label": ariaLabel || label } : {})}
+      className={`dashboard-card dashboard-card--${accent}${
+        to ? " dashboard-card--interactive" : ""
+      }`}
+    >
       <div className="dashboard-card__label">{label}</div>
       <div className="dashboard-card__value">{value}</div>
       <div className="dashboard-card__detail">{detail}</div>
-    </div>
+    </Component>
+  );
+}
+
+function DashboardAsideCard({ value, label, to, ariaLabel }) {
+  const Component = to ? Link : "div";
+
+  return (
+    <Component
+      {...(to ? { to, "aria-label": ariaLabel || label } : {})}
+      className={`dashboard-hero__aside-card${
+        to ? " dashboard-hero__aside-card--interactive" : ""
+      }`}
+    >
+      <strong>{value}</strong>
+      <span>{label}</span>
+    </Component>
   );
 }
 
@@ -155,9 +192,10 @@ export function DashboardPage({ utilisateur, onLogout }) {
     () =>
       selectSchedulerScoringMode(
         dernierRapportScoring,
-        dernierRapport?.details?.modeOptimisationUtilise || "equilibre"
+        dernierRapport?.details_bruts?.details?.modeOptimisationUtilise ||
+          "equilibre"
       ),
-    [dernierRapport?.details?.modeOptimisationUtilise, dernierRapportScoring]
+    [dernierRapport?.details_bruts?.details?.modeOptimisationUtilise, dernierRapportScoring]
   );
   const coursRecents = overview?.cours_recents || [];
   const professeursRecents = overview?.professeurs_recents || [];
@@ -202,7 +240,24 @@ export function DashboardPage({ utilisateur, onLogout }) {
     resumeSessionActive.nb_groupes_actifs,
   ]);
 
-  const scoreRapport = dernierRapport ? `${dernierRapport.score_qualite}/100` : "-";
+  const scoreRapportValeur = Number(
+    dernierRapportModeScoring?.scoreGlobal ?? dernierRapport?.score_qualite
+  );
+  const scoreRapport = Number.isFinite(scoreRapportValeur)
+    ? `${formaterValeurScoring(scoreRapportValeur)}/100`
+    : "-";
+  const lienHistoriqueScheduler = useMemo(
+    () => ({
+      pathname: "/scheduler",
+      search: "?tab=historique",
+    }),
+    []
+  );
+  const lienGestionGroupes = "/gestion-groupes";
+  const lienImportEtudiants = "/import-etudiants";
+  const lienHorairesEtudiants = "/horaires-etudiants";
+  const lienProfesseurs = "/professeurs";
+  const lienSalles = "/salles";
 
   return (
     <div className="dashboard-page">
@@ -216,14 +271,29 @@ export function DashboardPage({ utilisateur, onLogout }) {
             </p>
 
             <div className="dashboard-hero__chips">
-              <span>
+              <DashboardChip>
                 {sessionActive
                   ? `Session active : ${sessionActive.nom}`
                   : "Aucune session active"}
-              </span>
-              <span>{compteursGlobaux.nb_groupes} groupes en base</span>
-              <span>{compteursGlobaux.nb_etudiants} etudiants inscrits</span>
-              <span>{compteursGlobaux.capacite_totale_salles} places de salle au total</span>
+              </DashboardChip>
+              <DashboardChip
+                to={lienGestionGroupes}
+                ariaLabel="Ouvrir la gestion des groupes"
+              >
+                {compteursGlobaux.nb_groupes} groupes en base
+              </DashboardChip>
+              <DashboardChip
+                to={lienImportEtudiants}
+                ariaLabel="Ouvrir l'import des etudiants"
+              >
+                {compteursGlobaux.nb_etudiants} etudiants inscrits
+              </DashboardChip>
+              <DashboardChip
+                to={lienSalles}
+                ariaLabel="Ouvrir la page des salles"
+              >
+                {compteursGlobaux.capacite_totale_salles} places de salle au total
+              </DashboardChip>
             </div>
 
             <div className="dashboard-hero__academic-strip">
@@ -237,18 +307,24 @@ export function DashboardPage({ utilisateur, onLogout }) {
           </div>
 
           <div className="dashboard-hero__aside">
-            <div className="dashboard-hero__aside-card">
-              <strong>{chargement ? "..." : resumeSessionActive.nb_etudiants_avec_horaire}</strong>
-              <span>Etudiants avec horaire sur la session active</span>
-            </div>
-            <div className="dashboard-hero__aside-card">
-              <strong>{chargement ? "..." : resumeSessionActive.nb_groupes_avec_horaire}</strong>
-              <span>Groupes deja planifies</span>
-            </div>
-            <div className="dashboard-hero__aside-card">
-              <strong>{chargement ? "..." : scoreRapport}</strong>
-              <span>Score du dernier rapport de generation</span>
-            </div>
+            <DashboardAsideCard
+              value={chargement ? "..." : resumeSessionActive.nb_etudiants_avec_horaire}
+              label="Etudiants avec horaire sur la session active"
+              to={lienHorairesEtudiants}
+              ariaLabel="Ouvrir les horaires etudiants"
+            />
+            <DashboardAsideCard
+              value={chargement ? "..." : resumeSessionActive.nb_groupes_avec_horaire}
+              label="Groupes deja planifies"
+              to={lienGestionGroupes}
+              ariaLabel="Ouvrir la gestion des groupes"
+            />
+            <DashboardAsideCard
+              value={chargement ? "..." : scoreRapport}
+              label="Score du dernier rapport de generation"
+              to={lienHistoriqueScheduler}
+              ariaLabel="Ouvrir l'historique du pilotage des sessions"
+            />
           </div>
         </section>
 
@@ -258,18 +334,24 @@ export function DashboardPage({ utilisateur, onLogout }) {
             value={compteursGlobaux.nb_groupes}
             detail={`${resumeSessionActive.nb_groupes_actifs} sur la session active`}
             accent="blue"
+            to={lienGestionGroupes}
+            ariaLabel="Ouvrir la gestion des groupes"
           />
           <DashboardCard
             label="Etudiants inscrits"
             value={compteursGlobaux.nb_etudiants}
             detail={`${resumeSessionActive.nb_etudiants_session_active} rattaches a la session active`}
             accent="purple"
+            to={lienImportEtudiants}
+            ariaLabel="Ouvrir l'import des etudiants"
           />
           <DashboardCard
             label="Etudiants avec horaire"
             value={resumeSessionActive.nb_etudiants_avec_horaire}
             detail={`${resumeSessionActive.nb_etudiants_sans_horaire} encore sans horaire actif`}
             accent="teal"
+            to={lienHorairesEtudiants}
+            ariaLabel="Ouvrir les horaires etudiants"
           />
           <DashboardCard
             label="Couverture etudiante"
@@ -282,12 +364,16 @@ export function DashboardPage({ utilisateur, onLogout }) {
             value={compteursGlobaux.nb_professeurs}
             detail={`${compteursGlobaux.nb_cours_actifs} cours actifs a couvrir`}
             accent="blue"
+            to={lienProfesseurs}
+            ariaLabel="Ouvrir la page des professeurs"
           />
           <DashboardCard
             label="Salles"
             value={compteursGlobaux.nb_salles}
             detail={`${compteursGlobaux.capacite_totale_salles} places de capacite totale`}
             accent="teal"
+            to={lienSalles}
+            ariaLabel="Ouvrir la page des salles"
           />
         </section>
 

@@ -64,6 +64,10 @@ export class AvailabilityChecker {
    * la source de verite. Sinon on retombe sur la specialite texte.
    */
   static profCompatible(professeur, cours) {
+    if (Number(cours?.est_en_ligne || 0) === 1) {
+      return true;
+    }
+
     const coursIds = AvailabilityChecker._lireCoursIds(professeur);
     if (coursIds.length > 0) {
       return coursIds.includes(Number(cours.id_cours));

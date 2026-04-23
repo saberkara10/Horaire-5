@@ -55,6 +55,10 @@ import {
   readSchedulerScoringSummary,
   selectSchedulerScoringMode,
 } from "../utils/schedulerScoring.js";
+import {
+  getCourseLocationLabel,
+  isOnlineCourseLike,
+} from "../utils/courseDelivery.js";
 import "../styles/AffectationsPage.css";
 
 const ETAPES_REFERENCE = ["1", "2", "3", "4", "5", "6", "7", "8"];
@@ -274,7 +278,11 @@ function construirePayloadPorteeModificationIntelligente(planification) {
  * @param {Object} planification - etat courant du formulaire.
  * @returns {Object} Objet `modifications` compatible backend.
  */
-function construireModificationsIntelligentes(affectation, planification) {
+function construireModificationsIntelligentes(
+  affectation,
+  planification,
+  coursEstEnLigne = false
+) {
   if (!affectation) {
     return {};
   }
@@ -293,7 +301,11 @@ function construireModificationsIntelligentes(affectation, planification) {
     modifications.id_professeur = Number(planification.id_professeur);
   }
 
-  if (planification?.id_salle && String(planification.id_salle) !== salleCourante) {
+  if (coursEstEnLigne) {
+    if (salleCourante) {
+      modifications.id_salle = null;
+    }
+  } else if (planification?.id_salle && String(planification.id_salle) !== salleCourante) {
     modifications.id_salle = Number(planification.id_salle);
   }
 
@@ -325,7 +337,8 @@ function construireModificationsIntelligentes(affectation, planification) {
 function construireRequeteModificationIntelligente(
   affectation,
   planification,
-  modeOptimisation
+  modeOptimisation,
+  coursEstEnLigne = false
 ) {
   if (!affectation) {
     return null;
@@ -333,7 +346,11 @@ function construireRequeteModificationIntelligente(
 
   return {
     idSeance: Number(affectation.id_affectation_cours),
-    modifications: construireModificationsIntelligentes(affectation, planification),
+    modifications: construireModificationsIntelligentes(
+      affectation,
+      planification,
+      coursEstEnLigne
+    ),
     portee: construirePayloadPorteeModificationIntelligente(planification),
     modeOptimisation: modeOptimisation || "legacy",
   };
@@ -368,6 +385,7 @@ function construireIssuesLocalesModification({
   planification,
   sessionActive,
   salleSelectionnee,
+  coursEstEnLigne,
   editionRecurrenteDisponible,
   requeteModification,
 }) {
@@ -379,7 +397,7 @@ function construireIssuesLocalesModification({
 
   if (
     !planification?.id_professeur ||
-    !planification?.id_salle ||
+    (!coursEstEnLigne && !planification?.id_salle) ||
     !planification?.date ||
     !planification?.heure_debut ||
     !planification?.heure_fin
@@ -388,7 +406,9 @@ function construireIssuesLocalesModification({
       code: "FIELDS_REQUIRED",
       level: "error",
       message:
-        "Completer le professeur, la salle, la date et l'horaire avant de lancer la simulation.",
+        coursEstEnLigne
+          ? "Completer le professeur, la date et l'horaire avant de lancer la simulation."
+          : "Completer le professeur, la salle, la date et l'horaire avant de lancer la simulation.",
     });
   }
 
@@ -453,7 +473,7 @@ function construireIssuesLocalesModification({
     });
   }
 
-  if (salleSelectionnee && salleSelectionnee.disponible === false) {
+  if (!coursEstEnLigne && salleSelectionnee && salleSelectionnee.disponible === false) {
     issues.push({
       code: "ROOM_LOCALLY_BLOCKED",
       level: "warning",
@@ -757,6 +777,7 @@ export function AffectationsPage({ utilisateur, onLogout }) {
         programmeNormalise: normaliserTexte(element.programme),
         etapeValeur: String(element.etape_etude || "").trim(),
         typeSalleNormalise: normaliserTexte(element.type_salle),
+        estEnLigne: isOnlineCourseLike(element),
       })),
     [cours]
   );
@@ -848,6 +869,7 @@ export function AffectationsPage({ utilisateur, onLogout }) {
 
         return {
           ...affectation,
+          estEnLigne: isOnlineCourseLike(affectation),
           idSalleNombre: Number(affectation.id_salle) || 0,
           professeurNomComplet,
           rechercheNormalisee: normaliserTexte(
@@ -882,6 +904,10 @@ export function AffectationsPage({ utilisateur, onLogout }) {
     const index = new Map();
 
     for (const affectation of horairesEnrichis) {
+      if (affectation.estEnLigne || !affectation.id_salle) {
+        continue;
+      }
+
       const cle = creerCleSalleDate(affectation.id_salle, affectation.date);
       const existantes = index.get(cle);
 
@@ -1156,11 +1182,22 @@ export function AffectationsPage({ utilisateur, onLogout }) {
     );
   }, [coursPlanificationManuelle, planificationManuelle.id_cours]);
 
+  const coursPlanificationEstEnLigne = Boolean(coursPlanificationActif?.estEnLigne);
+  const salleRequisePlanification = Boolean(
+    coursPlanificationActif && !coursPlanificationEstEnLigne
+  );
+
   const professeursPlanificationManuelle = useMemo(() => {
     const idCoursActif = Number(coursPlanificationActif?.id_cours);
 
     if (!Number.isInteger(idCoursActif) || idCoursActif <= 0) {
       return [];
+    }
+
+    if (coursPlanificationActif?.estEnLigne) {
+      return [...professeursEnrichis].sort((professeurA, professeurB) =>
+        professeurA.nomComplet.localeCompare(professeurB.nomComplet, "fr")
+      );
     }
 
     return professeursEnrichis
@@ -1181,6 +1218,18 @@ export function AffectationsPage({ utilisateur, onLogout }) {
   // INCOMPATIBLE_TYPE : type de salle ne correspond pas au cours  → bloquée (orange)
   // CAPACITY_TOO_SMALL: effectif > capacité                       → bloquée (gris)
   const disponibiliteSalles = useMemo(() => {
+    if (!coursPlanificationActif || coursPlanificationActif.estEnLigne) {
+      return {
+        sallesPlanificationManuelleAvecStatut: [],
+        resumeDisponibiliteSalles: {
+          disponibles: 0,
+          occupees: 0,
+          incompatibles: 0,
+          trop_petites: 0,
+        },
+      };
+    }
+
     const datePlanification = String(planificationManuelle.date || "").trim();
     const heureDebut = String(planificationManuelle.heure_debut || "").trim();
     const heureFin = String(planificationManuelle.heure_fin || "").trim();
@@ -1196,7 +1245,7 @@ export function AffectationsPage({ utilisateur, onLogout }) {
       trop_petites: 0,
     };
 
-    const sallesNotees = (coursPlanificationActif ? sallesEnrichies : []).map((salle) => {
+    const sallesNotees = sallesEnrichies.map((salle) => {
       const typeSalle = salle.typeNormalise;
       const capacite = salle.capaciteNombre;
 
@@ -1364,10 +1413,12 @@ export function AffectationsPage({ utilisateur, onLogout }) {
     return construireRequeteModificationIntelligente(
       affectationEnEdition,
       planificationManuelle,
-      modeOptimisationModification
+      modeOptimisationModification,
+      coursPlanificationEstEnLigne
     );
   }, [
     affectationEnEdition,
+    coursPlanificationEstEnLigne,
     modeOptimisationModification,
     planificationManuelle,
   ]);
@@ -1388,10 +1439,12 @@ export function AffectationsPage({ utilisateur, onLogout }) {
       planification: planificationManuelle,
       sessionActive,
       salleSelectionnee: sallePlanificationSelectionnee,
+      coursEstEnLigne: coursPlanificationEstEnLigne,
       editionRecurrenteDisponible,
       requeteModification: requeteModificationIntelligente,
     });
   }, [
+    coursPlanificationEstEnLigne,
     editionRecurrenteDisponible,
     idAffectationEdition,
     planificationManuelle,
@@ -1638,7 +1691,33 @@ export function AffectationsPage({ utilisateur, onLogout }) {
   }, [professeursPlanificationManuelle]);
 
   useEffect(() => {
+    if (!coursPlanificationEstEnLigne) {
+      return undefined;
+    }
+
+    setPlanificationManuelle((actuel) =>
+      actuel.id_salle
+        ? {
+          ...actuel,
+          id_salle: "",
+        }
+        : actuel
+    );
+
+    return undefined;
+  }, [coursPlanificationEstEnLigne]);
+
+  useEffect(() => {
     setPlanificationManuelle((actuel) => {
+      if (coursPlanificationEstEnLigne) {
+        return actuel.id_salle
+          ? {
+            ...actuel,
+            id_salle: "",
+          }
+          : actuel;
+      }
+
       const salleSelectionneeDisponible = sallesPlanificationManuelleAvecStatut.some(
         (salle) =>
           String(salle.id_salle) === String(actuel.id_salle) && salle.disponible
@@ -1661,7 +1740,7 @@ export function AffectationsPage({ utilisateur, onLogout }) {
         id_salle: prochaineSalle,
       };
     });
-  }, [sallesPlanificationManuelleAvecStatut]);
+  }, [coursPlanificationEstEnLigne, sallesPlanificationManuelleAvecStatut]);
 
   useEffect(() => {
     let actif = true;
@@ -2134,12 +2213,16 @@ export function AffectationsPage({ utilisateur, onLogout }) {
       !planificationManuelle.id_groupes_etudiants ||
       !planificationManuelle.id_cours ||
       !planificationManuelle.id_professeur ||
-      !planificationManuelle.id_salle ||
+      (salleRequisePlanification && !planificationManuelle.id_salle) ||
       !planificationManuelle.date ||
       !planificationManuelle.heure_debut ||
       !planificationManuelle.heure_fin
     ) {
-      showError("Completer le groupe, le cours, le professeur, la salle, la date et l'horaire.");
+      showError(
+        salleRequisePlanification
+          ? "Completer le groupe, le cours, le professeur, la salle, la date et l'horaire."
+          : "Completer le groupe, le cours, le professeur, la date et l'horaire."
+      );
       return;
     }
 
@@ -2168,7 +2251,9 @@ export function AffectationsPage({ utilisateur, onLogout }) {
         id_groupes_etudiants: Number(planificationManuelle.id_groupes_etudiants),
         id_cours: Number(planificationManuelle.id_cours),
         id_professeur: Number(planificationManuelle.id_professeur),
-        id_salle: Number(planificationManuelle.id_salle),
+        id_salle: salleRequisePlanification
+          ? Number(planificationManuelle.id_salle)
+          : null,
         date: planificationManuelle.date,
         heure_debut: planificationManuelle.heure_debut,
         heure_fin: planificationManuelle.heure_fin,
@@ -2196,6 +2281,7 @@ export function AffectationsPage({ utilisateur, onLogout }) {
     planificationManuelle,
     rechargerContexteActif,
     reinitialiserPlanification,
+    salleRequisePlanification,
     showError,
     showSuccess,
   ]);
@@ -2330,6 +2416,8 @@ export function AffectationsPage({ utilisateur, onLogout }) {
   ]);
 
   const handleModifier = useCallback((affectation) => {
+    const affectationEstEnLigne = isOnlineCourseLike(affectation);
+
     setIdAffectationEdition(Number(affectation.id_affectation_cours));
     setModeOptimisationModification("legacy");
     setSimulationModification(null);
@@ -2339,7 +2427,7 @@ export function AffectationsPage({ utilisateur, onLogout }) {
       id_groupes_etudiants: String(affectation.id_groupes_etudiants || ""),
       id_cours: String(affectation.id_cours || ""),
       id_professeur: String(affectation.id_professeur || ""),
-      id_salle: String(affectation.id_salle || ""),
+      id_salle: affectationEstEnLigne ? "" : String(affectation.id_salle || ""),
       date: String(affectation.date || dateCouranteLocale()),
       heure_debut: formaterHeure(affectation.heure_debut) || "08:00",
       heure_fin: formaterHeure(affectation.heure_fin) || "10:00",
@@ -2975,21 +3063,33 @@ export function AffectationsPage({ utilisateur, onLogout }) {
                 </label>
 
                 <label className="crud-page__field">
-                  <span>Salle (sélection rapide)</span>
+                  <span>
+                    {coursPlanificationEstEnLigne
+                      ? "Mode de diffusion"
+                      : "Salle (selection rapide)"}
+                  </span>
                   <select
                     name="id_salle"
-                    value={planificationManuelle.id_salle}
+                    value={
+                      coursPlanificationEstEnLigne
+                        ? "en_ligne"
+                        : planificationManuelle.id_salle
+                    }
                     onChange={handleChangerPlanification}
-                    disabled={!coursPlanificationActif}
+                    disabled={coursPlanificationEstEnLigne || !coursPlanificationActif}
                   >
-                    <option value="">Choisir une salle</option>
+                    {coursPlanificationEstEnLigne ? (
+                      <option value="en_ligne">En ligne - aucune salle requise</option>
+                    ) : (
+                      <option value="">Choisir une salle</option>
+                    )}
                     {sallesPlanificationManuelleAvecStatut.map((salle) => (
                       <option
                         key={salle.id_salle}
                         value={salle.id_salle}
                         disabled={!salle.disponible}
                       >
-                        {salle.code} ({salle.type} — {salle.capacite}p)
+                        {salle.code} ({salle.type} - {salle.capacite}p)
                       </option>
                     ))}
                   </select>
@@ -3147,13 +3247,19 @@ export function AffectationsPage({ utilisateur, onLogout }) {
                   Effectif : {groupePlanificationActif?.effectif || 0} etudiants
                   {" - "}
                   {coursPlanificationActif
-                    ? `Type de salle requis : ${coursPlanificationActif.type_salle || "standard"}`
+                    ? coursPlanificationEstEnLigne
+                      ? "Mode : En ligne - aucune salle requise"
+                      : `Type de salle requis : ${coursPlanificationActif.type_salle || "standard"}`
                     : "Selectionner un cours"}
                 </span>
                 <span>
                   {idAffectationEdition
-                    ? "Le backend recalculera les conflits groupe, professeur, salle et etudiants en reprise avant toute application."
-                    : "La validation finale recontrole aussi les etudiants en reprise hors groupe et l'effectif reel de la seance avant insertion."}
+                    ? coursPlanificationEstEnLigne
+                      ? "Le backend recalculera les conflits groupe, professeur et etudiants, sans reserver de salle, avant toute application."
+                      : "Le backend recalculera les conflits groupe, professeur, salle et etudiants en reprise avant toute application."
+                    : coursPlanificationEstEnLigne
+                      ? "La validation finale controle le professeur, le groupe, les reprises et les etudiants reellement presents, sans exiger de salle."
+                      : "La validation finale recontrole aussi les etudiants en reprise hors groupe et l'effectif reel de la seance avant insertion."}
                 </span>
                 {idAffectationEdition ? (
                   <span>
@@ -3165,21 +3271,27 @@ export function AffectationsPage({ utilisateur, onLogout }) {
                     )?.nomComplet || "A confirmer"}
                   </span>
                 ) : null}
-                <div className="affectations-page__room-status-legend">
-                  <span className="affectations-page__room-legend-item affectations-page__room-legend-item--available">
-                    <span className="affectations-page__room-legend-dot" /> {resumeDisponibiliteSalles.disponibles} disponible(s)
+                {coursPlanificationEstEnLigne ? (
+                  <span className="affectations-page__room-selected-info affectations-page__room-selected-info--ok">
+                    En ligne - aucun local ne sera reserve pour cette seance.
                   </span>
-                  <span className="affectations-page__room-legend-item affectations-page__room-legend-item--occupied">
-                    <span className="affectations-page__room-legend-dot" /> {resumeDisponibiliteSalles.occupees} occupee(s)
-                  </span>
-                  <span className="affectations-page__room-legend-item affectations-page__room-legend-item--incompatible">
-                    <span className="affectations-page__room-legend-dot" /> {resumeDisponibiliteSalles.incompatibles} incompatible(s)
-                  </span>
-                  <span className="affectations-page__room-legend-item affectations-page__room-legend-item--small">
-                    <span className="affectations-page__room-legend-dot" /> {resumeDisponibiliteSalles.trop_petites} trop petite(s)
-                  </span>
-                </div>
-                {sallePlanificationSelectionnee ? (
+                ) : (
+                  <div className="affectations-page__room-status-legend">
+                    <span className="affectations-page__room-legend-item affectations-page__room-legend-item--available">
+                      <span className="affectations-page__room-legend-dot" /> {resumeDisponibiliteSalles.disponibles} disponible(s)
+                    </span>
+                    <span className="affectations-page__room-legend-item affectations-page__room-legend-item--occupied">
+                      <span className="affectations-page__room-legend-dot" /> {resumeDisponibiliteSalles.occupees} occupee(s)
+                    </span>
+                    <span className="affectations-page__room-legend-item affectations-page__room-legend-item--incompatible">
+                      <span className="affectations-page__room-legend-dot" /> {resumeDisponibiliteSalles.incompatibles} incompatible(s)
+                    </span>
+                    <span className="affectations-page__room-legend-item affectations-page__room-legend-item--small">
+                      <span className="affectations-page__room-legend-dot" /> {resumeDisponibiliteSalles.trop_petites} trop petite(s)
+                    </span>
+                  </div>
+                )}
+                {!coursPlanificationEstEnLigne && sallePlanificationSelectionnee ? (
                   <span className={`affectations-page__room-selected-info affectations-page__room-selected-info--${
                     sallePlanificationSelectionnee.statut === "AVAILABLE" ? "ok" : "error"
                   }`}>
@@ -3198,7 +3310,8 @@ export function AffectationsPage({ utilisateur, onLogout }) {
                 lastAppliedResult={resumeModificationIntelligente}
               />
 
-              {sallesPlanificationManuelleAvecStatut.length > 0 ? (
+              {!coursPlanificationEstEnLigne &&
+              sallesPlanificationManuelleAvecStatut.length > 0 ? (
                 <div className="affectations-page__rooms-panel">
                   <div className="affectations-page__rooms-panel-header">
                     <h3>Tableau de bord des salles</h3>
@@ -3301,7 +3414,7 @@ export function AffectationsPage({ utilisateur, onLogout }) {
                     disabled={
                       planificationEnCours ||
                       loading ||
-                      !sallePlanificationSelectionnee?.disponible
+                      (salleRequisePlanification && !sallePlanificationSelectionnee?.disponible)
                     }
                   >
                     {planificationEnCours ? "Enregistrement..." : "Planifier le cours"}
@@ -3471,7 +3584,7 @@ export function AffectationsPage({ utilisateur, onLogout }) {
                         <td>
                           {affectation.professeur_prenom} {affectation.professeur_nom}
                         </td>
-                        <td>{affectation.salle_code}</td>
+                        <td>{getCourseLocationLabel(affectation)}</td>
                         <td>{formaterDate(affectation.date)}</td>
                         <td>
                           {formaterHeure(affectation.heure_debut)} -{" "}

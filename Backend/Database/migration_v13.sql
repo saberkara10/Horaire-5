@@ -1,6 +1,6 @@
-
+-- =============================================================================
 -- Migration v13 - Module Help
-
+-- =============================================================================
 --
 -- Objectif:
 --   Ajouter le centre d'aide applicatif avec categories, guides video,
@@ -11,7 +11,7 @@
 --   - thumbnail_path stocke un chemin relatif de type
 --     uploads/help/thumbnails/{slug}.jpg
 --   - les fichiers sont servis uniquement via l'API authentifiee
-
+-- =============================================================================
 
 CREATE TABLE IF NOT EXISTS help_categories (
   id_category INT NOT NULL AUTO_INCREMENT,

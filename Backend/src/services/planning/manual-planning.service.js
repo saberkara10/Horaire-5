@@ -88,6 +88,16 @@ function etapesCorrespondent(a, b) {
   return Boolean(etapeA) && etapeA === etapeB;
 }
 
+function normaliserIdentifiantOptionnel(value) {
+  const identifiant = Number(value);
+  return Number.isInteger(identifiant) && identifiant > 0 ? identifiant : null;
+}
+
+function normaliserSallesImpactees(idSalle) {
+  const identifiant = normaliserIdentifiantOptionnel(idSalle);
+  return identifiant ? [identifiant] : [];
+}
+
 const STATUTS_COURS_ECHOUES_PLANIFICATION_MANUELLE_SQL = `
   'a_reprendre',
   'planifie',
@@ -204,6 +214,7 @@ async function recupererContextePlanification(
   { idCours, idProfesseur, idSalle, idGroupeEtudiants = null },
   executor = pool
 ) {
+  const idSalleNormalise = normaliserIdentifiantOptionnel(idSalle);
   // Les ressources sont chargees en parallele pour retourner un contexte
   // coherent a la validation, sans disperser les erreurs de presence/existence.
   const requetes = [
@@ -240,16 +251,18 @@ async function recupererContextePlanification(
        LIMIT 1`,
       [Number(idProfesseur)]
     ),
-    executor.query(
-      `SELECT s.id_salle,
-              s.code,
-              s.type,
-              s.capacite
-       FROM salles s
-       WHERE s.id_salle = ?
-       LIMIT 1`,
-      [Number(idSalle)]
-    ),
+    idSalleNormalise
+      ? executor.query(
+        `SELECT s.id_salle,
+                s.code,
+                s.type,
+                s.capacite
+         FROM salles s
+         WHERE s.id_salle = ?
+         LIMIT 1`,
+        [idSalleNormalise]
+      )
+      : Promise.resolve([[]]),
   ];
 
   if (Number.isInteger(Number(idGroupeEtudiants)) && Number(idGroupeEtudiants) > 0) {
@@ -426,12 +439,16 @@ export async function recupererParticipantsSeance(
 }
 
 function salleCompatibleAvecCours(salle, cours) {
-  if (!salle || !cours) {
+  if (!cours) {
     return false;
   }
 
   if (Number(cours.est_en_ligne || 0) === 1) {
     return true;
+  }
+
+  if (!salle) {
+    return false;
   }
 
   const typeSalle = normaliserTexte(salle.type);
@@ -1220,6 +1237,7 @@ async function creerAffectationAvecLiens(
   },
   executor = pool
 ) {
+  const idSalleNormalise = normaliserIdentifiantOptionnel(idSalle);
   const idPlage = await creerPlageHoraire(date, heureDebut, heureFin, executor);
   const [affectationResult] = await executor.query(
     `INSERT INTO affectation_cours (
@@ -1233,7 +1251,7 @@ async function creerAffectationAvecLiens(
     [
       Number(idCours),
       Number(idProfesseur),
-      Number(idSalle),
+      idSalleNormalise,
       Number(idPlage),
       Number.isInteger(Number(idPlanificationSerie)) && Number(idPlanificationSerie) > 0
         ? Number(idPlanificationSerie)
@@ -1323,7 +1341,9 @@ async function validerOccurrenceGroupe(
     );
   }
 
-  if (!salle) {
+  const coursEstEnLigne = Number(cours.est_en_ligne || 0) === 1;
+
+  if (!coursEstEnLigne && !salle) {
     throw creerErreurPlanification("Salle introuvable.", 404, "ROOM_NOT_FOUND");
   }
 
@@ -1347,29 +1367,32 @@ async function validerOccurrenceGroupe(
     );
   }
 
-  if (!salleCompatibleAvecCours(salle, cours)) {
-    throw creerErreurPlanification(
-      "La salle n'est pas compatible avec le type reel de ce cours.",
-      409,
-      "ROOM_COURSE_TYPE_MISMATCH",
-      {
-        type_salle_cours: cours.type_salle,
-        type_salle: salle.type,
-      }
-    );
-  }
-
   const effectifReel = Number(participants.effectifReel || 0);
-  if (!AvailabilityChecker.salleCompatible(salle, cours, effectifReel)) {
-    throw creerErreurPlanification(
-      `La salle ne peut pas accueillir l'effectif reel de la seance (${effectifReel} etudiants).`,
-      409,
-      "ROOM_CAPACITY_INSUFFICIENT",
-      {
-        capacite_salle: Number(salle.capacite || 0),
-        effectif_reel: effectifReel,
-      }
-    );
+
+  if (!coursEstEnLigne) {
+    if (!salleCompatibleAvecCours(salle, cours)) {
+      throw creerErreurPlanification(
+        "La salle n'est pas compatible avec le type reel de ce cours.",
+        409,
+        "ROOM_COURSE_TYPE_MISMATCH",
+        {
+          type_salle_cours: cours.type_salle,
+          type_salle: salle.type,
+        }
+      );
+    }
+
+    if (!AvailabilityChecker.salleCompatible(salle, cours, effectifReel)) {
+      throw creerErreurPlanification(
+        `La salle ne peut pas accueillir l'effectif reel de la seance (${effectifReel} etudiants).`,
+        409,
+        "ROOM_CAPACITY_INSUFFICIENT",
+        {
+          capacite_salle: Number(salle.capacite || 0),
+          effectif_reel: effectifReel,
+        }
+      );
+    }
   }
 
   ensureDateDansSession(
@@ -1412,6 +1435,7 @@ async function validerOccurrenceGroupe(
   }
 
   if (
+    !coursEstEnLigne &&
     !AvailabilityChecker.salleDisponible(
       Number(salle.id_salle),
       occurrence.date,
@@ -1427,17 +1451,19 @@ async function validerOccurrenceGroupe(
 
   const [conflitSalle, conflitProfesseur, conflitGroupe, conflitsEtudiants] =
     await Promise.all([
-      verifierConflitEntity(
-        {
-          type: "salle",
-          idValeur: salle.id_salle,
-          date: occurrence.date,
-          heureDebut,
-          heureFin,
-          idsAffectationsExclues,
-        },
-        executor
-      ),
+      coursEstEnLigne
+        ? Promise.resolve(0)
+        : verifierConflitEntity(
+          {
+            type: "salle",
+            idValeur: salle.id_salle,
+            date: occurrence.date,
+            heureDebut,
+            heureFin,
+            idsAffectationsExclues,
+          },
+          executor
+        ),
       verifierConflitEntity(
         {
           type: "professeur",
@@ -1667,7 +1693,9 @@ function construirePayloadOccurrence(affectation, overrides = {}) {
   return {
     idCours: Number(overrides.idCours ?? affectation.id_cours),
     idProfesseur: Number(overrides.idProfesseur ?? affectation.id_professeur),
-    idSalle: Number(overrides.idSalle ?? affectation.id_salle),
+    idSalle: normaliserIdentifiantOptionnel(
+      overrides.idSalle ?? affectation.id_salle
+    ),
     idGroupeEtudiants: Number(
       overrides.idGroupeEtudiants ?? affectation.id_groupes_etudiants
     ),
@@ -1730,7 +1758,7 @@ export async function planifierCoursGroupeManuellement(payload, executor = pool)
     const basePayload = {
       idCours: Number(payload.idCours),
       idProfesseur: Number(payload.idProfesseur),
-      idSalle: Number(payload.idSalle),
+      idSalle: normaliserIdentifiantOptionnel(payload.idSalle),
       idGroupeEtudiants: Number(payload.idGroupeEtudiants),
       date: String(payload.date || ""),
       heureDebut: String(payload.heureDebut || ""),
@@ -1809,7 +1837,7 @@ export async function planifierCoursGroupeManuellement(payload, executor = pool)
       id_planification_serie: idSerie,
       groupes_impactes: [basePayload.idGroupeEtudiants],
       professeurs_impactes: [basePayload.idProfesseur],
-      salles_impactees: [basePayload.idSalle],
+      salles_impactees: normaliserSallesImpactees(basePayload.idSalle),
       etudiants_impactes: participants.etudiantsReguliers.map((etudiant) =>
         Number(etudiant.id_etudiant)
       ),
@@ -1991,7 +2019,7 @@ export async function replanifierCoursGroupeManuellement(
       })),
       groupes_impactes: [payloadBase.idGroupeEtudiants],
       professeurs_impactes: [payloadBase.idProfesseur],
-      salles_impactees: [payloadBase.idSalle],
+      salles_impactees: normaliserSallesImpactees(payloadBase.idSalle),
       etudiants_impactes: participants.etudiantsReguliers.map((etudiant) =>
         Number(etudiant.id_etudiant)
       ),

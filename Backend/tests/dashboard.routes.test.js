@@ -63,6 +63,23 @@ describe("routes dashboard", () => {
             nb_cours_planifies: 320,
             nb_cours_non_planifies: 2,
             date_generation: "2026-09-03T10:00:00.000Z",
+            details: JSON.stringify({
+              details: {
+                modeOptimisationUtilise: "legacy",
+                scoring_v1: {
+                  version: "v1",
+                  modes: {
+                    equilibre: {
+                      mode: "equilibre",
+                      scoreGlobal: 98.48,
+                      scoreEtudiant: 97.8,
+                      scoreProfesseur: 99.58,
+                      scoreGroupe: 98.04,
+                    },
+                  },
+                },
+              },
+            }),
           },
         ]];
       }
@@ -133,6 +150,9 @@ describe("routes dashboard", () => {
     expect(response.status).toBe(200);
     expect(response.body.compteurs_globaux.nb_groupes).toBe(22);
     expect(response.body.resume_session_active.nb_etudiants_sans_horaire).toBe(20);
+    expect(
+      response.body.dernier_rapport.details_bruts.details.scoring_v1.modes.equilibre.scoreGlobal
+    ).toBe(98.48);
     expect(response.body.groupes_sans_horaire).toHaveLength(1);
     expect(response.body.cas_particuliers[0]).toEqual(
       expect.objectContaining({

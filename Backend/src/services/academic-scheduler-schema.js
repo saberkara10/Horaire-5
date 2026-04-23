@@ -392,6 +392,131 @@ async function assurerPlanificationSeries(executor) {
 }
 
 /**
+ * Assure la presence de la table des rapports de generation.
+ *
+ * Pourquoi:
+ * - `SchedulerEngine.generer()` insere dans `rapports_generation` en toute fin
+ *   de transaction ;
+ * - si la base n'a pas recu toutes les migrations mais que le scheduler peut
+ *   quand meme tourner, l'echec n'apparait qu'au moment de persister le
+ *   rapport final.
+ *
+ * Impact:
+ * - evite une erreur tardive apres une generation reussie ;
+ * - garde les routes d'historique compatibles avec les bases legacy.
+ *
+ * @param {Object} executor Connexion SQL active.
+ * @returns {Promise<void>}
+ */
+async function assurerRapportsGeneration(executor) {
+  await executor.query(
+    `CREATE TABLE IF NOT EXISTS rapports_generation (
+      id INT NOT NULL AUTO_INCREMENT,
+      id_session INT NULL,
+      genere_par INT NULL,
+      date_generation TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      score_qualite DECIMAL(5,2) DEFAULT 0,
+      nb_cours_planifies INT NOT NULL DEFAULT 0,
+      nb_cours_non_planifies INT NOT NULL DEFAULT 0,
+      nb_cours_echoues_traites INT NOT NULL DEFAULT 0,
+      nb_cours_en_ligne_generes INT NOT NULL DEFAULT 0,
+      nb_groupes_speciaux INT NOT NULL DEFAULT 0,
+      nb_resolutions_manuelles INT NOT NULL DEFAULT 0,
+      details JSON NULL,
+      PRIMARY KEY (id),
+      CONSTRAINT fk_rg_session
+        FOREIGN KEY (id_session) REFERENCES sessions (id_session)
+        ON DELETE SET NULL,
+      CONSTRAINT fk_rg_user
+        FOREIGN KEY (genere_par) REFERENCES utilisateurs (id_utilisateur)
+        ON DELETE SET NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
+  );
+
+  await ajouterColonneSiAbsente(executor, "rapports_generation", "id_session", "INT NULL");
+  await ajouterColonneSiAbsente(
+    executor,
+    "rapports_generation",
+    "genere_par",
+    "INT NULL"
+  );
+  await ajouterColonneSiAbsente(
+    executor,
+    "rapports_generation",
+    "date_generation",
+    "TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP"
+  );
+  await ajouterColonneSiAbsente(
+    executor,
+    "rapports_generation",
+    "score_qualite",
+    "DECIMAL(5,2) NOT NULL DEFAULT 0"
+  );
+  await ajouterColonneSiAbsente(
+    executor,
+    "rapports_generation",
+    "nb_cours_planifies",
+    "INT NOT NULL DEFAULT 0"
+  );
+  await ajouterColonneSiAbsente(
+    executor,
+    "rapports_generation",
+    "nb_cours_non_planifies",
+    "INT NOT NULL DEFAULT 0"
+  );
+  await ajouterColonneSiAbsente(
+    executor,
+    "rapports_generation",
+    "nb_cours_echoues_traites",
+    "INT NOT NULL DEFAULT 0"
+  );
+  await ajouterColonneSiAbsente(
+    executor,
+    "rapports_generation",
+    "nb_cours_en_ligne_generes",
+    "INT NOT NULL DEFAULT 0"
+  );
+  await ajouterColonneSiAbsente(
+    executor,
+    "rapports_generation",
+    "nb_groupes_speciaux",
+    "INT NOT NULL DEFAULT 0"
+  );
+  await ajouterColonneSiAbsente(
+    executor,
+    "rapports_generation",
+    "nb_resolutions_manuelles",
+    "INT NOT NULL DEFAULT 0"
+  );
+  await ajouterColonneSiAbsente(
+    executor,
+    "rapports_generation",
+    "details",
+    "LONGTEXT NULL"
+  );
+
+  await creerContrainteSiAbsente(
+    executor,
+    "rapports_generation",
+    "fk_rg_session",
+    `ALTER TABLE rapports_generation
+     ADD CONSTRAINT fk_rg_session
+     FOREIGN KEY (id_session) REFERENCES sessions (id_session)
+     ON DELETE SET NULL`
+  );
+
+  await creerContrainteSiAbsente(
+    executor,
+    "rapports_generation",
+    "fk_rg_user",
+    `ALTER TABLE rapports_generation
+     ADD CONSTRAINT fk_rg_user
+     FOREIGN KEY (genere_par) REFERENCES utilisateurs (id_utilisateur)
+     ON DELETE SET NULL`
+  );
+}
+
+/**
  * Cree le journal metier des replanifications intelligentes d'affectations.
  *
  * @param {Object} executor Connexion SQL active.
@@ -433,6 +558,7 @@ async function assurerSchema(executor) {
   await assurerEchangesCoursEtudiants(executor);
   await assurerCoursEchouesEvolution(executor);
   await assurerPlanificationSeries(executor);
+  await assurerRapportsGeneration(executor);
   await assurerJournalModificationsAffectationsScheduler(executor);
   await assurerIndexGroupesParSession(executor);
 }
