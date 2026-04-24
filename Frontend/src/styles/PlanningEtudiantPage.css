@@ -158,6 +158,15 @@
   color: #4d7c0f;
 }
 
+.planning-table__row--reprise td {
+  background: rgba(255, 247, 237, 0.82);
+}
+
+.planning-table__row--reprise .planning-code,
+.planning-table__row--reprise .planning-salle--online {
+  color: #b45309;
+}
+
 .planning-message {
   padding: 1.25rem;
   border-radius: 20px;
@@ -384,4 +393,16 @@
 .cal-seance {
   background: linear-gradient(135deg, var(--brand), #0d7c50);
   box-shadow: 0 12px 24px rgba(16, 167, 96, 0.2);
+}
+
+.cal-seance.etudiant-schedule__seance--reprise {
+  background: linear-gradient(135deg, #f59e0b, #ea580c);
+  color: #ffffff;
+  box-shadow: 0 14px 28px rgba(234, 88, 12, 0.28);
+}
+
+.cal-seance.etudiant-schedule__seance--reprise .cal-seance-salle,
+.cal-seance.etudiant-schedule__seance--reprise .cal-seance-prof,
+.cal-seance.etudiant-schedule__seance--reprise .etudiant-schedule__source {
+  color: rgba(255, 255, 255, 0.9);
 }

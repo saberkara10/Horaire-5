@@ -60,7 +60,7 @@ describe("SchedulerEngine.generer", () => {
     let nextPlageId = 700;
     let nextAffectationId = 900;
 
-    queryMock.mockImplementation(async (sql) => {
+    queryMock.mockImplementation(async (sql, params = []) => {
       const normalizedSql = String(sql).replace(/\s+/g, " ").trim();
 
       if (normalizedSql.startsWith("INSERT IGNORE INTO plages_horaires")) {
@@ -68,8 +68,17 @@ describe("SchedulerEngine.generer", () => {
       }
 
       if (normalizedSql.includes("SELECT id_plage_horaires")) {
-        nextPlageId += 1;
-        return [[{ id_plage_horaires: nextPlageId }]];
+        const rows = [];
+        for (let index = 0; index < params.length; index += 3) {
+          nextPlageId += 1;
+          rows.push({
+            id_plage_horaires: nextPlageId,
+            date: params[index],
+            heure_debut: params[index + 1],
+            heure_fin: params[index + 2],
+          });
+        }
+        return [rows];
       }
 
       if (normalizedSql.startsWith("INSERT INTO affectation_cours")) {

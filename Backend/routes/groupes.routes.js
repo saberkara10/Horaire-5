@@ -322,6 +322,16 @@ export default function groupesRoutes(app) {
       }
 
       const totalPlanifies = resultats.reduce((s, r) => s + r.nb_cours_planifies, 0);
+      await journaliserActivite({
+        request: req,
+        actionType: "GENERATE",
+        module: "Horaires",
+        targetType: "Generation groupes",
+        description: `Generation ciblee terminee: ${resultats.length} groupe(s) traite(s).`,
+        newValue: { programme, etape, mode_optimisation: modeOptimisation, total_planifies: totalPlanifies, resultats, erreurs },
+        status: erreurs.length > 0 ? "ERROR" : "SUCCESS",
+        errorMessage: erreurs.length > 0 ? `${erreurs.length} groupe(s) en erreur.` : null,
+      });
       return res.status(201).json({
         message: `Génération ciblée terminée : ${resultats.length} groupe(s) traité(s), ${totalPlanifies} séances planifiées.`,
         mode_optimisation_utilise: modeOptimisation,
@@ -330,6 +340,16 @@ export default function groupesRoutes(app) {
       });
     } catch (err) {
       console.error("[groupes] POST /generer-cible:", err);
+      await journaliserActivite({
+        request: req,
+        actionType: "GENERATE",
+        module: "Horaires",
+        targetType: "Generation groupes",
+        description: "Echec de generation ciblee des groupes.",
+        status: "ERROR",
+        errorMessage: err.message,
+        newValue: req.body,
+      });
       return res.status(500).json({ message: err.message || "Erreur serveur lors de la génération ciblée." });
     }
   });
@@ -876,6 +896,22 @@ export default function groupesRoutes(app) {
         optimizationMode: modeOptimisation,
       });
 
+      await journaliserActivite({
+        request: req,
+        actionType: "GENERATE",
+        module: "Horaires",
+        targetType: "Groupe",
+        targetId: idGroupe,
+        description: `Generation d'horaire pour le groupe ${groupe.nom_groupe}.`,
+        newValue: {
+          groupe: groupe.nom_groupe,
+          nb_cours_planifies: rapport.nb_cours_planifies,
+          nb_cours_non_planifies: rapport.nb_cours_non_planifies,
+          score_qualite: rapport.score_qualite,
+          mode_optimisation: rapport?.details?.modeOptimisationUtilise || modeOptimisation,
+        },
+      });
+
       return res.status(201).json({
         message: `Horaire généré pour "${groupe.nom_groupe}" : ${rapport.nb_cours_planifies} séances planifiées.`,
         message:
@@ -888,6 +924,17 @@ export default function groupesRoutes(app) {
       });
     } catch (err) {
       console.error("[groupes] POST /:id/generer-horaire:", err);
+      await journaliserActivite({
+        request: req,
+        actionType: "GENERATE",
+        module: "Horaires",
+        targetType: "Groupe",
+        targetId: req.params.id,
+        description: "Echec de generation d'horaire pour un groupe.",
+        status: "ERROR",
+        errorMessage: err.message,
+        newValue: req.body,
+      });
       return res.status(err.statusCode || 500).json({ message: err.message || "Erreur serveur." });
     }
   });

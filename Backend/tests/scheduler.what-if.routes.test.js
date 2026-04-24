@@ -90,14 +90,17 @@ describe("scheduler what-if route", () => {
 
     expect(response.status).toBe(201);
     expect(response.body.mode_optimisation_utilise).toBe("professeur");
-    expect(schedulerGenererMock).toHaveBeenCalledWith({
-      idSession: 4,
-      idUtilisateur: null,
-      inclureWeekend: false,
-      optimizationMode: "professeur",
-      saParams: { maxIterParTemp: 40 },
-      onProgress: null,
-    });
+    expect(schedulerGenererMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        idSession: 4,
+        idUtilisateur: null,
+        inclureWeekend: false,
+        optimizationMode: "professeur",
+        saParams: { maxIterParTemp: 40 },
+        onProgress: null,
+        performanceTracker: expect.any(Object),
+      })
+    );
   });
 
   test("GET /api/scheduler/generer-stream relaie le mode d'optimisation au moteur", async () => {
@@ -114,14 +117,17 @@ describe("scheduler what-if route", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(schedulerGenererMock).toHaveBeenCalledWith({
-      idSession: 9,
-      idUtilisateur: null,
-      inclureWeekend: false,
-      optimizationMode: "equilibre",
-      saParams: { maxIterParTemp: 60 },
-      onProgress: expect.any(Function),
-    });
+    expect(schedulerGenererMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        idSession: 9,
+        idUtilisateur: null,
+        inclureWeekend: false,
+        optimizationMode: "equilibre",
+        saParams: { maxIterParTemp: 60 },
+        onProgress: expect.any(Function),
+        performanceTracker: expect.any(Object),
+      })
+    );
     expect(response.text).toContain("\"type\":\"done\"");
   });
 

@@ -34,7 +34,7 @@ describe("SchedulerEngine.genererGroupe", () => {
   beforeEach(() => {
     jest.clearAllMocks();
 
-    queryMock.mockImplementation(async (sql) => {
+    queryMock.mockImplementation(async (sql, params = []) => {
       const normalizedSql = String(sql).replace(/\s+/g, " ").trim();
 
       if (normalizedSql.includes("FROM sessions")) {
@@ -176,7 +176,16 @@ describe("SchedulerEngine.genererGroupe", () => {
       }
 
       if (normalizedSql.includes("SELECT id_plage_horaires FROM plages_horaires")) {
-        return [[{ id_plage_horaires: 77 }]];
+        const rows = [];
+        for (let index = 0; index < params.length; index += 3) {
+          rows.push({
+            id_plage_horaires: 77 + index / 3,
+            date: params[index],
+            heure_debut: params[index + 1],
+            heure_fin: params[index + 2],
+          });
+        }
+        return [rows];
       }
 
       if (normalizedSql.startsWith("INSERT INTO affectation_cours")) {

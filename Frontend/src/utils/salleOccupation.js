@@ -11,12 +11,12 @@
  */
 import {
   JOURS_SEMAINE_COMPLETS,
-  creerDateLocale,
   getDebutSemaine,
 } from "./calendar.js";
 
 const HEURE_DEBUT_JOURNEE = "08:00:00";
 const HEURE_FIN_JOURNEE = "23:00:00";
+const NB_JOURS_SEMAINE_AFFICHES = 7;
 
 export const HEURES_GRILLE = Array.from({ length: 15 }, (_, index) =>
   `${String(index + 8).padStart(2, "0")}:00`
@@ -41,8 +41,56 @@ export function heureEnMinutes(heure) {
   return Number(heures) * 60 + Number(minutes);
 }
 
+function estDateValide(date) {
+  return date instanceof Date && !Number.isNaN(date.getTime());
+}
+
+function parserDateValide(dateSource) {
+  if (dateSource instanceof Date) {
+    return estDateValide(dateSource) ? new Date(dateSource) : null;
+  }
+
+  const texte = String(dateSource || "").trim();
+
+  if (!texte) {
+    return null;
+  }
+
+  const dateIso = texte.includes("T") ? texte.slice(0, 10) : texte;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateIso);
+
+  if (match) {
+    const [, annee, mois, jour] = match;
+    const anneeNombre = Number(annee);
+    const moisNombre = Number(mois);
+    const jourNombre = Number(jour);
+    const date = new Date(anneeNombre, moisNombre - 1, jourNombre);
+    const dateCorrespond =
+      date.getFullYear() === anneeNombre &&
+      date.getMonth() === moisNombre - 1 &&
+      date.getDate() === jourNombre;
+
+    return estDateValide(date) && dateCorrespond ? date : null;
+  }
+
+  const fallback = new Date(texte);
+  return estDateValide(fallback) ? fallback : null;
+}
+
+function getDebutSemaineValide(dateSource, fallback = new Date()) {
+  const dateReference =
+    parserDateValide(dateSource) || parserDateValide(fallback) || new Date();
+  const debutSemaine = getDebutSemaine(dateReference);
+
+  return estDateValide(debutSemaine) ? debutSemaine : getDebutSemaine(new Date());
+}
+
 export function formaterDateIsoLocal(dateSource) {
-  const date = dateSource instanceof Date ? dateSource : creerDateLocale(dateSource);
+  const date = parserDateValide(dateSource) || new Date();
+
+  if (!estDateValide(date)) {
+    return formaterDateIsoLocal(new Date());
+  }
 
   return [
     String(date.getFullYear()).padStart(4, "0"),
@@ -360,7 +408,7 @@ export function construireVueHebdomadaireSalle(
   lundiCourant,
   salle = null
 ) {
-  const debutSemaine = getDebutSemaine(lundiCourant || new Date());
+  const debutSemaine = getDebutSemaineValide(lundiCourant, new Date());
   const finSemaine = ajouterJours(debutSemaine, 6);
   const debutSemaineIso = formaterDateIsoLocal(debutSemaine);
   const finSemaineIso = formaterDateIsoLocal(finSemaine);
@@ -382,54 +430,56 @@ export function construireVueHebdomadaireSalle(
     occupationsParDate.get(occupation.date).push(occupation);
   }
 
-  const jours = JOURS_SEMAINE_COMPLETS.map((jour, index) => {
-    const date = ajouterJours(debutSemaine, index);
-    const dateIso = formaterDateIsoLocal(date);
-    const occupationsJour = [...(occupationsParDate.get(dateIso) || [])];
-    const creneaux = [];
-    let curseurMinutes = debutJourneeMinutes;
+  const jours = JOURS_SEMAINE_COMPLETS
+    .slice(0, NB_JOURS_SEMAINE_AFFICHES)
+    .map((jour, index) => {
+      const date = ajouterJours(debutSemaine, index);
+      const dateIso = formaterDateIsoLocal(date);
+      const occupationsJour = [...(occupationsParDate.get(dateIso) || [])];
+      const creneaux = [];
+      let curseurMinutes = debutJourneeMinutes;
 
-    for (const occupation of occupationsJour) {
-      const debutOccupation = Math.max(
-        debutJourneeMinutes,
-        heureEnMinutes(occupation.heure_debut)
-      );
-      const finOccupation = Math.min(
-        finJourneeMinutes,
-        heureEnMinutes(occupation.heure_fin)
-      );
+      for (const occupation of occupationsJour) {
+        const debutOccupation = Math.max(
+          debutJourneeMinutes,
+          heureEnMinutes(occupation.heure_debut)
+        );
+        const finOccupation = Math.min(
+          finJourneeMinutes,
+          heureEnMinutes(occupation.heure_fin)
+        );
 
-      if (debutOccupation > curseurMinutes) {
+        if (debutOccupation > curseurMinutes) {
+          creneaux.push(
+            construireCreneauLibre(dateIso, jour.value, curseurMinutes, debutOccupation)
+          );
+        }
+
+        creneaux.push({
+          ...occupation,
+          id_creneau: `occupation-${occupation.id_affectation_cours}-${dateIso}-${occupation.heure_debut}`,
+          statut: occupation.conflit_detecte ? "conflit" : occupation.statut || "occupee",
+          jour_semaine: jour.value,
+          debut_minutes: debutOccupation,
+          fin_minutes: finOccupation,
+          duree_minutes: Math.max(0, finOccupation - debutOccupation),
+        });
+
+        curseurMinutes = Math.max(curseurMinutes, finOccupation);
+      }
+
+      if (curseurMinutes < finJourneeMinutes) {
         creneaux.push(
-          construireCreneauLibre(dateIso, jour.value, curseurMinutes, debutOccupation)
+          construireCreneauLibre(dateIso, jour.value, curseurMinutes, finJourneeMinutes)
         );
       }
 
-      creneaux.push({
-        ...occupation,
-        id_creneau: `occupation-${occupation.id_affectation_cours}-${dateIso}-${occupation.heure_debut}`,
-        statut: occupation.conflit_detecte ? "conflit" : occupation.statut || "occupee",
-        jour_semaine: jour.value,
-        debut_minutes: debutOccupation,
-        fin_minutes: finOccupation,
-        duree_minutes: Math.max(0, finOccupation - debutOccupation),
-      });
-
-      curseurMinutes = Math.max(curseurMinutes, finOccupation);
-    }
-
-    if (curseurMinutes < finJourneeMinutes) {
-      creneaux.push(
-        construireCreneauLibre(dateIso, jour.value, curseurMinutes, finJourneeMinutes)
-      );
-    }
-
-    return {
-      date: dateIso,
-      nom: jour.label,
-      creneaux: calculerDispositionJour(creneaux),
-    };
-  });
+      return {
+        date: dateIso,
+        nom: jour.label,
+        creneaux: calculerDispositionJour(creneaux),
+      };
+    });
 
   return {
     debutSemaine,
@@ -443,22 +493,25 @@ export function construireVueHebdomadaireSalle(
 }
 
 export function determinerLundiInitialOccupation(consultation) {
+  const candidats = [
+    consultation?.vue_hebdomadaire?.debut_semaine,
+    consultation?.vue_hebdomadaire?.date_reference,
+    consultation?.occupations?.[0]?.date,
+    consultation?.session?.date_debut,
+    new Date(),
+  ];
   const dateReference =
-    consultation?.vue_hebdomadaire?.debut_semaine ||
-    consultation?.vue_hebdomadaire?.date_reference ||
-    consultation?.occupations?.[0]?.date ||
-    consultation?.session?.date_debut ||
-    new Date();
+    candidats.find((candidat) => parserDateValide(candidat)) || new Date();
 
-  return getDebutSemaine(dateReference);
+  return getDebutSemaineValide(dateReference);
 }
 
 export function extraireBornesNavigation(consultation) {
   const premiereSemaine = consultation?.vue_hebdomadaire?.premiere_semaine
-    ? getDebutSemaine(consultation.vue_hebdomadaire.premiere_semaine)
+    ? getDebutSemaineValide(consultation.vue_hebdomadaire.premiere_semaine)
     : null;
   const derniereSemaine = consultation?.vue_hebdomadaire?.derniere_semaine
-    ? getDebutSemaine(consultation.vue_hebdomadaire.derniere_semaine)
+    ? getDebutSemaineValide(consultation.vue_hebdomadaire.derniere_semaine)
     : null;
 
   return {

@@ -6,6 +6,8 @@
 
 import { disponibiliteCouvreDate } from "../professeurs/availability-temporal.js";
 
+const TIME_TO_MINUTES_CACHE = new Map();
+
 export class AvailabilityChecker {
   static profDisponible(
     idProf,
@@ -150,8 +152,15 @@ export class AvailabilityChecker {
   }
 
   static _heureVersMin(heure) {
-    const [heures, minutes = "0"] = String(heure).split(":");
-    return parseInt(heures, 10) * 60 + parseInt(minutes, 10);
+    const key = String(heure || "");
+    if (TIME_TO_MINUTES_CACHE.has(key)) {
+      return TIME_TO_MINUTES_CACHE.get(key);
+    }
+
+    const [heures, minutes = "0"] = key.split(":");
+    const value = parseInt(heures, 10) * 60 + parseInt(minutes, 10);
+    TIME_TO_MINUTES_CACHE.set(key, value);
+    return value;
   }
 
   static _lireCoursIds(professeur) {

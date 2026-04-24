@@ -38,6 +38,8 @@ import {
   TARGET_ACTIVE_DAYS_PER_GROUP,
 } from "./AcademicCatalog.js";
 
+const GROUP_STUDENT_IDS_CACHE = Symbol("groupStudentIdsCache");
+
 export class SchedulerEngine {
   static async generer(options = {}) {
     const {
@@ -47,6 +49,7 @@ export class SchedulerEngine {
       optimizationMode = "legacy",
       saParams = {},
       onProgress = null,
+      performanceTracker = null,
     } = options;
     const weekendAutorise = false;
     // Legacy reste le filet de securite. Les autres profils reutilisent
@@ -75,10 +78,18 @@ export class SchedulerEngine {
     };
 
     try {
-      await connection.beginTransaction();
+      performanceTracker?.startStep("generation_totale");
+      const trackedConnection =
+        performanceTracker?.wrapExecutor?.(connection, "scheduler_engine") || connection;
+
+      await trackedConnection.beginTransaction();
       SchedulerEngine._progress(onProgress, "PHASE_1", "Chargement du contexte...", 5);
 
-      const ctx = await ContextLoader.charger(idSession, connection);
+      const ctx = await (performanceTracker?.measure
+        ? performanceTracker.measure("chargement_donnees", async () =>
+            ContextLoader.charger(idSession, trackedConnection)
+          )
+        : ContextLoader.charger(idSession, trackedConnection));
       rapport.session = ctx.session;
 
       const {
@@ -121,11 +132,11 @@ export class SchedulerEngine {
 
       SchedulerEngine._progress(onProgress, "PHASE_2", "Formation des groupes...", 15);
 
-      const { groupesFormes, affectationsEtudiantGroupe } = GroupFormer.formerGroupes(
-        etudiants,
-        cours,
-        echouesParEtudiant
-      );
+      const { groupesFormes, affectationsEtudiantGroupe } = performanceTracker?.measureSync
+        ? performanceTracker.measureSync("formation_groupes", () =>
+            GroupFormer.formerGroupes(etudiants, cours, echouesParEtudiant)
+          )
+        : GroupFormer.formerGroupes(etudiants, cours, echouesParEtudiant);
       rapport.groupes_crees = groupesFormes.map((groupe) => ({
         nom: groupe.nomGroupe,
         taille_reguliere: Array.isArray(groupe.etudiants) ? groupe.etudiants.length : 0,
@@ -139,7 +150,7 @@ export class SchedulerEngine {
       const idGroupeParNom = await SchedulerEngine._persisterGroupes(
         groupesFormes,
         session.id_session,
-        connection
+        trackedConnection
       );
       for (const groupe of groupesFormes) {
         groupe.id_groupe = idGroupeParNom.get(groupe.nomGroupe) || null;
@@ -148,12 +159,12 @@ export class SchedulerEngine {
       await SchedulerEngine._detacherEtudiantsHorsSession(
         session.id_session,
         sessionSaison,
-        connection
+        trackedConnection
       );
       await SchedulerEngine._mettreAJourGroupesEtudiants(
         affectationsEtudiantGroupe,
         idGroupeParNom,
-        connection
+        trackedConnection
       );
 
       SchedulerEngine._progress(
@@ -163,7 +174,44 @@ export class SchedulerEngine {
         25
       );
 
-      const matrix = new ConstraintMatrix();
+      const {
+        matrix,
+        jours,
+        datesParJourSemaine,
+        creneaux,
+        coursePlanningContextMap,
+        courseTimeCandidateMap,
+        preferencesStabilite,
+        chargeSeriesParProf,
+        chargeSeriesParJour,
+        chargeSeriesParGroupeJour,
+        chargeSeriesParProfJour,
+        slotsParGroupeJour,
+        slotsParProfJour,
+        resourcePlacementIndex,
+        coursParId,
+        groupesParNom,
+      } = performanceTracker?.measureSync
+        ? performanceTracker.measureSync("preparation_contraintes", () =>
+            SchedulerEngine._preparerContexteGeneration({
+              session,
+              weekendAutorise,
+              coursPlanifiables,
+              professeurs,
+              salles,
+              groupesFormes,
+              affectationsExistantes,
+            })
+          )
+        : SchedulerEngine._preparerContexteGeneration({
+            session,
+            weekendAutorise,
+            coursPlanifiables,
+            professeurs,
+            salles,
+            groupesFormes,
+            affectationsExistantes,
+          });
 
       SchedulerEngine._progress(
         onProgress,
@@ -172,39 +220,11 @@ export class SchedulerEngine {
         35
       );
 
-      const jours = AvailabilityChecker.genererJours(
-        session.date_debut,
-        session.date_fin,
-        weekendAutorise
-      );
-      const datesParJourSemaine =
-        SchedulerEngine._indexerDatesParJourSemaine(jours);
-      const creneaux = [...ACADEMIC_WEEKDAY_TIME_SLOTS];
-      const courseTimeCandidateMap = new Map(
-        coursPlanifiables.map((course) => [
-          Number(course.id_cours),
-          SchedulerEngine._normaliserCreneauxCours(
-            course,
-            CandidatePrecomputer.buildCourseTimeCandidates(course)
-          ),
-        ])
-      );
-      const preferencesStabilite = SchedulerEngine._construirePreferencesStabilite(
-        affectationsExistantes
-      );
-      const chargeSeriesParProf = new Map();
-      const chargeSeriesParJour = new Map();
-      const chargeSeriesParGroupeJour = new Map();
-      const chargeSeriesParProfJour = new Map();
-      const slotsParGroupeJour = new Map();
-      const slotsParProfJour = new Map();
-      const resourcePlacementIndex = new ResourceDayPlacementIndex();
-
-      await SchedulerEngine._supprimerHoraireSession(session.id_session, connection);
+      await SchedulerEngine._supprimerHoraireSession(session.id_session, trackedConnection);
       await SchedulerEngine._supprimerGroupesVidesSession(
         session.id_session,
         groupesFormes.map((groupe) => groupe.nomGroupe),
-        connection
+        trackedConnection
       );
 
       const solution = [];
@@ -215,167 +235,20 @@ export class SchedulerEngine {
         {
           candidateMap: courseTimeCandidateMap,
           resolveCompatibleProfessorCount: (course) =>
-            professeurs.filter((professeur) =>
-              AvailabilityChecker.profCompatible(professeur, course)
-            ).length,
+            coursePlanningContextMap.get(Number(course.id_cours))?.profsCompatibles.length || 0,
           resolveCompatibleRoomCount: (course) =>
-            course.est_en_ligne
-              ? 1
-              : salles.filter((salle) =>
-                  AvailabilityChecker.salleCompatible(salle, course)
-                ).length,
+            coursePlanningContextMap.get(Number(course.id_cours))?.sallesCompatiblesType.length ||
+            0,
         }
       );
 
-      for (const [indexCours, coursActuel] of coursTries.entries()) {
-        if (indexCours > 0 && indexCours % 25 === 0) {
-          await SchedulerEngine._maintenirConnexionActive(connection);
-        }
-
-        const creneauxCours =
-          courseTimeCandidateMap.get(Number(coursActuel.id_cours)) ||
-          SchedulerEngine._normaliserCreneauxCours(coursActuel, creneaux);
-        const sallesCompatiblesType = coursActuel.est_en_ligne
-          ? [null]
-          : salles
-              .filter((salle) => AvailabilityChecker.salleCompatible(salle, coursActuel))
-              .sort((salleA, salleB) => salleA.capacite - salleB.capacite);
-
-        if (!coursActuel.est_en_ligne && sallesCompatiblesType.length === 0) {
-          nonPlanifies.push({
-            id_cours: coursActuel.id_cours,
-            code: coursActuel.code,
-            nom: coursActuel.nom,
-            raison: `Aucune salle compatible pour le type "${coursActuel.type_salle}".`,
-          });
-          continue;
-        }
-
-        const profsCompatibles = professeurs
-          .filter((professeur) =>
-            AvailabilityChecker.profCompatible(professeur, coursActuel)
-          )
-          .sort((profA, profB) => {
-            const chargeA = chargeSeriesParProf.get(profA.id_professeur) || 0;
-            const chargeB = chargeSeriesParProf.get(profB.id_professeur) || 0;
-
-            if (chargeA !== chargeB) {
-              return chargeA - chargeB;
-            }
-
-            const nbGroupesA =
-              matrix.groupesParProf.get(String(profA.id_professeur))?.size || 0;
-            const nbGroupesB =
-              matrix.groupesParProf.get(String(profB.id_professeur))?.size || 0;
-
-            if (nbGroupesA !== nbGroupesB) {
-              return nbGroupesA - nbGroupesB;
-            }
-
-            const nbCoursA =
-              matrix.coursParProf.get(String(profA.id_professeur))?.size || 0;
-            const nbCoursB =
-              matrix.coursParProf.get(String(profB.id_professeur))?.size || 0;
-            if (nbCoursA !== nbCoursB) {
-              return nbCoursA - nbCoursB;
-            }
-
-            return String(profA.matricule || "").localeCompare(
-              String(profB.matricule || ""),
-              "fr"
-            );
-          });
-
-        if (profsCompatibles.length === 0) {
-          nonPlanifies.push({
-            id_cours: coursActuel.id_cours,
-            code: coursActuel.code,
-            nom: coursActuel.nom,
-            raison: "Aucun professeur compatible trouve.",
-          });
-          continue;
-        }
-
-        const groupesCours = groupesFormes.filter((groupe) => {
-          const programmeGroupe = AvailabilityChecker._normaliser(groupe.programme || "");
-          const programmeCours = AvailabilityChecker._normaliser(
-            coursActuel.programme || ""
-          );
-          const etapeGroupe =
-            groupe.etape != null ? String(Number(groupe.etape)) : "";
-          const etapeCours = String(coursActuel.etape_etude || "").trim();
-
-          return (
-            programmeGroupe !== "" &&
-            programmeGroupe === programmeCours &&
-            etapeGroupe !== "" &&
-            etapeGroupe === etapeCours
-          );
-        });
-
-        if (groupesCours.length === 0) {
-          continue;
-        }
-
-        const seancesParSemaine = Math.max(
-          1,
-          Number(coursActuel.sessions_par_semaine || 1)
-        );
-
-        for (const groupe of groupesCours) {
-          const idGroupe = idGroupeParNom.get(groupe.nomGroupe);
-          const effectifGroupe = GroupFormer.lireEffectifCours(
-            groupe,
-            coursActuel.id_cours
-          );
-
-          if (!idGroupe) {
-            nonPlanifies.push({
-              id_cours: coursActuel.id_cours,
-              code: coursActuel.code,
-              nom: coursActuel.nom,
-              groupe: groupe.nomGroupe,
-              raison: "Le groupe n'a pas pu etre persiste avant la generation.",
-            });
-            continue;
-          }
-
-          const sallesCompatibles = coursActuel.est_en_ligne
-            ? [null]
-            : sallesCompatiblesType
-                .filter((salle) =>
-                  AvailabilityChecker.salleCompatible(
-                    salle,
-                    coursActuel,
-                    effectifGroupe
-                  )
-                )
-                .sort((salleA, salleB) => salleA.capacite - salleB.capacite);
-
-          if (!coursActuel.est_en_ligne && sallesCompatibles.length === 0) {
-            nonPlanifies.push({
-              id_cours: coursActuel.id_cours,
-              code: coursActuel.code,
-              nom: coursActuel.nom,
-              groupe: groupe.nomGroupe,
-              raison: `Aucune salle compatible ne peut accueillir ${effectifGroupe} etudiants pour le type "${coursActuel.type_salle}".`,
-            });
-            continue;
-          }
-
-          for (
-            let numeroSeance = 1;
-            numeroSeance <= seancesParSemaine;
-            numeroSeance += 1
-          ) {
-            const serie = SchedulerEngine._trouverSerieHebdomadaire({
-              cours: coursActuel,
-              groupe,
-              idGroupe,
-              profsCompatibles,
-              sallesCompatibles,
+      await (performanceTracker?.measure
+        ? performanceTracker.measure("generation_creneaux", async () =>
+            SchedulerEngine._genererPlacementsCourses({
+              coursTries,
+              coursePlanningContextMap,
               datesParJourSemaine,
-              creneaux: creneauxCours,
+              creneaux,
               matrix,
               dispParProf,
               absencesParProf,
@@ -387,28 +260,37 @@ export class SchedulerEngine {
               slotsParGroupeJour,
               slotsParProfJour,
               resourcePlacementIndex,
-              numeroSeance,
               preferencesStabilite,
-              optimizationMode: modeOptimisation,
-            });
-
-            if (!serie) {
-              nonPlanifies.push({
-                id_cours: coursActuel.id_cours,
-                code: coursActuel.code,
-                nom: coursActuel.nom,
-                groupe: groupe.nomGroupe,
-                seance: numeroSeance,
-                raison:
-                  "Aucun motif hebdomadaire stable disponible pour toute la session.",
-              });
-              continue;
-            }
-
-            solution.push(...serie.placements);
-          }
-        }
-      }
+              modeOptimisation,
+              idGroupeParNom,
+              solution,
+              nonPlanifies,
+              connection: trackedConnection,
+            })
+          )
+        : SchedulerEngine._genererPlacementsCourses({
+            coursTries,
+            coursePlanningContextMap,
+            datesParJourSemaine,
+            creneaux,
+            matrix,
+            dispParProf,
+            absencesParProf,
+            indispoParSalle,
+            chargeSeriesParProf,
+            chargeSeriesParJour,
+            chargeSeriesParGroupeJour,
+            chargeSeriesParProfJour,
+            slotsParGroupeJour,
+            slotsParProfJour,
+            resourcePlacementIndex,
+            preferencesStabilite,
+            modeOptimisation,
+            idGroupeParNom,
+            solution,
+            nonPlanifies,
+            connection: trackedConnection,
+          }));
       SchedulerEngine._progress(
         onProgress,
         "PHASE_4B",
@@ -419,65 +301,59 @@ export class SchedulerEngine {
       const nonPlanifiesOriginaux = [...nonPlanifies];
       nonPlanifies.length = 0;
 
-      for (const np of nonPlanifiesOriginaux) {
-        const coursActuel = cours.find((c) => c.id_cours === np.id_cours);
-        if (!coursActuel) { nonPlanifies.push(np); continue; }
-
-        const groupe = groupesFormes.find((g) => g.nomGroupe === np.groupe);
-        const idGroupe = np.groupe ? idGroupeParNom.get(np.groupe) : null;
-        if (!groupe || !idGroupe) { nonPlanifies.push(np); continue; }
-
-        const effectifGroupe = GroupFormer.lireEffectifCours(
-          groupe,
-          coursActuel.id_cours
-        );
-
-        const serie = SchedulerEngine._trouverSerieAssouplie({
-          cours: coursActuel,
-          groupe,
-          idGroupe,
-          professeurs,
-          salles,
-          datesParJourSemaine,
-          creneaux:
-            courseTimeCandidateMap.get(Number(coursActuel.id_cours)) ||
-            SchedulerEngine._normaliserCreneauxCours(coursActuel, creneaux),
-          matrix,
-          dispParProf,
-          absencesParProf,
-          indispoParSalle,
-          chargeSeriesParProf,
-          chargeSeriesParJour,
-          chargeSeriesParGroupeJour,
-          chargeSeriesParProfJour,
-          slotsParGroupeJour,
-          slotsParProfJour,
-          resourcePlacementIndex,
-          effectifGroupe,
-          optimizationMode: modeOptimisation,
-        });
-
-        if (serie) {
-          solution.push(...serie.placements);
-        } else {
-          const diag = SchedulerEngine._diagnosticPrecis({
-            cours: coursActuel,
-            groupe,
-            idGroupe,
+      (performanceTracker?.measureSync
+        ? performanceTracker.measureSync("generation_rattrapage", () =>
+            SchedulerEngine._traiterCoursNonPlanifies({
+              nonPlanifiesOriginaux,
+              coursParId,
+              groupesParNom,
+              idGroupeParNom,
+              professeurs,
+              salles,
+              datesParJourSemaine,
+              courseTimeCandidateMap,
+              creneaux,
+              matrix,
+              dispParProf,
+              absencesParProf,
+              indispoParSalle,
+              chargeSeriesParProf,
+              chargeSeriesParJour,
+              chargeSeriesParGroupeJour,
+              chargeSeriesParProfJour,
+              slotsParGroupeJour,
+              slotsParProfJour,
+              resourcePlacementIndex,
+              modeOptimisation,
+              solution,
+              nonPlanifies,
+            })
+          )
+        : SchedulerEngine._traiterCoursNonPlanifies({
+            nonPlanifiesOriginaux,
+            coursParId,
+            groupesParNom,
+            idGroupeParNom,
             professeurs,
             salles,
             datesParJourSemaine,
-            creneaux:
-              courseTimeCandidateMap.get(Number(coursActuel.id_cours)) ||
-              SchedulerEngine._normaliserCreneauxCours(coursActuel, creneaux),
+            courseTimeCandidateMap,
+            creneaux,
             matrix,
             dispParProf,
             absencesParProf,
             indispoParSalle,
-          });
-          nonPlanifies.push({ ...np, ...diag });
-        }
-      }
+            chargeSeriesParProf,
+            chargeSeriesParJour,
+            chargeSeriesParGroupeJour,
+            chargeSeriesParProfJour,
+            slotsParGroupeJour,
+            slotsParProfJour,
+            resourcePlacementIndex,
+            modeOptimisation,
+            solution,
+            nonPlanifies,
+          }));
 
       SchedulerEngine._progress(
         onProgress,
@@ -486,33 +362,57 @@ export class SchedulerEngine {
         50
       );
 
-      const { placementsGarantie, diagnosticsGarantie } =
-        SchedulerEngine._passeDeGarantieGroupes({
-          solution,
-          cours: coursPlanifiables,
-          groupesFormes,
-          idGroupeParNom,
-          professeurs,
-          salles,
-          datesParJourSemaine,
-          creneaux,
-          courseTimeCandidateMap,
-          matrix,
-          dispParProf,
-          absencesParProf,
-          indispoParSalle,
-          chargeSeriesParProf,
-          chargeSeriesParJour,
-          chargeSeriesParGroupeJour,
-          chargeSeriesParProfJour,
-          slotsParGroupeJour,
-          slotsParProfJour,
-          resourcePlacementIndex,
-        });
+      const { placementsGarantie, diagnosticsGarantie } = performanceTracker?.measureSync
+        ? performanceTracker.measureSync("verification_conflits", () =>
+            SchedulerEngine._passeDeGarantieGroupes({
+              solution,
+              cours: coursPlanifiables,
+              groupesFormes,
+              idGroupeParNom,
+              professeurs,
+              salles,
+              datesParJourSemaine,
+              creneaux,
+              courseTimeCandidateMap,
+              matrix,
+              dispParProf,
+              absencesParProf,
+              indispoParSalle,
+              chargeSeriesParProf,
+              chargeSeriesParJour,
+              chargeSeriesParGroupeJour,
+              chargeSeriesParProfJour,
+              slotsParGroupeJour,
+              slotsParProfJour,
+              resourcePlacementIndex,
+            })
+          )
+        : SchedulerEngine._passeDeGarantieGroupes({
+            solution,
+            cours: coursPlanifiables,
+            groupesFormes,
+            idGroupeParNom,
+            professeurs,
+            salles,
+            datesParJourSemaine,
+            creneaux,
+            courseTimeCandidateMap,
+            matrix,
+            dispParProf,
+            absencesParProf,
+            indispoParSalle,
+            chargeSeriesParProf,
+            chargeSeriesParJour,
+            chargeSeriesParGroupeJour,
+            chargeSeriesParProfJour,
+            slotsParGroupeJour,
+            slotsParProfJour,
+            resourcePlacementIndex,
+          });
 
       solution.push(...placementsGarantie);
       nonPlanifies.push(...diagnosticsGarantie);
-      await SchedulerEngine._maintenirConnexionActive(connection);
+      await SchedulerEngine._maintenirConnexionActive(trackedConnection);
 
       SchedulerEngine._progress(
         onProgress,
@@ -530,29 +430,49 @@ export class SchedulerEngine {
         transfertsGlobaux = [],
         debug: debugReprises = {},
         stats: statsReprises,
-      } = FailedCourseEngine.rattacherCoursEchoues({
-        echouesParEtudiant,
-        cours,
-        etudiants,
-        groupesFormes: groupesFormesAvecIds,
-        affectationsEtudiantGroupe,
-        placementsPlanifies: solution,
-        matrix,
-        salles,
-        professeurs,
-        datesParJourSemaine,
-        dispParProf,
-        absencesParProf,
-        indispoParSalle,
-        resourcePlacementIndex,
-        activerCoursEnLigne: isOnlineCourseSchedulingEnabled(),
-      });
+      } = performanceTracker?.measureSync
+        ? performanceTracker.measureSync("traitement_reprises", () =>
+            FailedCourseEngine.rattacherCoursEchoues({
+              echouesParEtudiant,
+              cours,
+              etudiants,
+              groupesFormes: groupesFormesAvecIds,
+              affectationsEtudiantGroupe,
+              placementsPlanifies: solution,
+              matrix,
+              salles,
+              professeurs,
+              datesParJourSemaine,
+              dispParProf,
+              absencesParProf,
+              indispoParSalle,
+              resourcePlacementIndex,
+              activerCoursEnLigne: isOnlineCourseSchedulingEnabled(),
+            })
+          )
+        : FailedCourseEngine.rattacherCoursEchoues({
+            echouesParEtudiant,
+            cours,
+            etudiants,
+            groupesFormes: groupesFormesAvecIds,
+            affectationsEtudiantGroupe,
+            placementsPlanifies: solution,
+            matrix,
+            salles,
+            professeurs,
+            datesParJourSemaine,
+            dispParProf,
+            absencesParProf,
+            indispoParSalle,
+            resourcePlacementIndex,
+            activerCoursEnLigne: isOnlineCourseSchedulingEnabled(),
+          });
       if (placementsReprisesGeneres.length > 0) {
         await SchedulerEngine._attacherGroupesAuxPlacements(
           placementsReprisesGeneres,
           idGroupeParNom,
           session.id_session,
-          connection
+          trackedConnection
         );
         SchedulerEngine._hydraterIdsGroupesGeneres(groupesReprisesGeneres, idGroupeParNom);
         SchedulerEngine._hydraterIdsGroupesDansAffectations(
@@ -578,7 +498,7 @@ export class SchedulerEngine {
         await SchedulerEngine._mettreAJourGroupesEtudiants(
           affectationsEtudiantGroupe,
           idGroupeParNom,
-          connection
+          trackedConnection
         );
       }
       if (groupesReprisesGeneres.length > 0) {
@@ -601,7 +521,7 @@ export class SchedulerEngine {
       rapport.nb_groupes_speciaux = groupesReprisesGeneres.length;
       rapport.nb_resolutions_manuelles = conflitsReprises.length;
       rapport.resolutions_manuelles = conflitsReprises;
-      await SchedulerEngine._maintenirConnexionActive(connection);
+      await SchedulerEngine._maintenirConnexionActive(trackedConnection);
 
       SchedulerEngine._progress(
         onProgress,
@@ -610,22 +530,53 @@ export class SchedulerEngine {
         70
       );
 
-      const saContext = { jours, dispParProf, absencesParProf, indispoParSalle };
-      const scoreInitial = SimulatedAnnealing._evaluerSolution(solution, saContext);
-      const optimisationLocale = SchedulerEngine._executerOptimisationLocaleLectureSeule({
-        placements: solution,
-        cours,
-        groupesFormes: groupesFormesAvecIds,
-        affectationsEtudiantGroupe,
-        affectationsReprises,
-        salles,
-        datesParJourSemaine,
-        matrix,
-        dispParProf,
-        absencesParProf,
-        indispoParSalle,
-        optimizationMode: modeOptimisation,
-      });
+      const { scoreInitial, optimisationLocale } = performanceTracker?.measureSync
+        ? performanceTracker.measureSync("evaluation_finale", () => {
+            const saContext = { jours, dispParProf, absencesParProf, indispoParSalle };
+            return {
+              scoreInitial: SimulatedAnnealing._evaluerSolution(solution, saContext),
+              optimisationLocale: SchedulerEngine._executerOptimisationLocaleLectureSeule({
+                placements: solution,
+                cours,
+                groupesFormes: groupesFormesAvecIds,
+                affectationsEtudiantGroupe,
+                affectationsReprises,
+                salles,
+                datesParJourSemaine,
+                matrix,
+                dispParProf,
+                absencesParProf,
+                indispoParSalle,
+                optimizationMode: modeOptimisation,
+                nonPlanifies,
+                nbConflitsEvites: conflitsReprises.length,
+              }),
+            };
+          })
+        : {
+            scoreInitial: SimulatedAnnealing._evaluerSolution(solution, {
+              jours,
+              dispParProf,
+              absencesParProf,
+              indispoParSalle,
+            }),
+            optimisationLocale: SchedulerEngine._executerOptimisationLocaleLectureSeule({
+              placements: solution,
+              cours,
+              groupesFormes: groupesFormesAvecIds,
+              affectationsEtudiantGroupe,
+              affectationsReprises,
+              salles,
+              datesParJourSemaine,
+              matrix,
+              dispParProf,
+              absencesParProf,
+              indispoParSalle,
+              optimizationMode: modeOptimisation,
+              nonPlanifies,
+              nbConflitsEvites: conflitsReprises.length,
+            }),
+          };
       const solutionOptimisee = optimisationLocale.placementsOptimises;
       rapport.nb_cours_en_ligne_generes = solutionOptimisee.filter((placement) =>
         Boolean(placement.est_en_ligne)
@@ -639,9 +590,17 @@ export class SchedulerEngine {
       });
       const modeScoringReference = PlacementEvaluator.resolveScoringMode(modeOptimisation);
 
-      rapport.score_initial = SchedulerEngine._safeNum(scoreInitial, 0);
+      rapport.score_initial = SchedulerEngine._lireScoreScoringV1(
+        optimisationLocale.scoringBefore,
+        modeOptimisation,
+        SchedulerEngine._safeNum(scoreInitial, 0)
+      );
       rapport.iterations_sa = 0;
-      rapport.score_qualite = qualite.score;
+      rapport.score_qualite = SchedulerEngine._lireScoreScoringV1(
+        optimisationLocale.scoringAfter,
+        modeOptimisation,
+        qualite.score
+      );
       rapport.details = {
         mode_planification: "hebdomadaire_recurrent",
         modeOptimisationUtilise: modeOptimisation,
@@ -678,75 +637,14 @@ export class SchedulerEngine {
           principauxGainsConstates: optimisationLocale.gains || {},
           mouvementsRetenus: optimisationLocale.improvements || [],
           fallbackLectureSeule: Boolean(optimisationLocale.fallbackLectureSeule),
+          optimisationIgnoree: Boolean(optimisationLocale.skipped),
+          raisonIgnoree: optimisationLocale.skipReason || null,
           erreur: optimisationLocale.error || null,
         },
       };
       rapport.details.scoring_v1_avant_optimisation_locale =
         optimisationLocale.scoringBefore;
       rapport.details.scoring_v1 = optimisationLocale.scoringAfter;
-
-      SchedulerEngine._progress(
-        onProgress,
-        "PHASE_7",
-        "Persistance en base de donnees...",
-        85
-      );
-
-      for (const placement of solutionOptimisee) {
-        await connection.query(
-          `INSERT IGNORE INTO plages_horaires (date, heure_debut, heure_fin)
-           VALUES (?, ?, ?)`,
-          [placement.date, placement.heure_debut, placement.heure_fin]
-        );
-
-        const [[plage]] = await connection.query(
-          `SELECT id_plage_horaires
-           FROM plages_horaires
-           WHERE date = ? AND heure_debut = ? AND heure_fin = ?
-           LIMIT 1`,
-          [placement.date, placement.heure_debut, placement.heure_fin]
-        );
-
-        const [affectation] = await connection.query(
-          `INSERT INTO affectation_cours (id_cours, id_professeur, id_salle, id_plage_horaires)
-           VALUES (?, ?, ?, ?)`,
-          [
-            placement.id_cours,
-            placement.id_professeur,
-            placement.id_salle,
-            plage.id_plage_horaires,
-          ]
-        );
-
-        if (placement.id_groupe) {
-          await connection.query(
-            `INSERT IGNORE INTO affectation_groupes (id_groupes_etudiants, id_affectation_cours)
-             VALUES (?, ?)`,
-            [placement.id_groupe, affectation.insertId]
-          );
-        }
-
-        rapport.affectations.push({
-          ...placement,
-          id_affectation_cours: affectation.insertId,
-        });
-      }
-
-      await SchedulerEngine._persisterAffectationsIndividuellesReprises(
-        affectationsReprises,
-        session.id_session,
-        connection
-      );
-      await SchedulerEngine._persisterAffectationsIndividuellesDernierRecours(
-        affectationsIndividuelles,
-        session.id_session,
-        connection
-      );
-      await SchedulerEngine._marquerCoursEchouesEnResolutionManuelle(
-        conflitsReprises,
-        session.id_session,
-        connection
-      );
 
       rapport.non_planifies = nonPlanifies;
       rapport.nb_cours_planifies = solutionOptimisee.length;
@@ -760,17 +658,75 @@ export class SchedulerEngine {
       });
       rapport.details.rapport_metier = snapshotRapportMetier;
 
-      await connection.commit();
-
-      try {
-        await SchedulerEngine._persisterRapportGeneration({
-          idSession: session.id_session,
-          idUtilisateur,
+      if (rapport.nb_cours_planifies === 0) {
+        rapport.score_initial = 0;
+        rapport.score_qualite = 0;
+        SchedulerEngine._progress(
+          onProgress,
+          "FAILED",
+          "Generation annulee: aucun cours n'a pu etre planifie.",
+          100
+        );
+        throw SchedulerEngine._creerErreurGenerationVide({
           rapport,
           nonPlanifies,
           conflitsReprises,
-          snapshotRapportMetier,
         });
+      }
+
+      SchedulerEngine._progress(
+        onProgress,
+        "PHASE_7",
+        "Persistance en base de donnees...",
+        85
+      );
+
+      await (performanceTracker?.measure
+        ? performanceTracker.measure("insertion_base_donnees", async () =>
+            SchedulerEngine._persisterSolutionOptimisee({
+              placements: solutionOptimisee,
+              affectationsReprises,
+              affectationsIndividuelles,
+              conflitsReprises,
+              idSession: session.id_session,
+              rapport,
+              connection: trackedConnection,
+            })
+          )
+        : SchedulerEngine._persisterSolutionOptimisee({
+            placements: solutionOptimisee,
+            affectationsReprises,
+            affectationsIndividuelles,
+            conflitsReprises,
+            idSession: session.id_session,
+            rapport,
+            connection: trackedConnection,
+          }));
+
+      await trackedConnection.commit();
+
+      try {
+        await (performanceTracker?.measure
+          ? performanceTracker.measure("persistance_rapport_generation", async () =>
+              SchedulerEngine._persisterRapportGeneration({
+                idSession: session.id_session,
+                idUtilisateur,
+                rapport,
+                nonPlanifies,
+                conflitsReprises,
+                snapshotRapportMetier,
+                executor:
+                  performanceTracker?.wrapExecutor?.(pool, "scheduler_engine_report") || pool,
+              })
+            )
+          : SchedulerEngine._persisterRapportGeneration({
+              idSession: session.id_session,
+              idUtilisateur,
+              rapport,
+              nonPlanifies,
+              conflitsReprises,
+              snapshotRapportMetier,
+            }));
       } catch (error) {
         const message =
           error?.message || "Impossible de persister le rapport de generation.";
@@ -781,14 +737,590 @@ export class SchedulerEngine {
       }
 
       SchedulerEngine._progress(onProgress, "DONE", "Generation terminee.", 100);
+      performanceTracker?.setCounter(
+        "cours_a_placer",
+        Number(rapport.nb_cours_planifies || 0) + Number(rapport.nb_cours_non_planifies || 0)
+      );
+      performanceTracker?.setCounter("cours_places", rapport.nb_cours_planifies);
+      performanceTracker?.setCounter(
+        "conflits_detectes",
+        Number(rapport.nb_cours_non_planifies || 0) +
+          Number(rapport.nb_resolutions_manuelles || 0)
+      );
+      performanceTracker?.endStep("generation_totale");
 
       return rapport;
     } catch (error) {
+      performanceTracker?.endStep("generation_totale");
       await connection.rollback();
       throw error;
     } finally {
       connection.release();
     }
+  }
+
+  static _buildSegmentKey(programme, etape) {
+    const programmeNormalise = AvailabilityChecker._normaliser(programme || "");
+    const etapeNormalisee =
+      etape != null && !Number.isNaN(Number(etape)) ? String(Number(etape)) : "";
+
+    return `${programmeNormalise}|${etapeNormalisee}`;
+  }
+
+  static _indexerGroupesParSegment(groupesFormes = []) {
+    const index = new Map();
+
+    for (const groupe of Array.isArray(groupesFormes) ? groupesFormes : []) {
+      const key = SchedulerEngine._buildSegmentKey(groupe?.programme, groupe?.etape);
+      if (key === "|") {
+        continue;
+      }
+
+      if (!index.has(key)) {
+        index.set(key, []);
+      }
+
+      index.get(key).push(groupe);
+    }
+
+    return index;
+  }
+
+  static _preparerContexteGeneration({
+    session,
+    weekendAutorise,
+    coursPlanifiables,
+    professeurs,
+    salles,
+    groupesFormes,
+    affectationsExistantes,
+  }) {
+    const matrix = new ConstraintMatrix();
+    const jours = AvailabilityChecker.genererJours(
+      session.date_debut,
+      session.date_fin,
+      weekendAutorise
+    );
+    const datesParJourSemaine = SchedulerEngine._indexerDatesParJourSemaine(jours);
+    const creneaux = [...ACADEMIC_WEEKDAY_TIME_SLOTS];
+    const preferencesStabilite =
+      SchedulerEngine._construirePreferencesStabilite(affectationsExistantes);
+    const chargeSeriesParProf = new Map();
+    const chargeSeriesParJour = new Map();
+    const chargeSeriesParGroupeJour = new Map();
+    const chargeSeriesParProfJour = new Map();
+    const slotsParGroupeJour = new Map();
+    const slotsParProfJour = new Map();
+    const resourcePlacementIndex = new ResourceDayPlacementIndex();
+    const coursParId = new Map(
+      (Array.isArray(coursPlanifiables) ? coursPlanifiables : []).map((coursItem) => [
+        Number(coursItem.id_cours),
+        coursItem,
+      ])
+    );
+    const groupesParNom = new Map(
+      (Array.isArray(groupesFormes) ? groupesFormes : []).map((groupe) => [
+        String(groupe.nomGroupe),
+        groupe,
+      ])
+    );
+    const groupesParSegment = SchedulerEngine._indexerGroupesParSegment(groupesFormes);
+    const courseTimeCandidateMap = new Map();
+    const coursePlanningContextMap = new Map();
+
+    for (const course of Array.isArray(coursPlanifiables) ? coursPlanifiables : []) {
+      const courseId = Number(course.id_cours);
+      const creneauxCours = SchedulerEngine._normaliserCreneauxCours(
+        course,
+        CandidatePrecomputer.buildCourseTimeCandidates(course)
+      );
+      const sallesCompatiblesType = course.est_en_ligne
+        ? [null]
+        : [...(Array.isArray(salles) ? salles : [])]
+            .filter((salle) => AvailabilityChecker.salleCompatible(salle, course))
+            .sort((left, right) => left.capacite - right.capacite);
+      const profsCompatibles = (Array.isArray(professeurs) ? professeurs : []).filter(
+        (professeur) => AvailabilityChecker.profCompatible(professeur, course)
+      );
+      const groupesCours =
+        groupesParSegment.get(
+          SchedulerEngine._buildSegmentKey(course.programme, course.etape_etude)
+        ) || [];
+
+      courseTimeCandidateMap.set(courseId, creneauxCours);
+      coursePlanningContextMap.set(courseId, {
+        creneauxCours,
+        sallesCompatiblesType,
+        profsCompatibles,
+        groupesCours,
+      });
+    }
+
+    return {
+      matrix,
+      jours,
+      datesParJourSemaine,
+      creneaux,
+      coursePlanningContextMap,
+      courseTimeCandidateMap,
+      preferencesStabilite,
+      chargeSeriesParProf,
+      chargeSeriesParJour,
+      chargeSeriesParGroupeJour,
+      chargeSeriesParProfJour,
+      slotsParGroupeJour,
+      slotsParProfJour,
+      resourcePlacementIndex,
+      coursParId,
+      groupesParNom,
+    };
+  }
+
+  static _trierProfesseursCompatibles(profsCompatibles, chargeSeriesParProf, matrix) {
+    return [...(Array.isArray(profsCompatibles) ? profsCompatibles : [])].sort(
+      (profA, profB) => {
+        const chargeA = chargeSeriesParProf.get(profA.id_professeur) || 0;
+        const chargeB = chargeSeriesParProf.get(profB.id_professeur) || 0;
+
+        if (chargeA !== chargeB) {
+          return chargeA - chargeB;
+        }
+
+        const nbGroupesA =
+          matrix.groupesParProf.get(String(profA.id_professeur))?.size || 0;
+        const nbGroupesB =
+          matrix.groupesParProf.get(String(profB.id_professeur))?.size || 0;
+
+        if (nbGroupesA !== nbGroupesB) {
+          return nbGroupesA - nbGroupesB;
+        }
+
+        const nbCoursA =
+          matrix.coursParProf.get(String(profA.id_professeur))?.size || 0;
+        const nbCoursB =
+          matrix.coursParProf.get(String(profB.id_professeur))?.size || 0;
+
+        if (nbCoursA !== nbCoursB) {
+          return nbCoursA - nbCoursB;
+        }
+
+        return String(profA.matricule || "").localeCompare(
+          String(profB.matricule || ""),
+          "fr"
+        );
+      }
+    );
+  }
+
+  static async _genererPlacementsCourses({
+    coursTries,
+    coursePlanningContextMap,
+    datesParJourSemaine,
+    creneaux,
+    matrix,
+    dispParProf,
+    absencesParProf,
+    indispoParSalle,
+    chargeSeriesParProf,
+    chargeSeriesParJour,
+    chargeSeriesParGroupeJour,
+    chargeSeriesParProfJour,
+    slotsParGroupeJour,
+    slotsParProfJour,
+    resourcePlacementIndex,
+    preferencesStabilite,
+    modeOptimisation,
+    idGroupeParNom,
+    solution,
+    nonPlanifies,
+    connection,
+  }) {
+    for (const [indexCours, coursActuel] of (coursTries || []).entries()) {
+      if (indexCours > 0 && indexCours % 25 === 0) {
+        await SchedulerEngine._maintenirConnexionActive(connection);
+      }
+
+      const planningContext =
+        coursePlanningContextMap.get(Number(coursActuel.id_cours)) || {};
+      const creneauxCours =
+        planningContext.creneauxCours ||
+        SchedulerEngine._normaliserCreneauxCours(coursActuel, creneaux);
+      const sallesCompatiblesType =
+        planningContext.sallesCompatiblesType ||
+        (coursActuel.est_en_ligne ? [null] : []);
+
+      if (!coursActuel.est_en_ligne && sallesCompatiblesType.length === 0) {
+        nonPlanifies.push({
+          id_cours: coursActuel.id_cours,
+          code: coursActuel.code,
+          nom: coursActuel.nom,
+          raison: `Aucune salle compatible pour le type "${coursActuel.type_salle}".`,
+        });
+        continue;
+      }
+
+      const profsCompatibles = SchedulerEngine._trierProfesseursCompatibles(
+        planningContext.profsCompatibles || [],
+        chargeSeriesParProf,
+        matrix
+      );
+
+      if (profsCompatibles.length === 0) {
+        nonPlanifies.push({
+          id_cours: coursActuel.id_cours,
+          code: coursActuel.code,
+          nom: coursActuel.nom,
+          raison: "Aucun professeur compatible trouve.",
+        });
+        continue;
+      }
+
+      const groupesCours = planningContext.groupesCours || [];
+      if (groupesCours.length === 0) {
+        continue;
+      }
+
+      const seancesParSemaine = Math.max(
+        1,
+        Number(coursActuel.sessions_par_semaine || 1)
+      );
+
+      for (const groupe of groupesCours) {
+        const idGroupe = idGroupeParNom.get(groupe.nomGroupe);
+        const effectifGroupe = GroupFormer.lireEffectifCours(
+          groupe,
+          coursActuel.id_cours
+        );
+
+        if (!idGroupe) {
+          nonPlanifies.push({
+            id_cours: coursActuel.id_cours,
+            code: coursActuel.code,
+            nom: coursActuel.nom,
+            groupe: groupe.nomGroupe,
+            raison: "Le groupe n'a pas pu etre persiste avant la generation.",
+          });
+          continue;
+        }
+
+        const sallesCompatibles = coursActuel.est_en_ligne
+          ? [null]
+          : sallesCompatiblesType.filter((salle) =>
+              AvailabilityChecker.salleCompatible(salle, coursActuel, effectifGroupe)
+            );
+
+        if (!coursActuel.est_en_ligne && sallesCompatibles.length === 0) {
+          nonPlanifies.push({
+            id_cours: coursActuel.id_cours,
+            code: coursActuel.code,
+            nom: coursActuel.nom,
+            groupe: groupe.nomGroupe,
+            raison: `Aucune salle compatible ne peut accueillir ${effectifGroupe} etudiants pour le type "${coursActuel.type_salle}".`,
+          });
+          continue;
+        }
+
+        for (
+          let numeroSeance = 1;
+          numeroSeance <= seancesParSemaine;
+          numeroSeance += 1
+        ) {
+          const serie = SchedulerEngine._trouverSerieHebdomadaire({
+            cours: coursActuel,
+            groupe,
+            idGroupe,
+            profsCompatibles,
+            sallesCompatibles,
+            datesParJourSemaine,
+            creneaux: creneauxCours,
+            matrix,
+            dispParProf,
+            absencesParProf,
+            indispoParSalle,
+            chargeSeriesParProf,
+            chargeSeriesParJour,
+            chargeSeriesParGroupeJour,
+            chargeSeriesParProfJour,
+            slotsParGroupeJour,
+            slotsParProfJour,
+            resourcePlacementIndex,
+            numeroSeance,
+            preferencesStabilite,
+            optimizationMode: modeOptimisation,
+          });
+
+          if (!serie) {
+            nonPlanifies.push({
+              id_cours: coursActuel.id_cours,
+              code: coursActuel.code,
+              nom: coursActuel.nom,
+              groupe: groupe.nomGroupe,
+              seance: numeroSeance,
+              raison:
+                "Aucun motif hebdomadaire stable disponible pour toute la session.",
+            });
+            continue;
+          }
+
+          solution.push(...serie.placements);
+        }
+      }
+    }
+  }
+
+  static _traiterCoursNonPlanifies({
+    nonPlanifiesOriginaux,
+    coursParId,
+    groupesParNom,
+    idGroupeParNom,
+    professeurs,
+    salles,
+    datesParJourSemaine,
+    courseTimeCandidateMap,
+    creneaux,
+    matrix,
+    dispParProf,
+    absencesParProf,
+    indispoParSalle,
+    chargeSeriesParProf,
+    chargeSeriesParJour,
+    chargeSeriesParGroupeJour,
+    chargeSeriesParProfJour,
+    slotsParGroupeJour,
+    slotsParProfJour,
+    resourcePlacementIndex,
+    modeOptimisation,
+    solution,
+    nonPlanifies,
+  }) {
+    for (const np of nonPlanifiesOriginaux) {
+      const coursActuel = coursParId.get(Number(np.id_cours));
+      if (!coursActuel) {
+        nonPlanifies.push(np);
+        continue;
+      }
+
+      const groupe = groupesParNom.get(String(np.groupe || ""));
+      const idGroupe = np.groupe ? idGroupeParNom.get(np.groupe) : null;
+      if (!groupe || !idGroupe) {
+        nonPlanifies.push(np);
+        continue;
+      }
+
+      const effectifGroupe = GroupFormer.lireEffectifCours(
+        groupe,
+        coursActuel.id_cours
+      );
+
+      const creneauxCours =
+        courseTimeCandidateMap.get(Number(coursActuel.id_cours)) ||
+        SchedulerEngine._normaliserCreneauxCours(coursActuel, creneaux);
+      const serie = SchedulerEngine._trouverSerieAssouplie({
+        cours: coursActuel,
+        groupe,
+        idGroupe,
+        professeurs,
+        salles,
+        datesParJourSemaine,
+        creneaux: creneauxCours,
+        matrix,
+        dispParProf,
+        absencesParProf,
+        indispoParSalle,
+        chargeSeriesParProf,
+        chargeSeriesParJour,
+        chargeSeriesParGroupeJour,
+        chargeSeriesParProfJour,
+        slotsParGroupeJour,
+        slotsParProfJour,
+        resourcePlacementIndex,
+        effectifGroupe,
+        optimizationMode: modeOptimisation,
+      });
+
+      if (serie) {
+        solution.push(...serie.placements);
+        continue;
+      }
+
+      const diag = SchedulerEngine._diagnosticPrecis({
+        cours: coursActuel,
+        groupe,
+        idGroupe,
+        professeurs,
+        salles,
+        datesParJourSemaine,
+        creneaux: creneauxCours,
+        matrix,
+        dispParProf,
+        absencesParProf,
+        indispoParSalle,
+      });
+      nonPlanifies.push({ ...np, ...diag });
+    }
+  }
+
+  static _buildPlageHoraireKey(date, heureDebut, heureFin) {
+    const normalizedDate =
+      date instanceof Date
+        ? date.toISOString().slice(0, 10)
+        : String(date || "").trim().slice(0, 10);
+    const normalizedStart = String(heureDebut || "").trim().slice(0, 8);
+    const normalizedEnd = String(heureFin || "").trim().slice(0, 8);
+
+    return [normalizedDate, normalizedStart, normalizedEnd].join("|");
+  }
+
+  static async _executerInsertParLots({
+    connection,
+    prefixSql,
+    rows,
+    tupleSql,
+    chunkSize = 200,
+  }) {
+    if (!Array.isArray(rows) || rows.length === 0) {
+      return;
+    }
+
+    for (let index = 0; index < rows.length; index += chunkSize) {
+      const chunk = rows.slice(index, index + chunkSize);
+      const sql = `${prefixSql} ${chunk.map(() => tupleSql).join(", ")}`;
+      const params = chunk.flat();
+      await connection.query(sql, params);
+    }
+  }
+
+  static async _chargerPlagesHorairesParCle(placements, connection) {
+    const uniquePlages = [];
+    const seenKeys = new Set();
+
+    for (const placement of Array.isArray(placements) ? placements : []) {
+      const key = SchedulerEngine._buildPlageHoraireKey(
+        placement.date,
+        placement.heure_debut,
+        placement.heure_fin
+      );
+      if (seenKeys.has(key)) {
+        continue;
+      }
+
+      seenKeys.add(key);
+      uniquePlages.push([placement.date, placement.heure_debut, placement.heure_fin]);
+    }
+
+    await SchedulerEngine._executerInsertParLots({
+      connection,
+      prefixSql:
+        "INSERT IGNORE INTO plages_horaires (date, heure_debut, heure_fin) VALUES",
+      rows: uniquePlages,
+      tupleSql: "(?, ?, ?)",
+    });
+
+    const plagesParCle = new Map();
+
+    for (let index = 0; index < uniquePlages.length; index += 150) {
+      const chunk = uniquePlages.slice(index, index + 150);
+      const whereClause = chunk
+        .map(() => "(date = ? AND heure_debut = ? AND heure_fin = ?)")
+        .join(" OR ");
+      const params = chunk.flat();
+      const [rows] = await connection.query(
+        `SELECT id_plage_horaires, date, heure_debut, heure_fin
+         FROM plages_horaires
+         WHERE ${whereClause}`,
+        params
+      );
+
+      for (const row of rows) {
+        plagesParCle.set(
+          SchedulerEngine._buildPlageHoraireKey(
+            row.date,
+            row.heure_debut,
+            row.heure_fin
+          ),
+          Number(row.id_plage_horaires)
+        );
+      }
+    }
+
+    return plagesParCle;
+  }
+
+  static async _persisterSolutionOptimisee({
+    placements,
+    affectationsReprises,
+    affectationsIndividuelles,
+    conflitsReprises,
+    idSession,
+    rapport,
+    connection,
+  }) {
+    const plagesParCle = await SchedulerEngine._chargerPlagesHorairesParCle(
+      placements,
+      connection
+    );
+    const affectationGroupRows = [];
+
+    for (const placement of Array.isArray(placements) ? placements : []) {
+      const plageId = plagesParCle.get(
+        SchedulerEngine._buildPlageHoraireKey(
+          placement.date,
+          placement.heure_debut,
+          placement.heure_fin
+        )
+      );
+
+      if (!plageId) {
+        throw new Error(
+          `Plage horaire introuvable pour ${placement.date} ${placement.heure_debut}-${placement.heure_fin}.`
+        );
+      }
+
+      const [affectation] = await connection.query(
+        `INSERT INTO affectation_cours (id_cours, id_professeur, id_salle, id_plage_horaires)
+         VALUES (?, ?, ?, ?)`,
+        [
+          placement.id_cours,
+          placement.id_professeur,
+          placement.id_salle,
+          plageId,
+        ]
+      );
+
+      if (placement.id_groupe) {
+        affectationGroupRows.push([placement.id_groupe, affectation.insertId]);
+      }
+
+      rapport.affectations.push({
+        ...placement,
+        id_affectation_cours: affectation.insertId,
+      });
+    }
+
+    await SchedulerEngine._executerInsertParLots({
+      connection,
+      prefixSql:
+        "INSERT IGNORE INTO affectation_groupes (id_groupes_etudiants, id_affectation_cours) VALUES",
+      rows: affectationGroupRows,
+      tupleSql: "(?, ?)",
+      chunkSize: 250,
+    });
+
+    await SchedulerEngine._persisterAffectationsIndividuellesReprises(
+      affectationsReprises,
+      idSession,
+      connection
+    );
+    await SchedulerEngine._persisterAffectationsIndividuellesDernierRecours(
+      affectationsIndividuelles,
+      idSession,
+      connection
+    );
+    await SchedulerEngine._marquerCoursEchouesEnResolutionManuelle(
+      conflitsReprises,
+      idSession,
+      connection
+    );
   }
 
   /**
@@ -1326,6 +1858,25 @@ export class SchedulerEngine {
   }
 
   static _lireEtudiantsCours(groupe, idCours) {
+    if (!groupe || typeof groupe !== "object") {
+      return [];
+    }
+
+    if (!groupe[GROUP_STUDENT_IDS_CACHE]) {
+      Object.defineProperty(groupe, GROUP_STUDENT_IDS_CACHE, {
+        value: new Map(),
+        enumerable: false,
+        configurable: false,
+        writable: false,
+      });
+    }
+
+    const cache = groupe[GROUP_STUDENT_IDS_CACHE];
+    const cacheKey = Number(idCours) || String(idCours || "");
+    if (cache.has(cacheKey)) {
+      return cache.get(cacheKey);
+    }
+
     const idsReguliers = Array.isArray(groupe?.etudiants)
       ? groupe.etudiants
           .map((idEtudiant) => Number(idEtudiant))
@@ -1337,7 +1888,9 @@ export class SchedulerEngine {
           .filter((idEtudiant) => Number.isInteger(idEtudiant) && idEtudiant > 0)
       : [];
 
-    return [...new Set([...idsReguliers, ...idsCours])];
+    const ids = [...new Set([...idsReguliers, ...idsCours])];
+    cache.set(cacheKey, ids);
+    return ids;
   }
 
   static _normaliserCreneauCandidate(creneau, fallbackIndex = 0) {
@@ -1450,18 +2003,24 @@ export class SchedulerEngine {
         Number(resource.resourceId) > 0
     );
 
-    return resourceChecks.every((resource) =>
-      BreakConstraintValidator.validateSequenceBreakConstraint({
-        placements: resourcePlacementIndex.get({
-          resourceType: resource.resourceType,
-          resourceId: resource.resourceId,
-          date: placement.date,
-        }),
+    return resourceChecks.every((resource) => {
+      const placements = resourcePlacementIndex.peek({
+        resourceType: resource.resourceType,
+        resourceId: resource.resourceId,
+        date: placement.date,
+      });
+
+      if (!Array.isArray(placements) || placements.length === 0) {
+        return true;
+      }
+
+      return BreakConstraintValidator.validateSequenceBreakConstraint({
+        placements,
         proposedPlacement: placement,
         resourceType: resource.resourceType,
         resourceId: resource.resourceId,
-      }).valid
-    );
+      }).valid;
+    });
   }
 
   static _memoriserPlacementsRessources({
@@ -1873,53 +2432,107 @@ export class SchedulerEngine {
 
   static async _persisterGroupes(groupesFormes, idSession, connection) {
     const idGroupeParNom = new Map();
-
-    for (const groupe of groupesFormes) {
-      const nomGroupe = String(groupe.nomGroupe || "").slice(0, 100);
-      const tailleMax = SchedulerEngine._safeNum(groupe.taille_max, 30);
-      const etapeVal =
+    const sessionVal = SchedulerEngine._safeNum(idSession) || null;
+    const groupesNormalises = (Array.isArray(groupesFormes) ? groupesFormes : []).map((groupe) => ({
+      originalName: groupe.nomGroupe,
+      nomGroupe: String(groupe.nomGroupe || "").slice(0, 100),
+      tailleMax: SchedulerEngine._safeNum(groupe.taille_max, 30),
+      etapeVal:
         groupe.etape != null && !Number.isNaN(Number(groupe.etape))
           ? Number(groupe.etape)
-          : null;
-      const programmeVal = groupe.programme
-        ? String(groupe.programme).slice(0, 150)
-        : null;
-      const estSpecial = groupe.est_groupe_special ? 1 : 0;
-      const sessionVal = SchedulerEngine._safeNum(idSession) || null;
+          : null,
+      programmeVal: groupe.programme ? String(groupe.programme).slice(0, 150) : null,
+      estSpecial: groupe.est_groupe_special ? 1 : 0,
+      sessionVal,
+    }));
+    const nomsGroupes = [...new Set(groupesNormalises.map((groupe) => groupe.nomGroupe).filter(Boolean))];
 
-      const [existants] = await connection.query(
-        `SELECT id_groupes_etudiants
-         FROM groupes_etudiants
-         WHERE nom_groupe = ? AND (id_session <=> ?)
-         LIMIT 1`,
-        [nomGroupe, sessionVal]
-      );
+    if (nomsGroupes.length === 0) {
+      return idGroupeParNom;
+    }
 
-      let idGroupe;
-      if (existants.length > 0) {
-        idGroupe = existants[0].id_groupes_etudiants;
-        await connection.query(
-          `UPDATE groupes_etudiants
-           SET taille_max = ?, est_groupe_special = ?, id_session = ?, programme = ?, etape = ?
-           WHERE id_groupes_etudiants = ?`,
-          [tailleMax, estSpecial, sessionVal, programmeVal, etapeVal, idGroupe]
-        );
-      } else {
-        const [resultat] = await connection.query(
-          `INSERT INTO groupes_etudiants (
-             nom_groupe,
-             taille_max,
-             est_groupe_special,
-             id_session,
-             programme,
-             etape
-           ) VALUES (?, ?, ?, ?, ?, ?)`,
-          [nomGroupe, tailleMax, estSpecial, sessionVal, programmeVal, etapeVal]
-        );
-        idGroupe = resultat.insertId;
+    const [existants] = await connection.query(
+      `SELECT id_groupes_etudiants, nom_groupe
+       FROM groupes_etudiants
+       WHERE (id_session <=> ?)
+         AND nom_groupe IN (${nomsGroupes.map(() => "?").join(", ")})`,
+      [sessionVal, ...nomsGroupes]
+    );
+    const existantsParNom = new Map(
+      existants.map((row) => [String(row.nom_groupe), Number(row.id_groupes_etudiants)])
+    );
+
+    for (const groupe of groupesNormalises) {
+      const idGroupe = existantsParNom.get(groupe.nomGroupe);
+      if (!idGroupe) {
+        continue;
       }
 
-      idGroupeParNom.set(groupe.nomGroupe, idGroupe);
+      await connection.query(
+        `UPDATE groupes_etudiants
+         SET taille_max = ?, est_groupe_special = ?, id_session = ?, programme = ?, etape = ?
+         WHERE id_groupes_etudiants = ?`,
+        [
+          groupe.tailleMax,
+          groupe.estSpecial,
+          groupe.sessionVal,
+          groupe.programmeVal,
+          groupe.etapeVal,
+          idGroupe,
+        ]
+      );
+      idGroupeParNom.set(groupe.originalName, idGroupe);
+    }
+
+    const groupesAInserer = groupesNormalises.filter((groupe, index, array) => {
+      if (existantsParNom.has(groupe.nomGroupe)) {
+        return false;
+      }
+
+      return array.findIndex((item) => item.nomGroupe === groupe.nomGroupe) === index;
+    });
+
+    await SchedulerEngine._executerInsertParLots({
+      connection,
+      prefixSql: `INSERT INTO groupes_etudiants (
+        nom_groupe,
+        taille_max,
+        est_groupe_special,
+        id_session,
+        programme,
+        etape
+      ) VALUES`,
+      tupleSql: "(?, ?, ?, ?, ?, ?)",
+      rows: groupesAInserer.map((groupe) => [
+        groupe.nomGroupe,
+        groupe.tailleMax,
+        groupe.estSpecial,
+        groupe.sessionVal,
+        groupe.programmeVal,
+        groupe.etapeVal,
+      ]),
+      chunkSize: 100,
+    });
+
+    if (groupesAInserer.length > 0) {
+      const [insertes] = await connection.query(
+        `SELECT id_groupes_etudiants, nom_groupe
+         FROM groupes_etudiants
+         WHERE (id_session <=> ?)
+           AND nom_groupe IN (${groupesAInserer.map(() => "?").join(", ")})`,
+        [sessionVal, ...groupesAInserer.map((groupe) => groupe.nomGroupe)]
+      );
+
+      for (const row of insertes) {
+        existantsParNom.set(String(row.nom_groupe), Number(row.id_groupes_etudiants));
+      }
+    }
+
+    for (const groupe of groupesNormalises) {
+      const idGroupe = existantsParNom.get(groupe.nomGroupe);
+      if (idGroupe) {
+        idGroupeParNom.set(groupe.originalName, idGroupe);
+      }
     }
 
     return idGroupeParNom;
@@ -2007,6 +2620,8 @@ export class SchedulerEngine {
     idGroupeParNom,
     connection
   ) {
+    const updates = [];
+
     for (const [idEtudiant, groupes] of affectationsEtudiantGroupe) {
       if (groupes.length === 0) {
         continue;
@@ -2017,11 +2632,23 @@ export class SchedulerEngine {
         continue;
       }
 
+      updates.push([Number(idEtudiant), Number(idGroupe)]);
+    }
+
+    for (let index = 0; index < updates.length; index += 200) {
+      const chunk = updates.slice(index, index + 200);
+      const caseSql = chunk.map(() => "WHEN ? THEN ?").join(" ");
+      const idsSql = chunk.map(() => "?").join(", ");
+      const params = [
+        ...chunk.flat(),
+        ...chunk.map(([idEtudiant]) => idEtudiant),
+      ];
+
       await connection.query(
         `UPDATE etudiants
-         SET id_groupes_etudiants = ?
-         WHERE id_etudiant = ?`,
-        [idGroupe, idEtudiant]
+         SET id_groupes_etudiants = CASE id_etudiant ${caseSql} END
+         WHERE id_etudiant IN (${idsSql})`,
+        params
       );
     }
   }
@@ -2334,6 +2961,30 @@ export class SchedulerEngine {
       .sort((left, right) => right.total - left.total || left.code.localeCompare(right.code, "fr"));
   }
 
+  static _creerErreurGenerationVide({
+    rapport = {},
+    nonPlanifies = [],
+    conflitsReprises = [],
+  } = {}) {
+    const error = new Error(
+      "Aucun cours n'a pu etre planifie. La generation a ete annulee et l'horaire precedent a ete conserve."
+    );
+    error.statusCode = 422;
+    error.code = "GENERATION_VIDE";
+    error.details = {
+      code: "GENERATION_VIDE",
+      nb_cours_planifies: SchedulerEngine._safeNum(rapport?.nb_cours_planifies, 0),
+      nb_cours_non_planifies: SchedulerEngine._safeNum(nonPlanifies?.length, 0),
+      nb_resolutions_manuelles: SchedulerEngine._safeNum(conflitsReprises?.length, 0),
+      score_qualite: 0,
+      raisons_principales: SchedulerEngine._resumerRaisonsRapport(nonPlanifies).slice(0, 5),
+      exemples_non_planifies: SchedulerEngine._normaliserNonPlanifiesPourRapportPersistant(
+        nonPlanifies
+      ).slice(0, 10),
+    };
+    return error;
+  }
+
   static _normaliserNonPlanifiesPourRapportPersistant(nonPlanifies = []) {
     return (Array.isArray(nonPlanifies) ? nonPlanifies : []).map((item) => ({
       id_cours: SchedulerEngine._safeNum(item?.id_cours),
@@ -2567,6 +3218,7 @@ export class SchedulerEngine {
     nonPlanifies,
     conflitsReprises,
     snapshotRapportMetier,
+    executor = pool,
   }) {
     const payload = SchedulerEngine._construirePayloadRapportPersistant({
       rapport,
@@ -2577,7 +3229,7 @@ export class SchedulerEngine {
     const detailsSerialises =
       SchedulerEngine._serialiserPayloadRapportPersistant(payload);
 
-    await pool.query(
+    await executor.query(
       `INSERT INTO rapports_generation
        (id_session, genere_par, score_qualite, nb_cours_planifies,
         nb_cours_non_planifies, nb_cours_echoues_traites, nb_cours_en_ligne_generes,
@@ -2771,6 +3423,19 @@ export class SchedulerEngine {
     };
   }
 
+  static _lireScoreScoringV1(scoringBundle, optimizationMode = "legacy", fallback = 0) {
+    const modeScoring = PlacementEvaluator.resolveScoringMode(
+      PlacementEvaluator.normalizeMode(optimizationMode)
+    );
+    const score = Number(
+      scoringBundle?.modes?.[modeScoring]?.scoreGlobal ??
+        scoringBundle?.modes?.equilibre?.scoreGlobal ??
+        fallback
+    );
+
+    return Number.isFinite(score) ? Number(score.toFixed(2)) : fallback;
+  }
+
   static _calculerScoringLectureSeule(payload = {}) {
     try {
       return ScheduleScorer.scoreAllModes(payload);
@@ -2817,6 +3482,8 @@ export class SchedulerEngine {
         placements,
         affectationsEtudiantGroupe: options?.affectationsEtudiantGroupe,
         affectationsReprises: options?.affectationsReprises,
+        nonPlanifies: options?.nonPlanifies,
+        nbConflitsEvites: options?.nbConflitsEvites,
       });
 
       return {
@@ -4009,6 +4676,8 @@ export class SchedulerEngine {
         absencesParProf,
         indispoParSalle,
         optimizationMode: modeOptimisation,
+        nonPlanifies,
+        nbConflitsEvites: 0,
       });
       const solutionOptimisee = optimisationLocale.placementsOptimises;
       const modeScoringReference = PlacementEvaluator.resolveScoringMode(modeOptimisation);
@@ -4019,7 +4688,16 @@ export class SchedulerEngine {
         nbResolutionsManuelles: 0,
         preferencesStabilite,
       });
-      rapport.score_qualite = qualite.score;
+      rapport.score_initial = SchedulerEngine._lireScoreScoringV1(
+        optimisationLocale.scoringBefore,
+        modeOptimisation,
+        qualite.score
+      );
+      rapport.score_qualite = SchedulerEngine._lireScoreScoringV1(
+        optimisationLocale.scoringAfter,
+        modeOptimisation,
+        qualite.score
+      );
 
       // Persister les nouvelles affectations pour ce groupe
       for (const placement of solutionOptimisee) {

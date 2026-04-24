@@ -42,7 +42,36 @@ function formaterNomProfesseur(seance) {
     .replace(/\s+/g, " ");
 }
 
+function valeurEstVraie(value) {
+  return (
+    value === true ||
+    Number(value || 0) === 1 ||
+    String(value || "").toLowerCase() === "true"
+  );
+}
+
+function estSeanceReprise(seance) {
+  const sourceHoraire = String(seance?.source_horaire || "").trim().toLowerCase();
+
+  return (
+    valeurEstVraie(seance?.est_reprise) ||
+    sourceHoraire === "reprise" ||
+    Number(seance?.id_cours_echoue || 0) > 0
+  );
+}
+
 function getPresentationSource(seance) {
+  if (estSeanceReprise(seance)) {
+    return {
+      badge: "Reprise",
+      badgeCourt: "REPRISE",
+      pillClass: "status-pill--warning",
+      description: `Groupe suivi : ${seance.groupe_source || "non renseigne"}`,
+      classeSeance: "etudiant-schedule__seance--reprise",
+      classeLigne: "planning-table__row--reprise",
+    };
+  }
+
   if (String(seance?.source_horaire || "") === "individuelle") {
     return {
       badge: "Exception",
@@ -50,16 +79,7 @@ function getPresentationSource(seance) {
       pillClass: "status-pill--exception",
       description: `Groupe d'accueil : ${seance.groupe_source || "non renseigne"}`,
       classeSeance: "etudiant-schedule__seance--individuelle",
-    };
-  }
-
-  if (Boolean(seance?.est_reprise)) {
-    return {
-      badge: "Reprise",
-      badgeCourt: "REPRISE",
-      pillClass: "status-pill--warning",
-      description: `Groupe suivi : ${seance.groupe_source || "non renseigne"}`,
-      classeSeance: "etudiant-schedule__seance--reprise",
+      classeLigne: "",
     };
   }
 
@@ -69,7 +89,28 @@ function getPresentationSource(seance) {
     pillClass: "status-pill--success",
     description: `Groupe principal : ${seance.groupe_source || "non renseigne"}`,
     classeSeance: "",
+    classeLigne: "",
   };
+}
+
+function getClasseLigneSeance(seance) {
+  const presentation = getPresentationSource(seance);
+
+  if (presentation.classeLigne) {
+    return presentation.classeLigne;
+  }
+
+  return isOnlineCourseLike(seance) ? "planning-table__row--online" : "";
+}
+
+function getClasseCarteSeance(seance) {
+  const presentation = getPresentationSource(seance);
+
+  if (presentation.classeSeance) {
+    return presentation.classeSeance;
+  }
+
+  return isOnlineCourseLike(seance) ? "cal-seance--online" : "";
 }
 
 function determinerLundiInitial(seances) {
@@ -190,45 +231,50 @@ export function EtudiantScheduleBoard({
             </tr>
           </thead>
           <tbody>
-            {seances.map((seance) => (
-              <tr
-                key={`${seance.source_horaire}-${seance.id_affectation_cours}-${seance.id_plage_horaires}`}
-                className={isOnlineCourseLike(seance) ? "planning-table__row--online" : ""}
-              >
-                <td>{formaterDateLongue(seance.date)}</td>
-                <td>{formaterHeure(seance.heure_debut)}</td>
-                <td>{formaterHeure(seance.heure_fin)}</td>
-                <td>
-                  <span className="planning-code">{seance.code_cours}</span>
-                  <span className="planning-nom-cours">{seance.nom_cours}</span>
-                  {isOnlineCourseLike(seance) ? (
-                    <span className="planning-mode-badge planning-mode-badge--online">
-                      En ligne
+            {seances.map((seance) => {
+              const presentation = getPresentationSource(seance);
+              const seanceEnLigne = isOnlineCourseLike(seance);
+
+              return (
+                <tr
+                  key={`${seance.source_horaire}-${seance.id_affectation_cours}-${seance.id_plage_horaires}`}
+                  className={getClasseLigneSeance(seance)}
+                >
+                  <td>{formaterDateLongue(seance.date)}</td>
+                  <td>{formaterHeure(seance.heure_debut)}</td>
+                  <td>{formaterHeure(seance.heure_fin)}</td>
+                  <td>
+                    <span className="planning-code">{seance.code_cours}</span>
+                    <span className="planning-nom-cours">{seance.nom_cours}</span>
+                    {seanceEnLigne ? (
+                      <span className="planning-mode-badge planning-mode-badge--online">
+                        En ligne
+                      </span>
+                    ) : null}
+                  </td>
+                  <td>
+                    <span className={`status-pill ${presentation.pillClass}`}>
+                      {presentation.badge}
                     </span>
-                  ) : null}
-                </td>
-                <td>
-                  <span className={`status-pill ${getPresentationSource(seance).pillClass}`}>
-                    {getPresentationSource(seance).badge}
-                  </span>
-                  <div className="etudiant-schedule__source">
-                    {getPresentationSource(seance).description}
-                  </div>
-                </td>
-                <td>
-                  {formaterNomProfesseur(seance) || "A confirmer"}
-                </td>
-                <td>
-                  <span
-                    className={`planning-salle ${
-                      isOnlineCourseLike(seance) ? "planning-salle--online" : ""
-                    }`}
-                  >
-                    {getCourseLocationLabel(seance)}
-                  </span>
-                </td>
-              </tr>
-            ))}
+                    <div className="etudiant-schedule__source">
+                      {presentation.description}
+                    </div>
+                  </td>
+                  <td>
+                    {formaterNomProfesseur(seance) || "A confirmer"}
+                  </td>
+                  <td>
+                    <span
+                      className={`planning-salle ${
+                        seanceEnLigne ? "planning-salle--online" : ""
+                      }`}
+                    >
+                      {getCourseLocationLabel(seance)}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -294,7 +340,7 @@ export function EtudiantScheduleBoard({
                   const seancesHeure = seancesMap[cle] || [];
 
                   return seancesHeure.map((seance) => {
-                    const seanceEnLigne = isOnlineCourseLike(seance);
+                    const presentation = getPresentationSource(seance);
                     const hauteur = getHauteur(seance.heure_debut, seance.heure_fin);
                     const debut = heureEnMinutes(formaterHeure(seance.heure_debut));
                     const heureReference = heureEnMinutes(HEURES[0]);
@@ -303,16 +349,12 @@ export function EtudiantScheduleBoard({
                     return (
                       <div
                         key={`${seance.source_horaire}-${seance.id_affectation_cours}-${seance.id_plage_horaires}-grid`}
-                        className={`cal-seance ${
-                          seanceEnLigne
-                            ? "cal-seance--online"
-                            : getPresentationSource(seance).classeSeance
-                        }`}
+                        className={`cal-seance ${getClasseCarteSeance(seance)}`}
                         style={{ top: `${top}px`, height: `${hauteur}px` }}
                       >
                         <span className="cal-seance-code">{seance.code_cours}</span>
                         <span className="etudiant-schedule__seance-badge">
-                          {getPresentationSource(seance).badgeCourt}
+                          {presentation.badgeCourt}
                         </span>
                         <span className="cal-seance-nom">{seance.nom_cours}</span>
                         <span className="cal-seance-salle">
@@ -322,7 +364,7 @@ export function EtudiantScheduleBoard({
                           {formaterNomProfesseur(seance) || "Prof a confirmer"}
                         </span>
                         <span className="etudiant-schedule__source">
-                          {getPresentationSource(seance).description}
+                          {presentation.description}
                         </span>
                       </div>
                     );

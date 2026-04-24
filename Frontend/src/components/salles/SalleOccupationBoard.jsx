@@ -10,7 +10,11 @@
  * projet pour rester coherent avec l'existant, puis ajoute uniquement les
  * variantes visuelles propres a l'occupation de salle.
  */
-import { formaterDateCourte } from "../../utils/calendar.js";
+import {
+  JOURS_SEMAINE_COMPLETS,
+  creerDateLocale,
+  formaterDateCourte,
+} from "../../utils/calendar.js";
 import {
   HEURES_GRILLE,
   formaterDateIsoLocal,
@@ -18,6 +22,50 @@ import {
   formaterNomProfesseur,
   normaliserHeure,
 } from "../../utils/salleOccupation.js";
+
+const NB_JOURS_AFFICHES = 7;
+
+function ajouterJours(dateSource, nbJours) {
+  const date = new Date(dateSource);
+  date.setDate(date.getDate() + nbJours);
+  return date;
+}
+
+function estDateValide(date) {
+  return date instanceof Date && !Number.isNaN(date.getTime());
+}
+
+function parserDateAffichage(dateSource) {
+  if (dateSource instanceof Date) {
+    return estDateValide(dateSource) ? new Date(dateSource) : null;
+  }
+
+  const texte = String(dateSource || "").trim();
+
+  if (!texte) {
+    return null;
+  }
+
+  const dateIso = texte.includes("T") ? texte.slice(0, 10) : texte;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateIso);
+
+  if (match) {
+    const [, annee, mois, jour] = match;
+    const anneeNombre = Number(annee);
+    const moisNombre = Number(mois);
+    const jourNombre = Number(jour);
+    const date = new Date(anneeNombre, moisNombre - 1, jourNombre);
+    const dateCorrespond =
+      date.getFullYear() === anneeNombre &&
+      date.getMonth() === moisNombre - 1 &&
+      date.getDate() === jourNombre;
+
+    return estDateValide(date) && dateCorrespond ? date : null;
+  }
+
+  const fallback = new Date(texte);
+  return estDateValide(fallback) ? fallback : null;
+}
 
 function formaterDateLongue(dateString) {
   return new Date(`${dateString}T00:00:00`).toLocaleDateString("fr-CA", {
@@ -123,10 +171,37 @@ function getClasseStatutCreneau(creneau) {
   }
 
   if (creneau.statut === "libre") {
-    return "room-occupation-board__slot room-occupation-board__slot--free";
+    return "cal-seance room-occupation-board__slot room-occupation-board__slot--free";
   }
 
   return "cal-seance room-occupation-board__slot room-occupation-board__slot--occupied";
+}
+
+function construireJoursAffiches(vueHebdomadaire) {
+  const debutSemaine =
+    parserDateAffichage(vueHebdomadaire?.debutSemaine) ||
+    parserDateAffichage(vueHebdomadaire?.debutSemaineIso) ||
+    parserDateAffichage(vueHebdomadaire?.debut_semaine) ||
+    new Date();
+  const creneauxParDate = new Map(
+    (Array.isArray(vueHebdomadaire?.jours) ? vueHebdomadaire.jours : [])
+      .map((jour) => {
+        const date = parserDateAffichage(jour?.date);
+        return date ? [formaterDateIsoLocal(date), jour.creneaux || []] : null;
+      })
+      .filter(Boolean)
+  );
+
+  return JOURS_SEMAINE_COMPLETS.slice(0, NB_JOURS_AFFICHES).map((jour, index) => {
+    const date = ajouterJours(debutSemaine, index);
+    const dateIso = formaterDateIsoLocal(date);
+
+    return {
+      date: dateIso,
+      nom: jour.label,
+      creneaux: creneauxParDate.get(dateIso) || [],
+    };
+  });
 }
 
 export function SalleOccupationBoard({
@@ -140,13 +215,18 @@ export function SalleOccupationBoard({
   peutNaviguerPrecedent = true,
   peutNaviguerSuivant = true,
 }) {
-  const occupationsSemaine = Array.isArray(vueHebdomadaire?.occupationsSemaine)
-    ? vueHebdomadaire.occupationsSemaine
-    : [];
-
   if (!vueHebdomadaire) {
     return null;
   }
+
+  const joursAffiches = construireJoursAffiches(vueHebdomadaire);
+  const datesAffichees = new Set(joursAffiches.map((jour) => jour.date));
+  const occupationsSemaine =
+    datesAffichees.size > 0 && Array.isArray(vueHebdomadaire.occupationsSemaine)
+      ? vueHebdomadaire.occupationsSemaine.filter(
+          (occupation) => datesAffichees.has(occupation.date)
+        )
+      : [];
 
   const classeEtatActuel =
     tempsReel?.statut === "conflit"
@@ -176,11 +256,11 @@ export function SalleOccupationBoard({
       </div>
 
       <div className="etudiant-schedule__legend">
-        <span className="status-pill room-occupation-board__pill room-occupation-board__pill--occupied">
-          Occupee
-        </span>
         <span className="status-pill room-occupation-board__pill room-occupation-board__pill--free">
           Libre
+        </span>
+        <span className="status-pill room-occupation-board__pill room-occupation-board__pill--occupied">
+          Occupee
         </span>
         <span className="status-pill room-occupation-board__pill room-occupation-board__pill--conflict">
           Conflit
@@ -240,7 +320,7 @@ export function SalleOccupationBoard({
       </div>
 
       <div className="cal-wrapper">
-        <div className="cal-grille room-occupation-board__grid">
+        <div className="cal-grille">
           <div className="cal-col-heures">
             <div className="cal-entete-vide"></div>
             {HEURES_GRILLE.map((heure) => (
@@ -250,12 +330,12 @@ export function SalleOccupationBoard({
             ))}
           </div>
 
-          {vueHebdomadaire.jours.map((jour) => (
-            <div key={jour.date} className="cal-col-jour">
+          {joursAffiches.map((jour) => (
+            <div key={`jour-${jour.date}`} className="cal-col-jour">
               <div className="cal-entete-jour">
                 <span className="cal-jour-nom">{jour.nom}</span>
                 <span className="cal-jour-date">
-                  {formaterDateCourte(new Date(`${jour.date}T00:00:00`))}
+                  {formaterDateCourte(creerDateLocale(jour.date))}
                 </span>
               </div>
               <div className="cal-col-body">
@@ -264,49 +344,52 @@ export function SalleOccupationBoard({
                 ))}
 
                 {jour.creneaux.map((creneau) => (
-                  <div
-                    key={creneau.id_creneau}
-                    className={getClasseStatutCreneau(creneau)}
-                    style={getStyleCreneau(creneau)}
-                  >
-                    {creneau.statut === "libre" ? (
-                      <>
-                        <span className="room-occupation-board__free-label">Libre</span>
-                        <span className="room-occupation-board__free-meta">
-                          {normaliserHeure(creneau.heure_debut)} -{" "}
-                          {normaliserHeure(creneau.heure_fin)}
-                        </span>
-                      </>
-                    ) : (
-                      <>
-                        <span className="cal-seance-code">
-                          {creneau.groupes || "Groupe a confirmer"}
-                        </span>
-                        <span className="room-occupation-board__slot-badge">
-                          {creneau.statut === "conflit"
-                            ? "CONFLIT"
-                            : creneau.est_reprise
-                            ? "REPRISE"
-                            : "OCCUPEE"}
-                        </span>
-                        <span className="cal-seance-nom">
-                          {creneau.code_cours} - {creneau.nom_cours}
-                        </span>
-                        <span className="cal-seance-prof">
-                          {formaterNomProfesseur(creneau) || "Professeur a confirmer"}
-                        </span>
-                        {formaterMetaOccupation(creneau) ? (
-                          <span className="room-occupation-board__slot-meta">
-                            {formaterMetaOccupation(creneau)}
+                    <div
+                      key={creneau.id_creneau}
+                      className={getClasseStatutCreneau(creneau)}
+                      style={getStyleCreneau(creneau)}
+                    >
+                      {creneau.statut === "libre" ? (
+                        <>
+                          <span className="room-occupation-board__free-label">Libre</span>
+                          <span className="room-occupation-board__free-meta">
+                            {normaliserHeure(creneau.heure_debut)} -{" "}
+                            {normaliserHeure(creneau.heure_fin)}
                           </span>
-                        ) : null}
-                        <span className="room-occupation-board__slot-meta">
-                          {creneau.effectif_total || 0}/{creneau.capacite_salle || 0} places
-                        </span>
-                      </>
-                    )}
-                  </div>
-                ))}
+                        </>
+                      ) : (
+                        <>
+                          <span className="cal-seance-code">
+                            {creneau.code_cours || "Cours a confirmer"}
+                          </span>
+                          <span className="room-occupation-board__slot-badge">
+                            {creneau.statut === "conflit"
+                              ? "CONFLIT"
+                              : creneau.est_reprise
+                              ? "REPRISE"
+                              : "OCCUPEE"}
+                          </span>
+                          <span className="cal-seance-nom">
+                            {creneau.nom_cours || "Nom du cours a confirmer"}
+                          </span>
+                          <span className="cal-seance-salle">
+                            {creneau.groupes || "Groupe a confirmer"}
+                          </span>
+                          <span className="cal-seance-prof">
+                            {formaterNomProfesseur(creneau) || "Professeur a confirmer"}
+                          </span>
+                          {formaterMetaOccupation(creneau) ? (
+                            <span className="room-occupation-board__slot-meta">
+                              {formaterMetaOccupation(creneau)}
+                            </span>
+                          ) : null}
+                          <span className="room-occupation-board__slot-meta">
+                            {creneau.effectif_total || 0}/{creneau.capacite_salle || 0} places
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  ))}
               </div>
             </div>
           ))}

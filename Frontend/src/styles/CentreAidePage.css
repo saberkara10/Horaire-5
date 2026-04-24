@@ -251,6 +251,15 @@
   border-radius: 32px;
 }
 
+.centre-aide__section--new {
+  padding: 1.35rem;
+  border: 1px solid rgba(53, 89, 121, 0.16);
+  border-radius: 30px;
+  background:
+    linear-gradient(135deg, rgba(234, 247, 239, 0.96), rgba(245, 249, 253, 0.96)),
+    rgba(255, 255, 255, 0.96);
+}
+
 .centre-aide__section-head {
   display: flex;
   align-items: flex-start;
@@ -489,6 +498,10 @@
 
 .centre-aide__grid--feature {
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
+
+.centre-aide__grid--spotlight {
+  grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
 }
 
 .centre-aide__video-grid {

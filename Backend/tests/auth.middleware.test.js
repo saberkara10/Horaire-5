@@ -7,6 +7,7 @@
 import { describe, expect, it, jest } from "@jest/globals";
 import {
   userAdmin,
+  userAdminTechnique,
   userAdminOrResponsable,
   userAdminResponsable,
   userAuth,
@@ -148,6 +149,42 @@ describe("middlewares auth", () => {
     expect(response.status).toHaveBeenCalledWith(401);
     expect(response.json).toHaveBeenCalledWith({
       message: "Acces reserve a l'Admin Responsable.",
+    });
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it("userAdminTechnique appelle next pour ADMIN", () => {
+    const request = { user: { roles: ["ADMIN"] } };
+    const response = createResponse();
+    const next = jest.fn();
+
+    userAdminTechnique(request, response, next);
+
+    expect(next).toHaveBeenCalled();
+    expect(response.status).not.toHaveBeenCalled();
+  });
+
+  it("userAdminTechnique appelle next pour ADMIN_RESPONSABLE", () => {
+    const request = { user: { roles: ["ADMIN_RESPONSABLE"] } };
+    const response = createResponse();
+    const next = jest.fn();
+
+    userAdminTechnique(request, response, next);
+
+    expect(next).toHaveBeenCalled();
+    expect(response.status).not.toHaveBeenCalled();
+  });
+
+  it("userAdminTechnique refuse RESPONSABLE simple", () => {
+    const request = { user: { roles: ["RESPONSABLE"] } };
+    const response = createJsonResponse();
+    const next = jest.fn();
+
+    userAdminTechnique(request, response, next);
+
+    expect(response.status).toHaveBeenCalledWith(403);
+    expect(response.json).toHaveBeenCalledWith({
+      message: "Acces reserve aux administrateurs.",
     });
     expect(next).not.toHaveBeenCalled();
   });

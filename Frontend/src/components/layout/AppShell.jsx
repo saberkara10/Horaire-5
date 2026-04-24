@@ -3,6 +3,7 @@ import "../../styles/AppShell.css";
 import {
   getLibelleRoleFrontend,
   utilisateurEstAdminResponsable,
+  utilisateurPeutVersionnerHoraires,
   utilisateurEstResponsable,
 } from "../../utils/roles.js";
 import { usePopup } from "../feedback/PopupProvider.jsx";
@@ -25,6 +26,7 @@ export function AppShell({
   const rolesUtilisateur = Array.isArray(utilisateur?.roles) ? utilisateur.roles : [];
   const estResponsable = utilisateurEstResponsable(utilisateur);
   const estAdminGeneral = utilisateurEstAdminResponsable(utilisateur);
+  const peutVersionnerHoraires = utilisateurPeutVersionnerHoraires(utilisateur);
   const peutUtiliserScheduler =
     rolesUtilisateur.includes("ADMIN") ||
     rolesUtilisateur.includes("RESPONSABLE") ||
@@ -121,6 +123,14 @@ export function AppShell({
           {
             label: "Sous-admins",
             to: "/admins",
+          },
+        ]
+      : []),
+    ...(peutVersionnerHoraires
+      ? [
+          {
+            label: "Generations",
+            to: "/historique-generations",
           },
         ]
       : []),

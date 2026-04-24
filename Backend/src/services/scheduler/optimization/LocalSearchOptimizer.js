@@ -36,6 +36,7 @@ import { PlacementEvaluator } from "./PlacementEvaluator.js";
 
 const DEFAULT_MAX_IMPROVEMENTS = 4;
 const DEFAULT_MAX_CANDIDATES_PER_SERIES = 3;
+const MAX_PLACEMENTS_FOR_LOCAL_SEARCH = 2500;
 
 /**
  * Trie des placements pour garder un ordre stable.
@@ -210,6 +211,8 @@ export class LocalSearchOptimizer {
     groupesFormes,
     affectationsEtudiantGroupe,
     affectationsReprises,
+    nonPlanifies = [],
+    nbConflitsEvites = 0,
     salles,
     datesParJourSemaine,
     matrix,
@@ -229,6 +232,8 @@ export class LocalSearchOptimizer {
       placements: initialPlacements,
       affectationsEtudiantGroupe,
       affectationsReprises,
+      nonPlanifies,
+      nbConflitsEvites,
     });
     const scoringBefore = ScheduleScorer.scoreAllModes(scorePayload);
 
@@ -248,6 +253,24 @@ export class LocalSearchOptimizer {
           scoringBefore,
           scoringMode
         ),
+      };
+    }
+
+    if (initialPlacements.length > MAX_PLACEMENTS_FOR_LOCAL_SEARCH) {
+      return {
+        placementsOptimises: initialPlacements,
+        scoringBefore,
+        scoringAfter: scoringBefore,
+        improvements: [],
+        improvementsRetained: 0,
+        gains: LocalSearchOptimizer.summarizeGains(
+          scoringBefore,
+          scoringBefore,
+          scoringMode
+        ),
+        skipped: true,
+        skipReason:
+          `optimisation_locale_ignoree_sur_une_grande_session (${initialPlacements.length} placements)`,
       };
     }
 
@@ -303,6 +326,8 @@ export class LocalSearchOptimizer {
         placements: workingPlacements,
         affectationsEtudiantGroupe,
         affectationsReprises,
+        nonPlanifies,
+        nbConflitsEvites,
       })
     );
 
@@ -860,11 +885,20 @@ export class LocalSearchOptimizer {
    * Effets secondaires : aucun.
    * Cas particuliers : laisse scoring_v1 gerer les details des reprises.
    */
-  static buildScorePayload({ placements, affectationsEtudiantGroupe, affectationsReprises }) {
+  static buildScorePayload({
+    placements,
+    affectationsEtudiantGroupe,
+    affectationsReprises,
+    nonPlanifies = [],
+    nbConflitsEvites = 0,
+  }) {
     return {
       placements: [...(Array.isArray(placements) ? placements : [])].sort(comparePlacements),
       affectationsEtudiantGroupe,
       affectationsReprises,
+      nonPlanifies,
+      nbCoursNonPlanifies: Array.isArray(nonPlanifies) ? nonPlanifies.length : 0,
+      nbConflitsEvites,
     };
   }
 

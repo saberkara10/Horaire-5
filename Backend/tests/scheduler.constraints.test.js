@@ -38,6 +38,22 @@ describe("scheduler constraints", () => {
     ).toBe(true);
   });
 
+  test("genere les jours de session de facon deterministe sur des appels repetes", () => {
+    const premiereSerie = AvailabilityChecker.genererJours(
+      "2026-09-07",
+      "2026-09-09",
+      false
+    );
+    const secondeSerie = AvailabilityChecker.genererJours(
+      "2026-09-07",
+      "2026-09-09",
+      false
+    );
+
+    expect(premiereSerie).toEqual(["2026-09-07", "2026-09-08", "2026-09-09"]);
+    expect(secondeSerie).toEqual(premiereSerie);
+  });
+
   test("limite un professeur a dix groupes distincts sur la session", () => {
     const matrix = new ConstraintMatrix();
 

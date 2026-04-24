@@ -251,4 +251,60 @@ describe("SchedulerEngine fallback paths", () => {
 
     expect(diagnostic.raison_code).toBe("ETUDIANTS_OCCUPES");
   });
+
+  test("_diagnosticPrecis detecte des professeurs occupes sur tous les creneaux", () => {
+    const fixture = createBaseFixture();
+    fixture.matrix.reserver(
+      20,
+      10,
+      "GX",
+      201,
+      "2026-09-07",
+      "08:00:00",
+      "11:00:00",
+      { studentIds: [] }
+    );
+    fixture.matrix.reserver(
+      20,
+      10,
+      "GY",
+      201,
+      "2026-09-14",
+      "08:00:00",
+      "11:00:00",
+      { studentIds: [] }
+    );
+
+    const diagnostic = SchedulerEngine._diagnosticPrecis(fixture);
+
+    expect(diagnostic.raison_code).toBe("PROFESSEURS_SATURES");
+  });
+
+  test("_diagnosticPrecis detecte des salles occupees sur tous les creneaux", () => {
+    const fixture = createBaseFixture();
+    fixture.matrix.reserver(
+      5,
+      99,
+      "GX",
+      201,
+      "2026-09-07",
+      "08:00:00",
+      "11:00:00",
+      { studentIds: [] }
+    );
+    fixture.matrix.reserver(
+      5,
+      99,
+      "GY",
+      201,
+      "2026-09-14",
+      "08:00:00",
+      "11:00:00",
+      { studentIds: [] }
+    );
+
+    const diagnostic = SchedulerEngine._diagnosticPrecis(fixture);
+
+    expect(diagnostic.raison_code).toBe("SALLES_SATUREES");
+  });
 });

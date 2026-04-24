@@ -174,6 +174,25 @@ export function userAdminResponsable(request, response, next) {
 }
 
 /**
+ * Middleware : autorise les admins techniques et les admins responsables.
+ *
+ * Ce garde est utile pour les modules purement administratifs lies au pilotage
+ * des generations d'horaires : un ADMIN classique doit y acceder, sans ouvrir
+ * l'acces au RESPONSABLE simple.
+ *
+ * @param {import("express").Request} request
+ * @param {import("express").Response} response
+ * @param {Function} next
+ */
+export function userAdminTechnique(request, response, next) {
+  if (utilisateurPossedeUnRole(request, ["ADMIN", "ADMIN_RESPONSABLE"])) {
+    return next();
+  }
+
+  return refuserAcces(response, 403, "Acces reserve aux administrateurs.");
+}
+
+/**
  * Middleware : vérifie que l'utilisateur a un rôle pédagogique (responsable).
  *
  * Donne accès aux actions liées aux programmes, groupes et planning.

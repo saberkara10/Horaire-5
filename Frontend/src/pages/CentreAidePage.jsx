@@ -48,6 +48,31 @@ const SECTION_IDS = {
   scenarios: "scenarios",
 };
 
+const SPOTLIGHT_CONTENT_IDS = [
+  "guide-journal-activite",
+  "guide-generation-historique-restauration",
+  "guide-concurrence",
+];
+
+const PRIORITY_DOCUMENT_IDS = [
+  "doc-journal-activite",
+  "doc-generations-horaires",
+  "doc-concurrence",
+];
+
+function isAvailableHelpVideo(video) {
+  return Boolean(video?.hasVideo && video?.streamUrl);
+}
+
+function prioritizeContent(collection, priorityIds, limit = collection.length) {
+  const content = Array.isArray(collection) ? collection : [];
+  const contentById = new Map(content.map((item) => [item.id, item]));
+  const prioritized = priorityIds.map((id) => contentById.get(id)).filter(Boolean);
+  const remaining = content.filter((item) => !priorityIds.includes(item.id));
+
+  return [...prioritized, ...remaining].slice(0, limit);
+}
+
 function SectionHeader({ eyebrow, title, description, actionLabel, onAction }) {
   return (
     <div className="centre-aide__section-head">
@@ -208,7 +233,7 @@ export function CentreAidePage({ utilisateur, onLogout }) {
     return sortContent([
       ...(helpCenter.guides || []),
       ...(helpCenter.documents || []),
-      ...(helpCenter.videos || []),
+      ...(helpCenter.videos || []).filter(isAvailableHelpVideo),
       ...(helpCenter.faqs || []),
       ...(helpCenter.scenarios || []),
     ]);
@@ -270,9 +295,7 @@ export function CentreAidePage({ utilisateur, onLogout }) {
       return [];
     }
 
-    const sortedVideos = sortContent(sourceVideos);
-    const readyVideos = sortedVideos.filter((video) => video.hasVideo);
-    const baseVideos = readyVideos.length > 0 ? readyVideos : sortedVideos.slice(0, 6);
+    const baseVideos = sortContent(sourceVideos.filter(isAvailableHelpVideo));
     const seenKeys = new Set();
 
     return baseVideos.filter((video) => {
@@ -286,6 +309,16 @@ export function CentreAidePage({ utilisateur, onLogout }) {
       return true;
     });
   }, [helpCenter]);
+
+  const spotlightContent = useMemo(
+    () => prioritizeContent(helpCenter?.guides || [], SPOTLIGHT_CONTENT_IDS, 3),
+    [helpCenter]
+  );
+
+  const visibleDocuments = useMemo(
+    () => prioritizeContent(helpCenter?.documents || [], PRIORITY_DOCUMENT_IDS, 10),
+    [helpCenter]
+  );
 
   function scrollToSection(sectionId) {
     const refMap = {
@@ -449,7 +482,7 @@ export function CentreAidePage({ utilisateur, onLogout }) {
                 <span>documents markdown</span>
               </article>
               <article className="centre-aide__metric-card">
-                <strong>{helpCenter?.summary?.videosReady || 0}</strong>
+                <strong>{featuredVideos.length}</strong>
                 <span>capsules disponibles</span>
               </article>
               <article className="centre-aide__metric-card">
@@ -505,6 +538,29 @@ export function CentreAidePage({ utilisateur, onLogout }) {
                 ))}
               </div>
             </section>
+
+            {spotlightContent.length > 0 ? (
+              <section className="centre-aide__section centre-aide__section--new">
+                <SectionHeader
+                  eyebrow="Nouvelles capsules"
+                  title="Audit, restauration et concurrence en direct"
+                  description="Trois parcours recents avec video, guide detaille et documentation Markdown directement reliee."
+                  actionLabel="Voir les videos"
+                  onAction={() => scrollToSection(SECTION_IDS.videos)}
+                />
+
+                <div className="centre-aide__grid centre-aide__grid--spotlight">
+                  {spotlightContent.map((item) => (
+                    <GuideCard
+                      key={item.id}
+                      item={item}
+                      variant="feature"
+                      onOpen={handleOpenContent}
+                    />
+                  ))}
+                </div>
+              </section>
+            ) : null}
 
             <section className="centre-aide__section">
               <SectionHeader
@@ -736,7 +792,7 @@ export function CentreAidePage({ utilisateur, onLogout }) {
               <SectionHeader
                 eyebrow="Capsules video"
                 title="Tutoriels video disponibles dans le centre d'aide"
-                description="Les capsules actives couvrent deja les horaires, les disponibilites, la gestion des groupes, la generation et le pilotage de session."
+                description="Toutes les capsules video disponibles dans le dossier d'aide sont affichees ici pour consultation directe."
               />
 
               <div className="centre-aide__video-grid">
@@ -758,7 +814,7 @@ export function CentreAidePage({ utilisateur, onLogout }) {
               />
 
               <div className="centre-aide__grid">
-                {(helpCenter?.documents || []).slice(0, 8).map((item) => (
+                {visibleDocuments.map((item) => (
                   <GuideCard key={item.id} item={item} onOpen={handleOpenContent} />
                 ))}
               </div>

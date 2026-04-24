@@ -355,6 +355,26 @@ export const HELP_DOCUMENTS = [
     keywords: ["rapport", "generation", "blocage", "recommandations"],
   }),
   createDocument({
+    id: "doc-generations-horaires",
+    slug: "documentation-generations-horaires",
+    title: "Documentation generations d'horaires",
+    description:
+      "Historique des versions d'horaire, comparaison, duplication, archivage et restauration d'une version precedente.",
+    categoryId: "session-pilotage",
+    moduleKey: "historique-generations",
+    kind: "procedure-detaillee",
+    relativePath: "documents/documentation-generations-horaires.md",
+    estimatedMinutes: 8,
+    tags: ["historique", "restauration", "generation", "versions"],
+    keywords: [
+      "historique generations",
+      "restaurer horaire",
+      "version precedente",
+      "comparer generations",
+      "dupliquer generation",
+    ],
+  }),
+  createDocument({
     id: "doc-horaires-etudiants",
     slug: "documentation-horaires-etudiants",
     title: "Documentation horaires etudiants",
@@ -1513,6 +1533,73 @@ export const HELP_GUIDES = [
     popularityScore: 99,
   }),
   createGuide({
+    id: "guide-generation-historique-restauration",
+    categoryId: "session-pilotage",
+    moduleKey: "historique-generations",
+    title: "Generations d'horaires : historique, comparaison et restauration",
+    summary:
+      "La capsule explique a quoi sert le module d'historique des generations et comment revenir a une version precedente d'horaire lorsque c'est necessaire.",
+    objective:
+      "Permettre a un administrateur de relire les versions sauvegardees, comparer deux generations, conserver une trace et restaurer proprement un horaire precedent.",
+    prerequisites: [
+      "Disposer des droits d'administration responsable.",
+      "Avoir au moins une generation sauvegardee pour la session concernee.",
+      "Comprendre que la restauration remplace l'horaire actif de la session cible.",
+    ],
+    steps: [
+      "Ouvrez Historique des generations pour consulter les versions disponibles.",
+      "Selectionnez une version et relisez son detail: score, seances, conflits, notes et utilisateur createur.",
+      "Comparez deux versions pour identifier les cours deplaces, changements de salle ou changements de professeur.",
+      "Utilisez Dupliquer ou Archiver lorsque vous voulez preparer ou ranger une version sans l'appliquer.",
+      "Lancez Restaurer seulement apres lecture de l'apercu et confirmation des avertissements.",
+    ],
+    attentionPoints: [
+      "La restauration doit rester limitee a la bonne session.",
+      "Une sauvegarde de l'etat courant est creee avant application afin de pouvoir retracer l'action.",
+      "Les conflits et references manquantes doivent etre lus avant confirmation.",
+    ],
+    commonErrors: [
+      "Restaurer une version sans verifier la session active.",
+      "Comparer deux versions sans tenir compte du contexte de generation.",
+    ],
+    practicalTips: [
+      "Pour une demonstration, montrez d'abord le detail d'une version, puis la comparaison, puis la restauration en deux etapes.",
+      "Ajoutez une note administrative avant une restauration importante pour garder une trace claire.",
+    ],
+    level: "avance",
+    estimatedMinutes: 9,
+    tags: ["historique", "restauration", "versions", "comparaison"],
+    keywords: [
+      "historique generations",
+      "restaurer version horaire",
+      "revenir ancienne version",
+      "comparer generations",
+      "dupliquer generation",
+    ],
+    documentIds: [
+      "doc-generations-horaires",
+      "doc-moteur-intelligent",
+      "doc-planification",
+    ],
+    videoSlots: [
+      createVideoSlot({
+        id: "video-generation-historique-restauration",
+        title: "Generation, historique et restauration d'une version d'horaire",
+        description:
+          "Role du module d'historique, lecture des versions et restauration controlee d'un horaire precedent.",
+        durationLabel: "6 min 33 s",
+        level: "avance",
+        videoSlug: "generation-historique-restauration",
+      }),
+    ],
+    relatedGuideIds: [
+      "guide-pilotage-session",
+      "guide-generation",
+      "guide-diagnostic-generation",
+    ],
+    popularityScore: 98,
+  }),
+  createGuide({
     id: "guide-administration",
     categoryId: "administration",
     moduleKey: "administration",
@@ -2181,6 +2268,7 @@ export const HELP_FEATURED = {
   popularGuideIds: [
     "guide-vision-projet",
     "guide-onboarding",
+    "guide-generation-historique-restauration",
     "guide-journal-activite",
     "guide-concurrence",
     "guide-generation",
@@ -2191,8 +2279,10 @@ export const HELP_FEATURED = {
   ],
   recentContentIds: [
     "guide-journal-activite",
+    "guide-generation-historique-restauration",
     "guide-concurrence",
     "doc-journal-activite",
+    "doc-generations-horaires",
     "doc-concurrence",
   ],
   recommendedGuideIds: [
@@ -2202,6 +2292,7 @@ export const HELP_FEATURED = {
     "guide-cours",
     "guide-disponibilites",
     "guide-generation",
+    "guide-generation-historique-restauration",
     "guide-journal-activite",
   ],
   learningPath: [

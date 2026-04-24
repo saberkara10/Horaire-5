@@ -17,6 +17,7 @@
 
 import pool from "../../../db.js";
 import { ScheduleModificationService } from "../../services/scheduler/planning/ScheduleModificationService.js";
+import { journaliserActivite } from "../../services/activity-log.service.js";
 
 function getCurrentUser(request) {
   return request.user || request.session?.user || null;
@@ -47,8 +48,37 @@ export class ScheduleModificationController {
         pool
       );
 
+      await journaliserActivite({
+        request,
+        actionType: "UPDATE",
+        module: "Horaires",
+        targetType: "Affectation",
+        targetId:
+          request.body?.idSeance ||
+          request.body?.id_seance ||
+          request.body?.idAffectationCours ||
+          request.body?.id_affectation_cours,
+        description: "Modification manuelle/intelligente d'une affectation horaire.",
+        newValue: result,
+      });
+
       return response.status(200).json(result);
     } catch (error) {
+      await journaliserActivite({
+        request,
+        actionType: "UPDATE",
+        module: "Horaires",
+        targetType: "Affectation",
+        targetId:
+          request.body?.idSeance ||
+          request.body?.id_seance ||
+          request.body?.idAffectationCours ||
+          request.body?.id_affectation_cours,
+        description: "Echec de modification manuelle/intelligente d'une affectation horaire.",
+        status: "ERROR",
+        errorMessage: error.message,
+        newValue: request.body,
+      });
       return response.status(error.statusCode || 500).json({
         message:
           error.message || "Erreur lors de la modification intelligente d'affectation.",

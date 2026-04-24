@@ -10,13 +10,17 @@
  */
 
 import { userAuth, userAdmin, userAdminOrResponsable } from "../middlewares/auth.js";
+import { requireResourceLock } from "../middlewares/concurrency.js";
 import { SchedulerEngine } from "../src/services/scheduler/SchedulerEngine.js";
 import { FailedCourseDebugService } from "../src/services/scheduler/FailedCourseDebugService.js";
 import { SchedulerReportService } from "../src/services/scheduler/SchedulerReportService.js";
 import { ScheduleModificationController } from "../src/controllers/scheduler/ScheduleModificationController.js";
 import { ScheduleModificationService } from "../src/services/scheduler/planning/ScheduleModificationService.js";
+import { ScheduleGenerationService } from "../src/services/scheduler/ScheduleGenerationService.js";
 import { ScenarioSimulator } from "../src/services/scheduler/simulation/ScenarioSimulator.js";
 import { assurerSchemaSchedulerAcademique } from "../src/services/academic-scheduler-schema.js";
+import { journaliserActivite } from "../src/services/activity-log.service.js";
+import { GenerationPerformanceTracker } from "../src/services/scheduler/performance/GenerationPerformanceTracker.js";
 import pool from "../db.js";
 
 function getUser(request) {
@@ -38,7 +42,36 @@ function readOptimizationMode(source = {}) {
   return source.optimization_mode || source.mode_optimisation || "legacy";
 }
 
+function logGenerationPerformance(tracker, rapport) {
+  tracker?.printSummary({
+    prefix: "[scheduler:perf]",
+    coursesToPlace:
+      Number(rapport?.nb_cours_planifies || 0) + Number(rapport?.nb_cours_non_planifies || 0),
+    coursesPlaced: Number(rapport?.nb_cours_planifies || 0),
+    conflictsDetected:
+      Number(rapport?.nb_cours_non_planifies || 0) +
+      Number(rapport?.nb_resolutions_manuelles || 0),
+  });
+}
+
+async function captureGenerationSnapshotSafe(options) {
+  try {
+    return await ScheduleGenerationService.captureCurrentGeneration(options);
+  } catch (error) {
+    console.warn(
+      "[scheduler] sauvegarde de la generation impossible:",
+      error?.message || error
+    );
+    return null;
+  }
+}
+
 export default function schedulerRoutes(app) {
+  const verrouGeneration = requireResourceLock("generation", () => "global");
+  const verrouPlanification = requireResourceLock(
+    "planification",
+    (request) => request.params.id || request.body?.id_session || "active"
+  );
   // Le bootstrap automatique est desactive. Le moteur travaille uniquement
   // avec les donnees presentes en base.
   app.post("/api/scheduler/bootstrap", userAuth, userAdmin, async (request, response) => {
@@ -63,6 +96,8 @@ export default function schedulerRoutes(app) {
     const { id_session, inclure_weekend, sa_params } = request.query;
     const saParams = sa_params ? JSON.parse(sa_params) : {};
     const optimizationMode = readOptimizationMode(request.query || {});
+    const performanceTracker = new GenerationPerformanceTracker();
+    performanceTracker.startStep("response_finale_backend");
 
     try {
       const rapport = await SchedulerEngine.generer({
@@ -72,17 +107,70 @@ export default function schedulerRoutes(app) {
         optimizationMode,
         saParams,
         onProgress: (info) => sendEvent({ type: "progress", ...info }),
+        performanceTracker,
       });
-      sendEvent({ type: "done", rapport });
+      const generation = await performanceTracker.measure(
+        "capture_generation_snapshot",
+        async () =>
+          captureGenerationSnapshotSafe({
+            idSession: rapport?.session?.id_session || id_session || null,
+            report: rapport,
+            request,
+            sourceKind: "automatic_generation",
+            status: "active",
+            performanceTracker,
+          })
+      );
+      await performanceTracker.measure("journal_activite", async () =>
+        journaliserActivite({
+          request,
+          actionType: "GENERATE",
+          module: "Horaires",
+          targetType: "Generation globale",
+          targetId: rapport?.id_rapport || null,
+          description: `Generation automatique terminee: ${rapport.nb_cours_planifies} cours planifies.`,
+          newValue: {
+            id_session,
+            inclure_weekend,
+            optimization_mode: optimizationMode,
+            nb_cours_planifies: rapport.nb_cours_planifies,
+            nb_cours_non_planifies: rapport.nb_cours_non_planifies,
+            score_qualite: rapport.score_qualite,
+            id_generation: generation?.id_generation || null,
+          },
+        })
+      );
+      performanceTracker.endStep("response_finale_backend");
+      logGenerationPerformance(performanceTracker, rapport);
+      sendEvent({ type: "done", rapport, generation });
     } catch (error) {
-      sendEvent({ type: "error", message: error.message || "Erreur serveur." });
+      performanceTracker.endStep("response_finale_backend");
+      logGenerationPerformance(performanceTracker, null);
+      await journaliserActivite({
+        request,
+        actionType: "GENERATE",
+        module: "Horaires",
+        targetType: "Generation globale",
+        description: "Echec de generation automatique SSE.",
+        status: "ERROR",
+        errorMessage: error.message,
+        newValue: request.query,
+      });
+      sendEvent({
+        type: "error",
+        code: error.code || null,
+        message: error.message || "Erreur serveur.",
+        details: error.details || null,
+      });
     } finally {
       response.end();
     }
   });
 
   // Generation complete sans canal SSE.
-  app.post("/api/scheduler/generer", userAuth, userAdmin, async (request, response) => {
+  app.post("/api/scheduler/generer", userAuth, userAdmin, verrouGeneration, async (request, response) => {
+    const performanceTracker = new GenerationPerformanceTracker();
+    performanceTracker.startStep("response_finale_backend");
     try {
       const user = getUser(request);
       const {
@@ -100,19 +188,71 @@ export default function schedulerRoutes(app) {
         optimizationMode: optimization_mode || mode_optimisation || "legacy",
         saParams: sa_params,
         onProgress: null,
+        performanceTracker,
       });
+      const generation = await performanceTracker.measure(
+        "capture_generation_snapshot",
+        async () =>
+          captureGenerationSnapshotSafe({
+            idSession: rapport?.session?.id_session || id_session || null,
+            report: rapport,
+            request,
+            sourceKind: "automatic_generation",
+            status: "active",
+            performanceTracker,
+          })
+      );
+
+      await performanceTracker.measure("journal_activite", async () =>
+        journaliserActivite({
+          request,
+          actionType: "GENERATE",
+          module: "Horaires",
+          targetType: "Generation globale",
+          targetId: rapport?.id_rapport || null,
+          description: `Generation automatique terminee: ${rapport.nb_cours_planifies} cours planifies.`,
+          newValue: {
+            id_session,
+            inclure_weekend,
+            optimization_mode: optimization_mode || mode_optimisation,
+            nb_cours_planifies: rapport.nb_cours_planifies,
+            nb_cours_non_planifies: rapport.nb_cours_non_planifies,
+            score_qualite: rapport.score_qualite,
+            id_generation: generation?.id_generation || null,
+          },
+        })
+      );
+      performanceTracker.endStep("response_finale_backend");
+      logGenerationPerformance(performanceTracker, rapport);
 
       return response.status(201).json({
         message: `OK ${rapport.nb_cours_planifies} affectations generees. Score qualite : ${rapport.score_qualite}/100`,
         mode_optimisation_utilise:
           rapport?.details?.modeOptimisationUtilise || "legacy",
         rapport,
+        generation,
       });
     } catch (error) {
+      performanceTracker.endStep("response_finale_backend");
+      logGenerationPerformance(performanceTracker, null);
       console.error("ERREUR Generation:", error);
+      await journaliserActivite({
+        request,
+        actionType: "GENERATE",
+        module: "Horaires",
+        targetType: "Generation globale",
+        description: "Echec de generation automatique.",
+        status: "ERROR",
+        errorMessage: error.message,
+        newValue: request.body,
+      });
       return response
         .status(error.statusCode || 500)
-        .json({ message: error.message || "Erreur serveur." });
+        .json({
+          message: error.message || "Erreur serveur.",
+          code: error.code || null,
+          details: error.details || null,
+        });
     }
   });
 
@@ -251,6 +391,16 @@ export default function schedulerRoutes(app) {
         [nom, date_debut, date_fin]
       );
 
+      await journaliserActivite({
+        request,
+        actionType: "CREATE",
+        module: "Sessions",
+        targetType: "Session",
+        targetId: result.insertId,
+        description: `Creation et activation de la session ${nom}.`,
+        newValue: { id_session: result.insertId, nom, date_debut, date_fin, active: true },
+      });
+
       return response.status(201).json({
         id_session: result.insertId,
         nom,
@@ -259,17 +409,45 @@ export default function schedulerRoutes(app) {
         active: true,
       });
     } catch (error) {
+      await journaliserActivite({
+        request,
+        actionType: "CREATE",
+        module: "Sessions",
+        targetType: "Session",
+        description: "Echec de creation d'une session.",
+        status: "ERROR",
+        errorMessage: error.message,
+        newValue: request.body,
+      });
       return response.status(500).json({ message: "Erreur serveur." });
     }
   });
 
-  app.put("/api/scheduler/sessions/:id/activer", userAuth, userAdmin, async (request, response) => {
+  app.put("/api/scheduler/sessions/:id/activer", userAuth, userAdmin, verrouPlanification, async (request, response) => {
     try {
       const id = Number(request.params.id);
       await pool.query(`UPDATE sessions SET active = FALSE`);
       await pool.query(`UPDATE sessions SET active = TRUE WHERE id_session = ?`, [id]);
+      await journaliserActivite({
+        request,
+        actionType: "UPDATE",
+        module: "Sessions",
+        targetType: "Session",
+        targetId: id,
+        description: `Activation de la session ${id}.`,
+      });
       return response.json({ message: "Session activee." });
     } catch (error) {
+      await journaliserActivite({
+        request,
+        actionType: "UPDATE",
+        module: "Sessions",
+        targetType: "Session",
+        targetId: request.params.id,
+        description: "Echec d'activation d'une session.",
+        status: "ERROR",
+        errorMessage: error.message,
+      });
       return response.status(500).json({ message: "Erreur serveur." });
     }
   });
@@ -332,7 +510,7 @@ export default function schedulerRoutes(app) {
     }
   });
 
-  app.delete("/api/scheduler/cours-echoues/:id", userAuth, userAdmin, async (request, response) => {
+  app.delete("/api/scheduler/cours-echoues/:id", userAuth, userAdmin, verrouPlanification, async (request, response) => {
     try {
       await pool.query(`DELETE FROM cours_echoues WHERE id = ?`, [Number(request.params.id)]);
       return response.json({ message: "Supprime." });
@@ -380,7 +558,7 @@ export default function schedulerRoutes(app) {
     }
   });
 
-  app.delete("/api/scheduler/absences/:id", userAuth, userAdmin, async (request, response) => {
+  app.delete("/api/scheduler/absences/:id", userAuth, userAdmin, verrouPlanification, async (request, response) => {
     try {
       await pool.query(`DELETE FROM absences_professeurs WHERE id = ?`, [Number(request.params.id)]);
       return response.json({ message: "Absence supprimee." });
@@ -427,7 +605,7 @@ export default function schedulerRoutes(app) {
     }
   });
 
-  app.delete("/api/scheduler/salles-indisponibles/:id", userAuth, userAdmin, async (request, response) => {
+  app.delete("/api/scheduler/salles-indisponibles/:id", userAuth, userAdmin, verrouPlanification, async (request, response) => {
     try {
       await pool.query(`DELETE FROM salles_indisponibles WHERE id = ?`, [Number(request.params.id)]);
       return response.json({ message: "Supprime." });
@@ -478,7 +656,7 @@ export default function schedulerRoutes(app) {
     }
   });
 
-  app.delete("/api/scheduler/prerequis/:id", userAuth, userAdmin, async (request, response) => {
+  app.delete("/api/scheduler/prerequis/:id", userAuth, userAdmin, verrouPlanification, async (request, response) => {
     try {
       await pool.query(`DELETE FROM prerequis_cours WHERE id = ?`, [Number(request.params.id)]);
       return response.json({ message: "Prerequis supprime." });

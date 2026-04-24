@@ -31,8 +31,10 @@ import { AdminsPage } from "./pages/AdminsPage.jsx";
 import { ActivityLogsPage } from "./pages/ActivityLogsPage.jsx";
 import { AdminConcurrencePage } from "./pages/AdminConcurrencePage.jsx";
 import { CentreAidePage } from "./pages/CentreAidePage.jsx";
+import { ScheduleGenerationsPage } from "./pages/ScheduleGenerationsPage.jsx";
 import {
   utilisateurEstAdminResponsable,
+  utilisateurPeutVersionnerHoraires,
   utilisateurEstResponsable,
 } from "./utils/roles.js";
 import { PopupProvider } from "./components/feedback/PopupProvider.jsx";
@@ -98,6 +100,7 @@ export default function App() {
   const roles = Array.isArray(utilisateur?.roles) ? utilisateur.roles : [];
   const isAdminResponsable = roles.includes("ADMIN_RESPONSABLE");
   const estAdminGeneral = utilisateurEstAdminResponsable(utilisateur);
+  const peutVersionnerHoraires = utilisateurPeutVersionnerHoraires(utilisateur);
   const peutUtiliserScheduler =
     roles.includes("ADMIN") ||
     roles.includes("RESPONSABLE") ||
@@ -196,6 +199,16 @@ export default function App() {
               element={
                 estAdminGeneral ? (
                   <AdminConcurrencePage />
+                ) : (
+                  <Navigate to="/dashboard" replace />
+                )
+              }
+            />
+            <Route
+              path="historique-generations"
+              element={
+                peutVersionnerHoraires ? (
+                  <ScheduleGenerationsPage />
                 ) : (
                   <Navigate to="/dashboard" replace />
                 )

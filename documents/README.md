@@ -54,6 +54,9 @@ Chaque lien ci-dessous est cliquable et redirige directement vers le fichier cib
 
 - Pour consulter les details d'authentification, de session et de securisation des acces : [Documentation de l'authentification](documentation-authentification.md)
 - Pour consulter le fonctionnement administratif et la gestion des comptes de plateforme : [Documentation des administrateurs](documentation-admins.md)
+- Pour consulter le journal d'activite, l'audit des actions et l'export compatible Excel : [Documentation du journal d'activite](documentation-journal-activite.md)
+- Pour consulter la gestion des conflits d'utilisation, verrous, files d'attente et presence : [Documentation concurrence](documentation-concurrence.md)
+- Pour consulter l'historique, le versioning et la restauration des horaires generes : [Documentation des generations d'horaires](documentation-generations-horaires.md)
 
 ### Moteur, planification et traitement des exceptions
 

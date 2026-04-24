@@ -336,10 +336,10 @@ describe("SchedulerEngine helpers", () => {
     const connection = {
       query: jest
         .fn()
-        .mockResolvedValueOnce([[{ id_groupes_etudiants: 12 }]])
+        .mockResolvedValueOnce([[{ id_groupes_etudiants: 12, nom_groupe: "G-INF-01" }]])
         .mockResolvedValueOnce([{ affectedRows: 1 }])
-        .mockResolvedValueOnce([[]])
-        .mockResolvedValueOnce([{ insertId: 99 }]),
+        .mockResolvedValueOnce([{ affectedRows: 1 }])
+        .mockResolvedValueOnce([[{ id_groupes_etudiants: 99, nom_groupe: "G-INF-02" }]]),
     };
 
     const result = await SchedulerEngine._persisterGroupes(
@@ -416,7 +416,7 @@ describe("SchedulerEngine helpers", () => {
     expect(connection.query).toHaveBeenCalledTimes(1);
     expect(connection.query).toHaveBeenCalledWith(
       expect.stringContaining("UPDATE etudiants"),
-      [44, 1]
+      [1, 44, 1]
     );
   });
 

@@ -19,6 +19,16 @@ export function utilisateurEstAdminResponsable(utilisateur) {
   return roles.includes("ADMIN_RESPONSABLE") || utilisateur?.role === "ADMIN_RESPONSABLE";
 }
 
+export function utilisateurPeutVersionnerHoraires(utilisateur) {
+  const roles = Array.isArray(utilisateur?.roles) ? utilisateur.roles : [];
+
+  return (
+    roles.includes("ADMIN") ||
+    roles.includes("ADMIN_RESPONSABLE") ||
+    utilisateur?.role === "ADMIN" ||
+    utilisateur?.role === "ADMIN_RESPONSABLE"
+  );
+}
 
 function normaliserRoles(source) {
   if (Array.isArray(source)) {

@@ -11,6 +11,9 @@ import {
   MAX_WEEKLY_SESSIONS_PER_PROFESSOR,
 } from "./AcademicCatalog.js";
 
+const SUPERPOSED_KEYS_CACHE = new Map();
+const WEEK_KEY_CACHE = new Map();
+
 export class ConstraintMatrix {
   constructor() {
     this.salles = new Map();
@@ -28,6 +31,11 @@ export class ConstraintMatrix {
   }
 
   static clesSuperposees(date, heureDebut, heureFin) {
+    const cacheKey = `${date}|${heureDebut}|${heureFin}`;
+    if (SUPERPOSED_KEYS_CACHE.has(cacheKey)) {
+      return SUPERPOSED_KEYS_CACHE.get(cacheKey);
+    }
+
     const cles = [];
     const debutMin = ConstraintMatrix._heureVersMinutes(heureDebut);
     const finMin = ConstraintMatrix._heureVersMinutes(heureFin);
@@ -38,6 +46,7 @@ export class ConstraintMatrix {
       cles.push(`${date}|${heures}:${minutes}:00`);
     }
 
+    SUPERPOSED_KEYS_CACHE.set(cacheKey, cles);
     return cles;
   }
 
@@ -48,13 +57,19 @@ export class ConstraintMatrix {
 
   static cleSemaine(date) {
     const dateTexte = String(date || "").slice(0, 10);
+    if (WEEK_KEY_CACHE.has(dateTexte)) {
+      return WEEK_KEY_CACHE.get(dateTexte);
+    }
+
     const dateObj = new Date(`${dateTexte}T00:00:00`);
     const jour = dateObj.getDay() === 0 ? 7 : dateObj.getDay();
     dateObj.setDate(dateObj.getDate() - (jour - 1));
     const annee = dateObj.getFullYear();
     const mois = String(dateObj.getMonth() + 1).padStart(2, "0");
     const jourMois = String(dateObj.getDate()).padStart(2, "0");
-    return `${annee}-${mois}-${jourMois}`;
+    const weekKey = `${annee}-${mois}-${jourMois}`;
+    WEEK_KEY_CACHE.set(dateTexte, weekKey);
+    return weekKey;
   }
 
   salleLibre(idSalle, date, heureDebut, heureFin) {

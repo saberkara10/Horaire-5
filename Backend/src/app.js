@@ -44,6 +44,7 @@ import schedulerRoutes from "../routes/scheduler.routes.js";
 import exportRoutes from "../routes/export.routes.js";
 import helpRoutes    from "../routes/help.routes.js";   // Module Centre d'Aide
 import activityLogsRoutes from "../routes/activity-logs.routes.js";
+import scheduleGenerationsRoutes from "../routes/schedule-generations.routes.js";
 
 // Pour la route /api/programmes qui interroge plusieurs tables à la fois
 import pool from "../db.js";
@@ -254,6 +255,7 @@ schedulerRoutes(app);      // /api/scheduler/* — génération d'horaires
 exportRoutes(app);         // /api/export/* — export PDF et Excel
 helpRoutes(app);           // /api/help/*   — Centre d'Aide (catégories, guides, streaming)
 activityLogsRoutes(app);   // /api/admin/activity-logs/* — Journal d'activite admin
+scheduleGenerationsRoutes(app);
 if (!isTest) {
   const { default: concurrencyRoutes } = await import("../routes/concurrency.routes.js");
   concurrencyRoutes(app);  // /api/concurrency/* — Verrous, files et presence admin

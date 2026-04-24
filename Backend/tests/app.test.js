@@ -39,6 +39,9 @@ await jest.unstable_mockModule("../middlewares/auth.js", () => ({
   userAdmin(_request, _response, next) {
     next();
   },
+  userAdminTechnique(_request, _response, next) {
+    next();
+  },
   userResponsable(_request, _response, next) {
     next();
   },
