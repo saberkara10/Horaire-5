@@ -72,6 +72,14 @@ const PAGE_META_BY_PATH = {
     title: "Sous-admins",
     subtitle: "Creation, modification et suivi des comptes admin.",
   },
+  "/admin-concurrence": {
+    title: "Concurrence",
+    subtitle: "Surveillez les utilisateurs connectes, les verrous et les files d'attente.",
+  },
+  "/journal-activite": {
+    title: "Journal d'activite",
+    subtitle: "Audit securise des connexions, imports, generations et modifications importantes.",
+  },
   "/scheduler": {
     title: "Pilotage sessions",
     subtitle:

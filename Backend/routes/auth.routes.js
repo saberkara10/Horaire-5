@@ -25,6 +25,31 @@ import {
   passwordIsValid,
 } from "../src/validations/auth.validation.js";
 
+async function journaliserActiviteAuth(options) {
+  if (
+    process.env.NODE_ENV === "test" &&
+    process.env.FORCE_AUDIT_LOGS_IN_TESTS !== "1"
+  ) {
+    return null;
+  }
+
+  const { journaliserActivite } = await import(
+    "../src/services/activity-log.service.js"
+  );
+  return journaliserActivite(options);
+}
+
+async function fermerSessionConcurrenceSafe(request) {
+  if (process.env.NODE_ENV === "test") {
+    return { released_locks: 0 };
+  }
+
+  const { fermerSessionConcurrence } = await import(
+    "../src/services/concurrency.service.js"
+  );
+  return fermerSessionConcurrence(request);
+}
+
 /**
  * Initialise et enregistre les routes d'authentification sur l'application Express.
  *
@@ -57,8 +82,18 @@ export default function authRoutes(app) {
     loginRateLimit,
     (request, response, next) => {
       // Mode "callback" pour contrôler manuellement la réponse
-      passport.authenticate("local", (error, user, info) => {
+      passport.authenticate("local", async (error, user, info) => {
         if (error) {
+          await journaliserActiviteAuth({
+            request,
+            actionType: "LOGIN",
+            module: "Authentification",
+            targetType: "Utilisateur",
+            description: `Erreur technique lors de la connexion de ${request.body?.email || "utilisateur inconnu"}.`,
+            status: "ERROR",
+            errorMessage: error.message,
+            userName: request.body?.email || null,
+          });
           return next(error); // Erreur technique → Express gère l'erreur 500
         }
 
@@ -70,12 +105,33 @@ export default function authRoutes(app) {
               : null;
 
           if (rateLimitInfo?.estBloque) {
+            await journaliserActiviteAuth({
+              request,
+              actionType: "LOGIN",
+              module: "Authentification",
+              targetType: "Utilisateur",
+              description: `Tentative de connexion bloquee pour ${request.body?.email || "utilisateur inconnu"}.`,
+              status: "ERROR",
+              errorMessage: "Trop de tentatives de connexion.",
+              userName: request.body?.email || null,
+            });
             return response.status(429).json({
               message: "Trop de tentatives de connexion. Reessayez plus tard.",
               tentatives_restantes: 0,
               attente_secondes: rateLimitInfo.attente_secondes,
             });
           }
+
+          await journaliserActiviteAuth({
+            request,
+            actionType: "LOGIN",
+            module: "Authentification",
+            targetType: "Utilisateur",
+            description: `Tentative de connexion echouee pour ${request.body?.email || "utilisateur inconnu"}.`,
+            status: "ERROR",
+            errorMessage: info?.error || "Identifiants invalides.",
+            userName: request.body?.email || null,
+          });
 
           return response.status(401).json({
             ...info,
@@ -84,8 +140,19 @@ export default function authRoutes(app) {
         }
 
         // Authentification réussie → créer la session (sérialise user.id dans le cookie)
-        request.logIn(user, (erreur) => {
+        request.logIn(user, async (erreur) => {
           if (erreur) {
+            await journaliserActiviteAuth({
+              request,
+              user,
+              actionType: "LOGIN",
+              module: "Authentification",
+              targetType: "Utilisateur",
+              targetId: user?.id,
+              description: `Erreur lors de l'ouverture de session de ${user?.email || "utilisateur"}.`,
+              status: "ERROR",
+              errorMessage: erreur.message,
+            });
             return next(erreur);
           }
 
@@ -93,6 +160,17 @@ export default function authRoutes(app) {
           if (typeof loginRateLimit.reinitialiser === "function") {
             loginRateLimit.reinitialiser(request);
           }
+
+          await journaliserActiviteAuth({
+            request,
+            user,
+            actionType: "LOGIN",
+            module: "Authentification",
+            targetType: "Utilisateur",
+            targetId: user?.id,
+            description: `Connexion reussie pour ${user?.email || "utilisateur"}.`,
+            status: "SUCCESS",
+          });
 
           return response.sendStatus(200);
         });
@@ -115,9 +193,35 @@ export default function authRoutes(app) {
   app.post(
     "/auth/logout",
     userAuth,
-    (request, response, next) => {
-      request.logOut((erreur) => {
+    async (request, response, next) => {
+      const utilisateurAvantLogout = request.user;
+
+      await journaliserActiviteAuth({
+        request,
+        user: utilisateurAvantLogout,
+        actionType: "LOGOUT",
+        module: "Authentification",
+        targetType: "Utilisateur",
+        targetId: utilisateurAvantLogout?.id,
+        description: `Deconnexion de ${utilisateurAvantLogout?.email || "utilisateur"}.`,
+        status: "SUCCESS",
+      });
+
+      await fermerSessionConcurrenceSafe(request);
+
+      request.logOut(async (erreur) => {
         if (erreur) {
+          await journaliserActiviteAuth({
+            request,
+            user: utilisateurAvantLogout,
+            actionType: "LOGOUT",
+            module: "Authentification",
+            targetType: "Utilisateur",
+            targetId: utilisateurAvantLogout?.id,
+            description: "Erreur lors de la fermeture de session.",
+            status: "ERROR",
+            errorMessage: erreur.message,
+          });
           return next(erreur);
         }
 

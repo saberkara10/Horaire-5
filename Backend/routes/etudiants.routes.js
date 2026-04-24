@@ -22,6 +22,7 @@ import {
   previsualiserEchangeCoursEtudiants,
 } from "../src/services/etudiants/student-course-exchange.service.js";
 import { userAdminOrResponsable, userAuth } from "../middlewares/auth.js";
+import { journaliserActivite } from "../src/services/activity-log.service.js";
 
 export default function etudiantsRoutes(app) {
   const accesEtudiants = [userAuth, userAdminOrResponsable];
@@ -86,8 +87,29 @@ export default function etudiantsRoutes(app) {
         idCours: Number(request.body?.id_cours),
       });
 
+      await journaliserActivite({
+        request,
+        actionType: "UPDATE",
+        module: "Etudiants",
+        targetType: "Echange cours",
+        targetId: request.body?.id_cours,
+        description: `Echange de cours entre les etudiants ${request.body?.id_etudiant_a} et ${request.body?.id_etudiant_b}.`,
+        newValue: resultat,
+      });
+
       return response.status(200).json(resultat);
     } catch (error) {
+      await journaliserActivite({
+        request,
+        actionType: "UPDATE",
+        module: "Etudiants",
+        targetType: "Echange cours",
+        targetId: request.body?.id_cours,
+        description: "Echec d'un echange de cours entre etudiants.",
+        status: "ERROR",
+        errorMessage: error.message,
+        newValue: request.body,
+      });
       return response.status(error.statusCode || 500).json({
         message: error.message || "Erreur lors de l'echange cible du cours.",
         ...(error.code ? { code: error.code } : {}),
@@ -136,8 +158,26 @@ export default function etudiantsRoutes(app) {
     async (request, response) => {
       try {
         const resultat = await importerEtudiantsDepuisFichier(request.file);
+        await journaliserActivite({
+          request,
+          actionType: "IMPORT",
+          module: "Etudiants",
+          targetType: "Fichier Excel",
+          description: "Importation Excel des etudiants.",
+          newValue: { fichier: request.file?.originalname, resultat },
+        });
         return response.status(200).json(resultat);
       } catch (error) {
+        await journaliserActivite({
+          request,
+          actionType: "IMPORT",
+          module: "Etudiants",
+          targetType: "Fichier Excel",
+          description: "Echec de l'importation Excel des etudiants.",
+          status: "ERROR",
+          errorMessage: error.message,
+          newValue: { fichier: request.file?.originalname },
+        });
         if (error instanceof ImportEtudiantsError) {
           return response.status(error.status || 400).json({
             message: error.message,
@@ -155,10 +195,26 @@ export default function etudiantsRoutes(app) {
   app.delete("/api/etudiants", ...accesEtudiants, async (request, response) => {
     try {
       await supprimerTousLesEtudiants();
+      await journaliserActivite({
+        request,
+        actionType: "RESET",
+        module: "Etudiants",
+        targetType: "Etudiants",
+        description: "Suppression de tous les etudiants importes.",
+      });
       response.status(200).json({
         message: "Tous les etudiants importes et leurs groupes orphelins ont ete supprimes.",
       });
     } catch (error) {
+      await journaliserActivite({
+        request,
+        actionType: "RESET",
+        module: "Etudiants",
+        targetType: "Etudiants",
+        description: "Echec de suppression de tous les etudiants importes.",
+        status: "ERROR",
+        errorMessage: error.message,
+      });
       response.status(500).json({
         message: "Erreur lors de la suppression des etudiants.",
       });

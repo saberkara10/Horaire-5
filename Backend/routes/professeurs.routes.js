@@ -35,6 +35,8 @@ import {
   userAuth,
   userAdminOrResponsable,
 } from "../middlewares/auth.js";
+import { requireResourceLock } from "../middlewares/concurrency.js";
+import { journaliserActivite } from "../src/services/activity-log.service.js";
 
 function normaliserHeure(heure) {
   const valeur = String(heure || "").trim();
@@ -217,6 +219,7 @@ function validerAbsencesPayload(absences) {
 export default function professeursRoutes(app) {
   const accesLectureProfesseurs = [userAuth, userAdminOrResponsable];
   const accesGestionProfesseurs = [userAuth, userAdmin];
+  const verrouProfesseur = requireResourceLock("professeur", (request) => request.params.id);
 
   app.get("/api/professeurs", ...accesLectureProfesseurs, async (request, response) => {
     try {
@@ -255,8 +258,26 @@ export default function professeursRoutes(app) {
     async (request, response) => {
       try {
         const resultat = await importerProfesseursDepuisFichier(request.file);
+        await journaliserActivite({
+          request,
+          actionType: "IMPORT",
+          module: "Professeurs",
+          targetType: "Fichier Excel",
+          description: "Importation Excel des professeurs.",
+          newValue: { fichier: request.file?.originalname, resultat },
+        });
         return response.status(200).json(resultat);
       } catch (error) {
+        await journaliserActivite({
+          request,
+          actionType: "IMPORT",
+          module: "Professeurs",
+          targetType: "Fichier Excel",
+          description: "Echec de l'importation Excel des professeurs.",
+          status: "ERROR",
+          errorMessage: error.message,
+          newValue: { fichier: request.file?.originalname },
+        });
         if (error instanceof ImportExcelError) {
           return response.status(error.status || 400).json({
             message: error.message,
@@ -301,6 +322,7 @@ export default function professeursRoutes(app) {
     ...accesGestionProfesseurs,
     validerIdProfesseur,
     verifierProfesseurExiste,
+    verrouProfesseur,
     async (request, response) => {
       try {
         const messageErreur = validerCoursPayload(request.body?.cours_ids);
@@ -385,6 +407,7 @@ export default function professeursRoutes(app) {
     ...accesGestionProfesseurs,
     validerIdProfesseur,
     verifierProfesseurExiste,
+    verrouProfesseur,
     async (request, response) => {
       try {
         const messageErreur = validerDisponibilitesPayload(
@@ -420,8 +443,35 @@ export default function professeursRoutes(app) {
           }
         );
 
+        await journaliserActivite({
+          request,
+          actionType: "UPDATE",
+          module: "Disponibilites professeurs",
+          targetType: "Professeur",
+          targetId: request.params.id,
+          description: `Modification des disponibilites du professeur ${request.professeur?.prenom || ""} ${request.professeur?.nom || ""}.`.trim(),
+          oldValue: { professeur: request.professeur },
+          newValue: {
+            disponibilites,
+            mode_application: request.body?.mode_application,
+            semaine_cible: request.body?.semaine_cible,
+          },
+        });
+
         return response.status(200).json(disponibilites);
       } catch (error) {
+        await journaliserActivite({
+          request,
+          actionType: "UPDATE",
+          module: "Disponibilites professeurs",
+          targetType: "Professeur",
+          targetId: request.params.id,
+          description: "Echec de modification des disponibilites professeur.",
+          status: "ERROR",
+          errorMessage: error.message,
+          oldValue: { professeur: request.professeur },
+          newValue: request.body,
+        });
         const payload = {
           message: error.message || "Erreur serveur.",
           details: Array.isArray(error.details) ? error.details : [],
@@ -456,6 +506,7 @@ export default function professeursRoutes(app) {
     ...accesGestionProfesseurs,
     validerIdProfesseur,
     verifierProfesseurExiste,
+    verrouProfesseur,
     async (request, response) => {
       try {
         const messageErreur = validerAbsencesPayload(request.body?.absences);
@@ -483,8 +534,27 @@ export default function professeursRoutes(app) {
     async (request, response) => {
       try {
         const professeurAjoute = await ajouterProfesseur(request.body);
+        await journaliserActivite({
+          request,
+          actionType: "CREATE",
+          module: "Professeurs",
+          targetType: "Professeur",
+          targetId: professeurAjoute?.id_professeur,
+          description: `Creation du professeur ${professeurAjoute?.prenom || ""} ${professeurAjoute?.nom || ""}.`.trim(),
+          newValue: professeurAjoute,
+        });
         response.status(201).json(professeurAjoute);
       } catch (error) {
+        await journaliserActivite({
+          request,
+          actionType: "CREATE",
+          module: "Professeurs",
+          targetType: "Professeur",
+          description: "Echec de creation d'un professeur.",
+          status: "ERROR",
+          errorMessage: error.message,
+          newValue: request.body,
+        });
         response.status(500).json({ message: "Erreur serveur." });
       }
     }
@@ -496,15 +566,40 @@ export default function professeursRoutes(app) {
     validerIdProfesseur,
     verifierProfesseurExiste,
     validerUpdateProfesseur,
+    verrouProfesseur,
     async (request, response) => {
       try {
+        const ancienProfesseur = request.professeur;
         const professeurModifie = await modifierProfesseur(
           Number(request.params.id),
           request.body
         );
 
+        await journaliserActivite({
+          request,
+          actionType: "UPDATE",
+          module: "Professeurs",
+          targetType: "Professeur",
+          targetId: request.params.id,
+          description: `Modification du professeur ${professeurModifie?.prenom || ""} ${professeurModifie?.nom || ""}.`.trim(),
+          oldValue: ancienProfesseur,
+          newValue: professeurModifie,
+        });
+
         response.status(200).json(professeurModifie);
       } catch (error) {
+        await journaliserActivite({
+          request,
+          actionType: "UPDATE",
+          module: "Professeurs",
+          targetType: "Professeur",
+          targetId: request.params.id,
+          description: "Echec de modification d'un professeur.",
+          status: "ERROR",
+          errorMessage: error.message,
+          oldValue: request.professeur,
+          newValue: request.body,
+        });
         response.status(500).json({ message: "Erreur serveur." });
       }
     }
@@ -516,11 +611,33 @@ export default function professeursRoutes(app) {
     validerIdProfesseur,
     verifierProfesseurExiste,
     validerDeleteProfesseur,
+    verrouProfesseur,
     async (request, response) => {
       try {
+        const ancienProfesseur = request.professeur;
         await supprimerProfesseur(Number(request.params.id));
+        await journaliserActivite({
+          request,
+          actionType: "DELETE",
+          module: "Professeurs",
+          targetType: "Professeur",
+          targetId: request.params.id,
+          description: `Suppression du professeur ${ancienProfesseur?.prenom || ""} ${ancienProfesseur?.nom || ""}.`.trim(),
+          oldValue: ancienProfesseur,
+        });
         response.status(200).json({ message: "Professeur supprime." });
       } catch (error) {
+        await journaliserActivite({
+          request,
+          actionType: "DELETE",
+          module: "Professeurs",
+          targetType: "Professeur",
+          targetId: request.params.id,
+          description: "Echec de suppression d'un professeur.",
+          status: "ERROR",
+          errorMessage: error.message,
+          oldValue: request.professeur,
+        });
         response.status(500).json({ message: "Erreur serveur." });
       }
     }

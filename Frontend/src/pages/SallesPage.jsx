@@ -20,6 +20,12 @@ import {
   importerSalles,
   telechargerModeleImportSalles,
 } from "../services/salles.api.js";
+import {
+  creerVerrouRessource,
+  libererVerrou,
+  prolongerVerrou,
+  rejoindreFileAttente,
+} from "../services/concurrency.api.js";
 import "../styles/CrudPages.css";
 
 const IMPORT_SALLES = recupererConfigurationImportExcel("salles");
@@ -122,6 +128,9 @@ export function SallesPage({ utilisateur, onLogout }) {
   const [modalOuvert, setModalOuvert] = useState(false);
   const [edition, setEdition] = useState(null);
   const [erreurFormulaire, setErreurFormulaire] = useState("");
+  const [verrouEdition, setVerrouEdition] = useState(null);
+  const [conflitVerrou, setConflitVerrou] = useState(null);
+  const [attenteDemandee, setAttenteDemandee] = useState(false);
 
   /* ── Formulaire ── */
   const [formulaire, setFormulaire] = useState({
@@ -214,7 +223,48 @@ export function SallesPage({ utilisateur, onLogout }) {
   }
 
   /* ─────────────── Ouverture / fermeture du modal ─────────────── */
-  function ouvrirModal(salle = null) {
+  async function demanderVerrouSalle(salle) {
+    if (!salle?.id_salle) {
+      return true;
+    }
+
+    setConflitVerrou(null);
+    setAttenteDemandee(false);
+
+    try {
+      const resultat = await creerVerrouRessource({
+        resource_type: "salle",
+        resource_id: salle.id_salle,
+        module: "Salles",
+        page: "/salles",
+      });
+
+      setVerrouEdition(resultat.lock || null);
+      return true;
+    } catch (error) {
+      setConflitVerrou({
+        message:
+          error.message ||
+          "Cette ressource est actuellement utilisee. Veuillez reessayer plus tard.",
+        lock: error.payload?.lock || null,
+        salle,
+      });
+      return false;
+    }
+  }
+
+  async function ouvrirModal(salle = null) {
+    if (salle) {
+      const verrouAcquis = await demanderVerrouSalle(salle);
+      if (!verrouAcquis) {
+        return;
+      }
+    } else {
+      setVerrouEdition(null);
+      setConflitVerrou(null);
+      setAttenteDemandee(false);
+    }
+
     setEdition(salle);
     setErreurFormulaire("");
 
@@ -260,7 +310,18 @@ export function SallesPage({ utilisateur, onLogout }) {
     }
   }, [chargementTypes, typesDisponibles]);
 
-  function fermerModal() {
+  async function fermerModal() {
+    const idLock = verrouEdition?.id_lock;
+    setVerrouEdition(null);
+
+    if (idLock) {
+      try {
+        await libererVerrou(idLock);
+      } catch {
+        // Le verrou peut deja etre expire; la fermeture de l'interface reste prioritaire.
+      }
+    }
+
     setModalOuvert(false);
     setEdition(null);
     setErreurFormulaire("");
@@ -269,6 +330,60 @@ export function SallesPage({ utilisateur, onLogout }) {
     setModeNouveauType(false);
     setNouveauTypeSaisi("");
   }
+
+  async function handleReessayerVerrou() {
+    if (!conflitVerrou?.salle) {
+      return;
+    }
+
+    await ouvrirModal(conflitVerrou.salle);
+  }
+
+  async function handleRejoindreFileAttente() {
+    if (!conflitVerrou?.salle) {
+      return;
+    }
+
+    try {
+      await rejoindreFileAttente({
+        resource_type: "salle",
+        resource_id: conflitVerrou.salle.id_salle,
+        module: "Salles",
+        page: "/salles",
+      });
+      setAttenteDemandee(true);
+      showSuccess("Vous avez ete place en file d'attente.");
+    } catch (error) {
+      showError(error.message || "Impossible de rejoindre la file d'attente.");
+    }
+  }
+
+  useEffect(() => {
+    if (!verrouEdition?.id_lock) {
+      return undefined;
+    }
+
+    function libererAvantFermeture() {
+      fetch(`/api/concurrency/locks/${verrouEdition.id_lock}`, {
+        method: "DELETE",
+        credentials: "include",
+        keepalive: true,
+      }).catch(() => {});
+    }
+
+    window.addEventListener("beforeunload", libererAvantFermeture);
+
+    const intervalId = window.setInterval(() => {
+      prolongerVerrou(verrouEdition.id_lock).catch(() => {
+        setErreurFormulaire("Le verrou de modification a expire.");
+      });
+    }, 60000);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("beforeunload", libererAvantFermeture);
+    };
+  }, [verrouEdition?.id_lock]);
 
   /* ─────────────── Soumission du formulaire ─────────────── */
   async function handleSoumettre(event) {
@@ -298,7 +413,7 @@ export function SallesPage({ utilisateur, onLogout }) {
         showSuccess("Salle ajoutée avec succès.");
       }
 
-      fermerModal();
+      await fermerModal();
       await chargerSalles();
     } catch (error) {
       setErreurFormulaire(error.message || "Erreur lors de l'enregistrement.");
@@ -338,6 +453,24 @@ export function SallesPage({ utilisateur, onLogout }) {
             + Ajouter une salle
           </button>
         </div>
+
+        {conflitVerrou ? (
+          <div className="crud-page__alert crud-page__alert--error">
+            <div>{conflitVerrou.message}</div>
+            <div className="crud-page__conflict-actions">
+              <button type="button" onClick={handleReessayerVerrou}>
+                Reessayer
+              </button>
+              <button
+                type="button"
+                onClick={handleRejoindreFileAttente}
+                disabled={attenteDemandee}
+              >
+                {attenteDemandee ? "En attente" : "Me placer en attente"}
+              </button>
+            </div>
+          </div>
+        ) : null}
 
         <ModuleExcelImportPanel
           definition={IMPORT_SALLES}

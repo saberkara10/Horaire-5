@@ -14,6 +14,7 @@ import {
   recupererSousAdmins,
   supprimerSousAdmin,
 } from "../src/model/utilisateur.js";
+import { journaliserActivite } from "../src/services/activity-log.service.js";
 
 function normaliserTexte(value) {
   return String(value || "").trim();
@@ -63,6 +64,15 @@ function estConflitUnicite(error) {
   return error?.code === "ER_DUP_ENTRY";
 }
 
+async function recupererSousAdminPourAudit(idAdmin) {
+  try {
+    const admins = await recupererSousAdmins();
+    return (admins || []).find((admin) => Number(admin.id) === Number(idAdmin)) || null;
+  } catch {
+    return null;
+  }
+}
+
 export default function adminsRoutes(app) {
   const accesGestionAdmins = [userAuth, userResponsable];
 
@@ -86,8 +96,27 @@ export default function adminsRoutes(app) {
 
     try {
       const admin = await creerSousAdmin(validation.donnees);
+      await journaliserActivite({
+        request,
+        actionType: "CREATE",
+        module: "Utilisateurs",
+        targetType: "Sous-admin",
+        targetId: admin?.id,
+        description: `Creation du sous-admin ${admin?.email || validation.donnees.email}.`,
+        newValue: admin,
+      });
       return response.status(201).json(admin);
     } catch (error) {
+      await journaliserActivite({
+        request,
+        actionType: "CREATE",
+        module: "Utilisateurs",
+        targetType: "Sous-admin",
+        description: "Echec de creation d'un sous-admin.",
+        status: "ERROR",
+        errorMessage: error.message,
+        newValue: validation.donnees,
+      });
       if (estConflitUnicite(error)) {
         return response.status(409).json({ message: "Ce courriel est deja utilise." });
       }
@@ -112,14 +141,37 @@ export default function adminsRoutes(app) {
     }
 
     try {
+      const ancienAdmin = await recupererSousAdminPourAudit(idAdmin);
       const admin = await mettreAJourSousAdmin(idAdmin, validation.donnees);
 
       if (!admin) {
         return response.status(404).json({ message: "Admin introuvable." });
       }
 
+      await journaliserActivite({
+        request,
+        actionType: "UPDATE",
+        module: "Utilisateurs",
+        targetType: "Sous-admin",
+        targetId: idAdmin,
+        description: `Modification du sous-admin ${admin.email}.`,
+        oldValue: ancienAdmin,
+        newValue: admin,
+      });
+
       return response.status(200).json(admin);
     } catch (error) {
+      await journaliserActivite({
+        request,
+        actionType: "UPDATE",
+        module: "Utilisateurs",
+        targetType: "Sous-admin",
+        targetId: idAdmin,
+        description: "Echec de modification d'un sous-admin.",
+        status: "ERROR",
+        errorMessage: error.message,
+        newValue: validation.donnees,
+      });
       if (estConflitUnicite(error)) {
         return response.status(409).json({ message: "Ce courriel est deja utilise." });
       }
@@ -138,14 +190,35 @@ export default function adminsRoutes(app) {
     }
 
     try {
+      const ancienAdmin = await recupererSousAdminPourAudit(idAdmin);
       const supprime = await supprimerSousAdmin(idAdmin);
 
       if (!supprime) {
         return response.status(404).json({ message: "Admin introuvable." });
       }
 
+      await journaliserActivite({
+        request,
+        actionType: "DELETE",
+        module: "Utilisateurs",
+        targetType: "Sous-admin",
+        targetId: idAdmin,
+        description: `Suppression du sous-admin ${ancienAdmin?.email || idAdmin}.`,
+        oldValue: ancienAdmin,
+      });
+
       return response.status(200).json({ message: "Admin supprime." });
-    } catch {
+    } catch (error) {
+      await journaliserActivite({
+        request,
+        actionType: "DELETE",
+        module: "Utilisateurs",
+        targetType: "Sous-admin",
+        targetId: idAdmin,
+        description: "Echec de suppression d'un sous-admin.",
+        status: "ERROR",
+        errorMessage: error.message,
+      });
       return response
         .status(500)
         .json({ message: "Erreur lors de la suppression de l'admin." });

@@ -22,6 +22,7 @@ import {
   HELP_LEVELS,
   HELP_SCENARIOS,
   findDocumentDefinitionBySlug,
+  findVideoSlotDefinitionById,
 } from "./HelpCenterCatalog.js";
 import {
   buildHelpStreamUrl,
@@ -163,6 +164,47 @@ function resolvePublicVideoSlot(slot) {
   };
 }
 
+function buildHelpVideoSlotStreamUrl(slotId) {
+  return `/api/help/video-slots/${encodeURIComponent(slotId)}/stream`;
+}
+
+function getBackendVideoPathForSlot(slot) {
+  if (slot.backendVideoPath) {
+    return slot.backendVideoPath;
+  }
+
+  if (slot.videoSlug) {
+    return `uploads/help/videos/${slot.videoSlug}.mp4`;
+  }
+
+  return null;
+}
+
+function resolveBackendVideoSlot(slot) {
+  const backendVideoPath = getBackendVideoPathForSlot(slot);
+
+  if (!backendVideoPath) {
+    return {
+      streamUrl: null,
+      hasVideo: false,
+    };
+  }
+
+  const resolvedVideo = resolveHelpMediaPath(backendVideoPath, "video");
+
+  if (!resolvedVideo.ok) {
+    return {
+      streamUrl: null,
+      hasVideo: false,
+    };
+  }
+
+  return {
+    streamUrl: buildHelpVideoSlotStreamUrl(slot.id),
+    hasVideo: true,
+  };
+}
+
 function formatEstimatedMinutes(minutes) {
   const parsedMinutes = Number(minutes);
 
@@ -238,13 +280,19 @@ function mapDocument(documentDefinition, categoriesById) {
   };
 }
 
-function mapVideoSlot(slot, guideDefinition, categoriesById, videosBySlug) {
+function mapVideoSlot(slot, guideDefinition, categoriesById, videosBySlug, documentsById) {
   const category = categoriesById.get(guideDefinition.categoryId);
   const repositoryVideo = slot.videoSlug ? videosBySlug.get(slot.videoSlug) : null;
   const resolvedVideo = repositoryVideo ? mapVideo(repositoryVideo) : null;
+  const backendVideo = resolveBackendVideoSlot(slot);
   const publicVideo = resolvePublicVideoSlot(slot);
+  const documents = guideDefinition.documentIds
+    .map((documentId) => documentsById.get(documentId))
+    .filter(Boolean);
   const hasPlayableVideo = Boolean(
-    (resolvedVideo?.hasVideo && resolvedVideo?.streamUrl) || publicVideo.streamUrl
+    (resolvedVideo?.hasVideo && resolvedVideo?.streamUrl) ||
+      backendVideo.streamUrl ||
+      publicVideo.streamUrl
   );
 
   return {
@@ -259,6 +307,18 @@ function mapVideoSlot(slot, guideDefinition, categoriesById, videosBySlug) {
     moduleKey: guideDefinition.moduleKey || category?.moduleKey || null,
     guideId: guideDefinition.id,
     guideTitle: guideDefinition.title,
+    documents,
+    relatedGuides: [
+      {
+        id: guideDefinition.id,
+        title: guideDefinition.title,
+        type: guideDefinition.type,
+        categoryId: guideDefinition.categoryId,
+        categoryName: category?.name || null,
+        level: guideDefinition.level,
+        levelLabel: findLabelById(HELP_LEVELS, guideDefinition.level),
+      },
+    ],
     level: slot.level || guideDefinition.level || null,
     levelLabel: findLabelById(HELP_LEVELS, slot.level || guideDefinition.level),
     durationLabel:
@@ -269,7 +329,7 @@ function mapVideoSlot(slot, guideDefinition, categoriesById, videosBySlug) {
     status: hasPlayableVideo ? "available" : "coming-soon",
     hasVideo: hasPlayableVideo,
     hasThumbnail: Boolean(resolvedVideo?.thumbnailUrl || publicVideo.thumbnailUrl),
-    streamUrl: resolvedVideo?.streamUrl || publicVideo.streamUrl,
+    streamUrl: resolvedVideo?.streamUrl || backendVideo.streamUrl || publicVideo.streamUrl,
     thumbnailUrl: resolvedVideo?.thumbnailUrl || publicVideo.thumbnailUrl,
     backendVideoId: resolvedVideo?.id || null,
     tags: uniqueValues(["video", ...guideDefinition.tags]),
@@ -285,7 +345,7 @@ function mapGuide(guideDefinition, categoriesById, documentsById, videosBySlug) 
     .map((documentId) => documentsById.get(documentId))
     .filter(Boolean);
   const videos = guideDefinition.videoSlots.map((slot) =>
-    mapVideoSlot(slot, guideDefinition, categoriesById, videosBySlug)
+    mapVideoSlot(slot, guideDefinition, categoriesById, videosBySlug, documentsById)
   );
 
   return {
@@ -772,6 +832,54 @@ export async function streamVideo(videoId, request, response) {
   }
 
   const resolvedVideo = resolveHelpMediaPath(videoMedia.video_path, "video");
+
+  if (!resolvedVideo.ok) {
+    throw createHttpError(404, resolvedVideo.reason);
+  }
+
+  const totalSize = fs.statSync(resolvedVideo.absolutePath).size;
+  const requestedRange = parseRangeHeader(request.headers.range, totalSize);
+
+  response.setHeader("Accept-Ranges", "bytes");
+  response.setHeader("Cache-Control", "private, max-age=3600");
+  response.setHeader("Content-Type", resolvedVideo.contentType);
+  response.setHeader("X-Content-Type-Options", "nosniff");
+
+  if (requestedRange === null) {
+    response.status(200);
+    response.setHeader("Content-Length", totalSize);
+    await pipeFileToResponse(resolvedVideo.absolutePath, response);
+    return;
+  }
+
+  if (!requestedRange.ok) {
+    response.status(416);
+    response.setHeader("Content-Range", `bytes */${totalSize}`);
+    response.end();
+    return;
+  }
+
+  const { start, end } = requestedRange;
+  const chunkSize = end - start + 1;
+
+  response.status(206);
+  response.setHeader("Content-Length", chunkSize);
+  response.setHeader("Content-Range", `bytes ${start}-${end}/${totalSize}`);
+
+  await pipeFileToResponse(resolvedVideo.absolutePath, response, { start, end });
+}
+
+export async function streamVideoSlot(slotId, request, response) {
+  const videoSlotDefinition = findVideoSlotDefinitionById(slotId);
+  const backendVideoPath = videoSlotDefinition?.slot
+    ? getBackendVideoPathForSlot(videoSlotDefinition.slot)
+    : null;
+
+  if (!backendVideoPath) {
+    throw createHttpError(404, "Capsule video introuvable.");
+  }
+
+  const resolvedVideo = resolveHelpMediaPath(backendVideoPath, "video");
 
   if (!resolvedVideo.ok) {
     throw createHttpError(404, resolvedVideo.reason);

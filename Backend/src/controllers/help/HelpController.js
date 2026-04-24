@@ -108,6 +108,14 @@ export async function streamVideo(request, response) {
   }
 }
 
+export async function streamVideoSlot(request, response) {
+  try {
+    await HelpService.streamVideoSlot(request.params.slotId, request, response);
+  } catch (error) {
+    sendJsonError(response, error, "Erreur lors du streaming de la video.");
+  }
+}
+
 export async function serveThumbnail(request, response) {
   try {
     await HelpService.serveThumbnail(request.params.id, response);

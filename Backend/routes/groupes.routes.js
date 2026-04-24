@@ -18,8 +18,10 @@ import {
 } from "../src/model/groupes.model.js";
 import pool from "../db.js";
 import { userAuth, userAdminOrResponsable } from "../middlewares/auth.js";
+import { requireResourceLock } from "../middlewares/concurrency.js";
 import { assurerSchemaSchedulerAcademique } from "../src/services/academic-scheduler-schema.js";
 import { analyserCompatibiliteChangementGroupePrincipalEtudiant } from "../src/services/etudiants/student-course-exchange.service.js";
+import { journaliserActivite } from "../src/services/activity-log.service.js";
 
 const CAPACITE_MAX_GROUPE = 30;
 
@@ -111,6 +113,7 @@ function construireMessageRefusChangementGroupe(diagnostic) {
 
 // ─── Routes ─────────────────────────────────────────────────────────────────
 export default function groupesRoutes(app) {
+  const verrouGroupe = requireResourceLock("groupe", (request) => request.params.id);
 
   // ══════════════════════════════════════════════════════════════════════════
   // GET /api/groupes  —  Liste des groupes avec détails
@@ -183,8 +186,27 @@ export default function groupesRoutes(app) {
          VALUES (?, ?, ?, ?, ?, ?)`,
         [nom_groupe.trim(), tailleFinale, est_groupe_special ? 1 : 0, programme.trim(), etape ?? null, sessionCible]
       );
+      await journaliserActivite({
+        request: req,
+        actionType: "CREATE",
+        module: "Groupes",
+        targetType: "Groupe",
+        targetId: result.insertId,
+        description: `Creation du groupe ${nom_groupe.trim()}.`,
+        newValue: { id_groupes_etudiants: result.insertId, nom_groupe, programme, etape, id_session: sessionCible },
+      });
       return res.status(201).json({ message: "Groupe créé avec succès.", id_groupes_etudiants: result.insertId });
     } catch (err) {
+      await journaliserActivite({
+        request: req,
+        actionType: "CREATE",
+        module: "Groupes",
+        targetType: "Groupe",
+        description: "Echec de creation d'un groupe.",
+        status: "ERROR",
+        errorMessage: err.message,
+        newValue: req.body,
+      });
       if (err?.code === "ER_DUP_ENTRY") {
         return res.status(409).json({ message: "Un groupe avec ce nom existe déjà pour cette session." });
       }
@@ -644,7 +666,7 @@ export default function groupesRoutes(app) {
   // PUT /api/groupes/:id/etudiants/:idEtudiant/deplacer
   // Déplacer un étudiant vers un autre groupe (validations métier strictes)
   // ══════════════════════════════════════════════════════════════════════════
-  app.put("/api/groupes/:id/etudiants/:idEtudiant/deplacer", userAuth, userAdminOrResponsable, async (req, res) => {
+  app.put("/api/groupes/:id/etudiants/:idEtudiant/deplacer", userAuth, userAdminOrResponsable, verrouGroupe, async (req, res) => {
     try {
       const idGroupeSource = Number(req.params.id);
       const idEtudiant = Number(req.params.idEtudiant);
@@ -727,6 +749,17 @@ export default function groupesRoutes(app) {
 
       await pool.query(`UPDATE etudiants SET id_groupes_etudiants = ? WHERE id_etudiant = ?`, [idGroupeCible, idEtudiant]);
 
+      await journaliserActivite({
+        request: req,
+        actionType: "UPDATE",
+        module: "Groupes",
+        targetType: "Etudiant",
+        targetId: idEtudiant,
+        description: `Deplacement de ${etudiant.prenom} ${etudiant.nom} vers ${gc.nom_groupe}.`,
+        oldValue: { id_groupe_source: idGroupeSource },
+        newValue: { id_groupe_cible: idGroupeCible, nom_groupe_cible: gc.nom_groupe },
+      });
+
       return res.json({
         message: `${etudiant.prenom} ${etudiant.nom} déplacé vers "${gc.nom_groupe}".`,
         id_etudiant: idEtudiant,
@@ -743,6 +776,17 @@ export default function groupesRoutes(app) {
       });
     } catch (err) {
       console.error("[groupes] PUT /:id/etudiants/:idEtudiant/deplacer:", err);
+      await journaliserActivite({
+        request: req,
+        actionType: "UPDATE",
+        module: "Groupes",
+        targetType: "Etudiant",
+        targetId: req.params.idEtudiant,
+        description: "Echec de deplacement d'un etudiant entre groupes.",
+        status: "ERROR",
+        errorMessage: err.message,
+        newValue: req.body,
+      });
       return res.status(err.statusCode || 500).json({
         message: err.message || "Erreur serveur lors du deplacement.",
         ...(err.code ? { code: err.code } : {}),
@@ -754,7 +798,7 @@ export default function groupesRoutes(app) {
   // ══════════════════════════════════════════════════════════════════════════
   // DELETE /api/groupes/:id/etudiants/:idEtudiant  —  Retirer un étudiant
   // ══════════════════════════════════════════════════════════════════════════
-  app.delete("/api/groupes/:id/etudiants/:idEtudiant", userAuth, userAdminOrResponsable, async (req, res) => {
+  app.delete("/api/groupes/:id/etudiants/:idEtudiant", userAuth, userAdminOrResponsable, verrouGroupe, async (req, res) => {
     try {
       const idGroupe = Number(req.params.id);
       const idEtudiant = Number(req.params.idEtudiant);
@@ -771,15 +815,35 @@ export default function groupesRoutes(app) {
   // ══════════════════════════════════════════════════════════════════════════
   // DELETE /api/groupes/:id  —  Supprimer un groupe
   // ══════════════════════════════════════════════════════════════════════════
-  app.delete("/api/groupes/:id", userAuth, userAdminOrResponsable, async (req, res) => {
+  app.delete("/api/groupes/:id", userAuth, userAdminOrResponsable, verrouGroupe, async (req, res) => {
     try {
       const idGroupe = Number(req.params.id);
+      const groupe = await recupererGroupeParId(idGroupe);
       await pool.query(`UPDATE etudiants SET id_groupes_etudiants = NULL WHERE id_groupes_etudiants = ?`, [idGroupe]);
       await pool.query(`DELETE FROM affectation_groupes WHERE id_groupes_etudiants = ?`, [idGroupe]);
       await pool.query(`DELETE FROM groupes_etudiants WHERE id_groupes_etudiants = ?`, [idGroupe]);
+      await journaliserActivite({
+        request: req,
+        actionType: "DELETE",
+        module: "Groupes",
+        targetType: "Groupe",
+        targetId: idGroupe,
+        description: `Suppression du groupe ${groupe?.nom_groupe || idGroupe}.`,
+        oldValue: groupe,
+      });
       return res.json({ message: "Groupe supprimé avec succès." });
     } catch (err) {
       console.error("[groupes] DELETE /:id:", err);
+      await journaliserActivite({
+        request: req,
+        actionType: "DELETE",
+        module: "Groupes",
+        targetType: "Groupe",
+        targetId: req.params.id,
+        description: "Echec de suppression d'un groupe.",
+        status: "ERROR",
+        errorMessage: err.message,
+      });
       return res.status(500).json({ message: "Erreur serveur lors de la suppression." });
     }
   });

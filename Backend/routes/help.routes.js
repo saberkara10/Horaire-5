@@ -14,6 +14,11 @@ export default function helpRoutes(app) {
   app.get("/api/help/videos", userAuth, HelpController.getAllVideos);
   app.get("/api/help/videos/search", userAuth, HelpController.searchVideos);
   app.get(
+    "/api/help/video-slots/:slotId/stream",
+    userAuth,
+    HelpController.streamVideoSlot
+  );
+  app.get(
     "/api/help/videos/category/:categoryId",
     userAuth,
     HelpController.getVideosByCategory

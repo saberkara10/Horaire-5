@@ -18,6 +18,7 @@ function createVideoSlot(definition) {
     durationLabel: null,
     level: null,
     videoSlug: null,
+    backendVideoPath: null,
     publicVideoPath: null,
     publicVideoCandidates: [],
     publicThumbnailUrl: null,
@@ -420,6 +421,49 @@ export const HELP_DOCUMENTS = [
     keywords: ["admin", "responsable", "delegation", "droits"],
   }),
   createDocument({
+    id: "doc-journal-activite",
+    slug: "documentation-journal-activite",
+    title: "Documentation journal d'activite",
+    description:
+      "Audit admin des connexions, modifications, suppressions, generations, imports et exports du rapport vers Excel.",
+    categoryId: "administration",
+    moduleKey: "journal-activite",
+    kind: "procedure-detaillee",
+    relativePath: "documents/documentation-journal-activite.md",
+    estimatedMinutes: 7,
+    tags: ["journal", "audit", "export", "admin"],
+    keywords: [
+      "journal activite",
+      "audit",
+      "connexions",
+      "modifications",
+      "suppressions",
+      "export excel",
+      "administrateur",
+    ],
+  }),
+  createDocument({
+    id: "doc-concurrence",
+    slug: "documentation-concurrence",
+    title: "Documentation concurrence",
+    description:
+      "Supervision des utilisateurs en direct, verrous de modification et files d'attente quand une ressource est deja utilisee.",
+    categoryId: "administration",
+    moduleKey: "admin-concurrence",
+    kind: "procedure-detaillee",
+    relativePath: "documents/documentation-concurrence.md",
+    estimatedMinutes: 5,
+    tags: ["concurrence", "verrous", "temps reel", "attente"],
+    keywords: [
+      "concurrence",
+      "utilisateurs connectes",
+      "verrou",
+      "file attente",
+      "un utilisateur a la fois",
+      "modification simultanee",
+    ],
+  }),
+  createDocument({
     id: "doc-centre-documentaire",
     slug: "centre-documentaire-projet",
     title: "Centre documentaire du projet",
@@ -801,12 +845,12 @@ export const HELP_GUIDES = [
     videoSlots: [
       createVideoSlot({
         id: "video-dashboard",
-        title: "Comprendre le tableau de bord",
+        title: "Tableau de bord dashboard",
         description:
-          "Lecture des informations, indicateurs et blocs de pilotage visibles sur le dashboard.",
-        durationLabel: "3 min 19 s",
+          "Comprendre a quoi sert le tableau de bord, comment lire ses informations et comment l'utiliser dans le suivi quotidien.",
+        durationLabel: "4 min 48 s",
         level: "debutant",
-        videoSlug: "tableau-de-bord",
+        backendVideoPath: "uploads/help/videos/tableau de bord dashboard.mp4",
       }),
     ],
     relatedGuideIds: ["guide-pilotage-session", "guide-diagnostic-generation"],
@@ -849,18 +893,12 @@ export const HELP_GUIDES = [
     videoSlots: [
       createVideoSlot({
         id: "video-cours",
-        title: "Gerer un cours du debut a la validation",
+        title: "Ajout de cours",
         description:
-          "Creation, edition et controle des champs critiques d'un cours.",
-        durationLabel: "5 min",
+          "Ajouter un cours, modifier ses informations et verifier les champs essentiels.",
+        durationLabel: "1 min 35 s",
         level: "debutant",
-        videoSlug: "gerer-un-cours",
-        publicVideoCandidates: [
-          "/help/CRUD_COURS.mkv",
-          "/help/CRUD_COURS.mp4",
-          "/help/COURS.mkv",
-          "/help/COURS.mp4",
-        ],
+        backendVideoPath: "uploads/help/videos/ajout de coours.mp4",
       }),
     ],
     relatedGuideIds: ["guide-generation"],
@@ -900,12 +938,12 @@ export const HELP_GUIDES = [
     videoSlots: [
       createVideoSlot({
         id: "video-professeurs",
-        title: "Gerer les profils enseignants",
+        title: "Ajout de professeur",
         description:
-          "Creation, modification et verification des donnees professeurs.",
-        durationLabel: "4 min",
+          "Ajouter un professeur, modifier sa fiche et verifier les donnees principales.",
+        durationLabel: "0 min 58 s",
         level: "debutant",
-        videoSlug: "gestion-profils-enseignants",
+        backendVideoPath: "uploads/help/videos/ajout de professeur.mp4",
       }),
     ],
     relatedGuideIds: ["guide-disponibilites", "guide-horaires-professeurs"],
@@ -1519,6 +1557,124 @@ export const HELP_GUIDES = [
     popularityScore: 73,
   }),
   createGuide({
+    id: "guide-journal-activite",
+    categoryId: "administration",
+    moduleKey: "journal-activite",
+    title: "Journal d'activite : audit des actions et export Excel",
+    summary:
+      "La capsule montre le journal d'activite reserve a l'administrateur responsable: connexions, modifications, suppressions, generations, erreurs et export du rapport.",
+    objective:
+      "Donner une vue claire de toutes les actions importantes realisees dans le systeme avec les details utiles pour l'audit et le suivi administratif.",
+    prerequisites: [
+      "Etre connecte avec le role ADMIN_RESPONSABLE.",
+      "Avoir des actions deja tracees: connexion, creation, modification, suppression, import ou generation.",
+    ],
+    steps: [
+      "Ouvrez Journal d'activite depuis le menu d'administration.",
+      "Lisez les compteurs principaux: actions du jour, erreurs, connexions et modifications.",
+      "Filtrez par module, action, statut, date ou mot-cle pour retrouver un evenement precis.",
+      "Ouvrez le detail d'une ligne pour voir l'utilisateur, le role, l'adresse IP, la cible et les anciennes ou nouvelles valeurs.",
+      "Exportez le rapport compatible Excel lorsque vous devez conserver ou partager une trace.",
+    ],
+    attentionPoints: [
+      "Le journal d'activite est volontairement limite a l'administrateur responsable.",
+      "Les champs sensibles comme mots de passe, tokens et cookies sont masques avant journalisation.",
+      "L'export doit etre produit apres application des bons filtres si le rapport doit couvrir un perimetre precis.",
+    ],
+    commonErrors: [
+      "Chercher une action sans verifier les filtres actifs.",
+      "Interpreter une absence de resultat sans elargir la periode de dates.",
+    ],
+    practicalTips: [
+      "Utilisez le journal comme preuve de suivi lorsque vous expliquez une suppression, une restauration ou une generation.",
+      "Pendant une demonstration, faites une action simple puis revenez au journal pour montrer la trace creee.",
+    ],
+    level: "intermediaire",
+    estimatedMinutes: 8,
+    tags: ["journal", "audit", "export", "administrateur"],
+    keywords: [
+      "journal activite",
+      "audit actions",
+      "connexion utilisateur",
+      "modification suppression",
+      "export excel",
+      "rapport activite",
+    ],
+    documentIds: ["doc-journal-activite", "doc-admins", "doc-roles"],
+    videoSlots: [
+      createVideoSlot({
+        id: "video-journal-activite",
+        title: "Journal d'activite : suivi, details et export Excel",
+        description:
+          "Audit des connexions, modifications, suppressions et generations avec detail complet et export du rapport.",
+        durationLabel: "7 min 07 s",
+        level: "intermediaire",
+        videoSlug: "journal d`activite",
+      }),
+    ],
+    relatedGuideIds: ["guide-administration", "guide-securite-acces"],
+    popularityScore: 96,
+  }),
+  createGuide({
+    id: "guide-concurrence",
+    categoryId: "administration",
+    moduleKey: "admin-concurrence",
+    title: "Concurrence : utilisateurs en direct, verrous et files d'attente",
+    summary:
+      "La capsule explique comment voir les utilisateurs connectes en direct et comment le systeme bloque les modifications simultanees sur une meme ressource.",
+    objective:
+      "Comprendre et superviser la concurrence afin qu'un seul utilisateur modifie une ressource commune a la fois, pendant que les autres sont places en attente.",
+    prerequisites: [
+      "Disposer des droits d'administration responsable pour consulter la supervision.",
+      "Avoir au moins deux utilisateurs connectes pour demontrer un cas de modification simultanee.",
+    ],
+    steps: [
+      "Ouvrez la supervision de concurrence pour voir les utilisateurs connectes, leurs modules et leur derniere activite.",
+      "Reperez les verrous actifs lorsqu'un utilisateur modifie une salle, un cours, un groupe, un professeur, une planification ou une generation.",
+      "Lorsqu'un deuxieme utilisateur tente de modifier la meme ressource, observez son placement en file d'attente.",
+      "Laissez le premier utilisateur terminer ou liberer le formulaire pour que le prochain en attente puisse reprendre la main.",
+      "Utilisez la page admin pour diagnostiquer les verrous expirants, attentes actives et usages simultanes du systeme.",
+    ],
+    attentionPoints: [
+      "La concurrence protege les ressources communes contre les modifications simultanees.",
+      "Un verrou inactif expire automatiquement apres le delai configure.",
+      "La file d'attente sert a garder l'ordre d'arrivee lorsque plusieurs utilisateurs veulent modifier la meme ressource.",
+    ],
+    commonErrors: [
+      "Forcer une deuxieme modification alors qu'un verrou actif existe deja.",
+      "Confondre utilisateur connecte et utilisateur en train de modifier une ressource verrouillee.",
+    ],
+    practicalTips: [
+      "Pour une demo claire, ouvrez la meme salle avec deux comptes et montrez la file d'attente du deuxieme utilisateur.",
+      "Associez ce module au journal d'activite pour tracer les blocages, liberations et changements d'etat.",
+    ],
+    level: "intermediaire",
+    estimatedMinutes: 6,
+    tags: ["concurrence", "verrous", "temps reel", "attente"],
+    keywords: [
+      "concurrence utilisateurs",
+      "utilisateurs connectes",
+      "verrou modification",
+      "file attente",
+      "un seul a la fois",
+      "ressource utilisee",
+    ],
+    documentIds: ["doc-concurrence", "doc-journal-activite"],
+    videoSlots: [
+      createVideoSlot({
+        id: "video-concurrence",
+        title: "Concurrence : utilisateurs connectes et file d'attente",
+        description:
+          "Utilisateurs en direct, verrous actifs et attente automatique lorsqu'une ressource est deja en modification.",
+        durationLabel: "3 min 15 s",
+        level: "intermediaire",
+        videoSlug: "concurrance",
+      }),
+    ],
+    relatedGuideIds: ["guide-journal-activite", "guide-administration"],
+    popularityScore: 95,
+  }),
+  createGuide({
     id: "guide-vision-projet",
     categoryId: "getting-started",
     moduleKey: "onboarding",
@@ -2025,6 +2181,8 @@ export const HELP_FEATURED = {
   popularGuideIds: [
     "guide-vision-projet",
     "guide-onboarding",
+    "guide-journal-activite",
+    "guide-concurrence",
     "guide-generation",
     "guide-disponibilites",
     "guide-horaires-etudiants",
@@ -2032,12 +2190,10 @@ export const HELP_FEATURED = {
     "guide-diagnostic-generation",
   ],
   recentContentIds: [
-    "doc-documentation-complete",
-    "doc-centre-documentaire",
-    "guide-pilotage-session",
-    "guide-diagnostic-generation",
-    "doc-moteur-intelligent",
-    "doc-planification-manuelle",
+    "guide-journal-activite",
+    "guide-concurrence",
+    "doc-journal-activite",
+    "doc-concurrence",
   ],
   recommendedGuideIds: [
     "guide-vision-projet",
@@ -2046,6 +2202,7 @@ export const HELP_FEATURED = {
     "guide-cours",
     "guide-disponibilites",
     "guide-generation",
+    "guide-journal-activite",
   ],
   learningPath: [
     {
@@ -2083,4 +2240,22 @@ export const HELP_FEATURED = {
 
 export function findDocumentDefinitionBySlug(slug) {
   return HELP_DOCUMENTS.find((document) => document.slug === slug) || null;
+}
+
+export function findVideoSlotDefinitionById(slotId) {
+  const normalizedSlotId = String(slotId || "").trim();
+
+  if (!normalizedSlotId) {
+    return null;
+  }
+
+  for (const guide of HELP_GUIDES) {
+    const slot = guide.videoSlots.find((videoSlot) => videoSlot.id === normalizedSlotId);
+
+    if (slot) {
+      return { guide, slot };
+    }
+  }
+
+  return null;
 }

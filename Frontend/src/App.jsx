@@ -5,7 +5,7 @@
  * principal du frontend.
  */
 import { useEffect, useState } from "react";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { LoginPage } from "./pages/LoginPage.jsx";
 import { LoginHelpPage } from "./pages/LoginHelpPage.jsx";
 import { DashboardPage } from "./pages/DashboardPage.jsx";
@@ -20,6 +20,7 @@ import {
   recupererUtilisateurConnecte,
 } from "./services/auth.api.js";
 import { SESSION_EXPIREE_EVENT } from "./services/api.js";
+import { envoyerHeartbeatPresence } from "./services/concurrency.api.js";
 import { AffectationsPage } from "./pages/AffectationsPage.jsx";
 import { HorairesProfesseursPage } from "./pages/HorairesProfesseursPage.jsx";
 import { HorairesGroupesPage } from "./pages/HorairesGroupesPage.jsx";
@@ -27,8 +28,13 @@ import { HorairesSallesPage } from "./pages/HorairesSallesPage.jsx";
 import { EtudiantsPage } from "./pages/EtudiantsPage.jsx";
 import { GestionGroupesPage } from "./pages/GestionGroupesPage.jsx";
 import { AdminsPage } from "./pages/AdminsPage.jsx";
+import { ActivityLogsPage } from "./pages/ActivityLogsPage.jsx";
+import { AdminConcurrencePage } from "./pages/AdminConcurrencePage.jsx";
 import { CentreAidePage } from "./pages/CentreAidePage.jsx";
-import { utilisateurEstResponsable } from "./utils/roles.js";
+import {
+  utilisateurEstAdminResponsable,
+  utilisateurEstResponsable,
+} from "./utils/roles.js";
 import { PopupProvider } from "./components/feedback/PopupProvider.jsx";
 import { MainLayout } from "./components/layout/MainLayout.jsx";
 
@@ -91,6 +97,7 @@ export default function App() {
 
   const roles = Array.isArray(utilisateur?.roles) ? utilisateur.roles : [];
   const isAdminResponsable = roles.includes("ADMIN_RESPONSABLE");
+  const estAdminGeneral = utilisateurEstAdminResponsable(utilisateur);
   const peutUtiliserScheduler =
     roles.includes("ADMIN") ||
     roles.includes("RESPONSABLE") ||
@@ -99,6 +106,7 @@ export default function App() {
   return (
     <PopupProvider>
       <BrowserRouter>
+        {utilisateur ? <PresenceHeartbeat /> : null}
         <Routes>
           <Route
             path="/login"
@@ -174,6 +182,26 @@ export default function App() {
               }
             />
             <Route
+              path="journal-activite"
+              element={
+                estAdminGeneral ? (
+                  <ActivityLogsPage utilisateur={utilisateur} />
+                ) : (
+                  <Navigate to="/dashboard" replace />
+                )
+              }
+            />
+            <Route
+              path="admin-concurrence"
+              element={
+                estAdminGeneral ? (
+                  <AdminConcurrencePage />
+                ) : (
+                  <Navigate to="/dashboard" replace />
+                )
+              }
+            />
+            <Route
               path="scheduler"
               element={
                 peutUtiliserScheduler ? (
@@ -189,4 +217,26 @@ export default function App() {
       </BrowserRouter>
     </PopupProvider>
   );
+}
+
+function PresenceHeartbeat() {
+  const location = useLocation();
+
+  useEffect(() => {
+    function envoyer() {
+      envoyerHeartbeatPresence({
+        page: location.pathname,
+        module: location.pathname.replace("/", "") || "dashboard",
+        status: "actif",
+      }).catch(() => {
+        // La presence ne doit jamais interrompre la navigation.
+      });
+    }
+
+    envoyer();
+    const intervalId = window.setInterval(envoyer, 60000);
+    return () => window.clearInterval(intervalId);
+  }, [location.pathname]);
+
+  return null;
 }

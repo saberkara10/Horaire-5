@@ -2,6 +2,7 @@ import { NavLink, useLocation } from "react-router-dom";
 import "../../styles/AppShell.css";
 import {
   getLibelleRoleFrontend,
+  utilisateurEstAdminResponsable,
   utilisateurEstResponsable,
 } from "../../utils/roles.js";
 import { usePopup } from "../feedback/PopupProvider.jsx";
@@ -23,6 +24,7 @@ export function AppShell({
   const { confirm } = usePopup();
   const rolesUtilisateur = Array.isArray(utilisateur?.roles) ? utilisateur.roles : [];
   const estResponsable = utilisateurEstResponsable(utilisateur);
+  const estAdminGeneral = utilisateurEstAdminResponsable(utilisateur);
   const peutUtiliserScheduler =
     rolesUtilisateur.includes("ADMIN") ||
     rolesUtilisateur.includes("RESPONSABLE") ||
@@ -119,6 +121,18 @@ export function AppShell({
           {
             label: "Sous-admins",
             to: "/admins",
+          },
+        ]
+      : []),
+    ...(estAdminGeneral
+      ? [
+          {
+            label: "Concurrence",
+            to: "/admin-concurrence",
+          },
+          {
+            label: "Journal d'activite",
+            to: "/journal-activite",
           },
         ]
       : []),

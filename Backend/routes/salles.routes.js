@@ -44,6 +44,8 @@ import {
 } from "../src/validations/salles.validation.js";
 import { televerserFichierImportExcel } from "../src/validations/import-excel.validation.js";
 import { userAdmin, userAdminOrResponsable, userAuth } from "../middlewares/auth.js";
+import { requireResourceLock } from "../middlewares/concurrency.js";
+import { journaliserActivite } from "../src/services/activity-log.service.js";
 
 /**
  * Vérifie qu'une date est au format YYYY-MM-DD.
@@ -110,6 +112,7 @@ export default function sallesRoutes(app) {
   // Groupes de middlewares réutilisables pour ne pas répéter la logique d'accès
   const accesLectureSalles = [userAuth, userAdminOrResponsable];  // Lecture : admin ou responsable
   const accesGestionSalles = [userAuth, userAdmin];                // Écriture : admin seulement
+  const verrouSalle = requireResourceLock("salle", (request) => request.params.id);
 
   /**
    * GET /api/salles
@@ -174,8 +177,26 @@ export default function sallesRoutes(app) {
     async (request, response) => {
       try {
         const resultat = await importerSallesDepuisFichier(request.file);
+        await journaliserActivite({
+          request,
+          actionType: "IMPORT",
+          module: "Salles",
+          targetType: "Fichier Excel",
+          description: "Importation Excel des salles.",
+          newValue: { fichier: request.file?.originalname, resultat },
+        });
         return response.status(200).json(resultat);
       } catch (error) {
+        await journaliserActivite({
+          request,
+          actionType: "IMPORT",
+          module: "Salles",
+          targetType: "Fichier Excel",
+          description: "Echec de l'importation Excel des salles.",
+          status: "ERROR",
+          errorMessage: error.message,
+          newValue: { fichier: request.file?.originalname },
+        });
         if (error instanceof ImportExcelError) {
           return response.status(error.status || 400).json({
             message: error.message,
@@ -301,6 +322,7 @@ export default function sallesRoutes(app) {
     ...accesGestionSalles,
     validerIdSalle,
     verifierSalleExiste,
+    verrouSalle,
     async (request, response) => {
       try {
         const messageErreur = validerIndisponibilitesPayload(
@@ -352,10 +374,30 @@ export default function sallesRoutes(app) {
         // Relire la salle créée pour retourner l'objet complet avec ID
         const salleAjoutee = await getSalleByCode(code);
 
+        await journaliserActivite({
+          request,
+          actionType: "CREATE",
+          module: "Salles",
+          targetType: "Salle",
+          targetId: salleAjoutee?.id_salle || code,
+          description: `Creation de la salle ${code}.`,
+          newValue: salleAjoutee || { code, type, capacite },
+        });
+
         response.status(201).json(
           salleAjoutee || { code, type, capacite } // Fallback si la lecture échoue
         );
       } catch (error) {
+        await journaliserActivite({
+          request,
+          actionType: "CREATE",
+          module: "Salles",
+          targetType: "Salle",
+          description: "Echec de creation d'une salle.",
+          status: "ERROR",
+          errorMessage: error.message,
+          newValue: request.body,
+        });
         if (error.code === "ER_DUP_ENTRY") {
           // MySQL retourne ER_DUP_ENTRY en cas de violation de contrainte UNIQUE
           return response.status(409).json({ message: "Code deja utilise." });
@@ -390,8 +432,10 @@ export default function sallesRoutes(app) {
     validerIdSalle,
     verifierSalleExiste,
     validerUpdateSalle,
+    verrouSalle,
     async (request, response) => {
       try {
+        const ancienneSalle = request.salle;
         // Si le champ n'est pas fourni, conserver la valeur actuelle de la salle
         const type = request.body.type ?? request.salle.type;
         const capacite = request.body.capacite ?? request.salle.capacite;
@@ -400,8 +444,30 @@ export default function sallesRoutes(app) {
 
         // Relire la salle pour retourner l'état à jour
         const salleModifiee = await getSalleById(Number(request.params.id));
+        await journaliserActivite({
+          request,
+          actionType: "UPDATE",
+          module: "Salles",
+          targetType: "Salle",
+          targetId: request.params.id,
+          description: `Modification de la salle ${salleModifiee?.code || request.params.id}.`,
+          oldValue: ancienneSalle,
+          newValue: salleModifiee,
+        });
         response.status(200).json(salleModifiee);
       } catch (error) {
+        await journaliserActivite({
+          request,
+          actionType: "UPDATE",
+          module: "Salles",
+          targetType: "Salle",
+          targetId: request.params.id,
+          description: "Echec de modification d'une salle.",
+          status: "ERROR",
+          errorMessage: error.message,
+          oldValue: request.salle,
+          newValue: request.body,
+        });
         response.status(500).json({ message: "Erreur serveur." });
       }
     }
@@ -427,11 +493,33 @@ export default function sallesRoutes(app) {
     validerIdSalle,
     verifierSalleExiste,
     validerDeleteSalle,
+    verrouSalle,
     async (request, response) => {
       try {
+        const ancienneSalle = request.salle;
         await deleteSalle(Number(request.params.id));
+        await journaliserActivite({
+          request,
+          actionType: "DELETE",
+          module: "Salles",
+          targetType: "Salle",
+          targetId: request.params.id,
+          description: `Suppression de la salle ${ancienneSalle?.code || request.params.id}.`,
+          oldValue: ancienneSalle,
+        });
         response.status(200).json({ message: "Salle supprimee." });
       } catch (error) {
+        await journaliserActivite({
+          request,
+          actionType: "DELETE",
+          module: "Salles",
+          targetType: "Salle",
+          targetId: request.params.id,
+          description: "Echec de suppression d'une salle.",
+          status: "ERROR",
+          errorMessage: error.message,
+          oldValue: request.salle,
+        });
         if (error.code === "ER_ROW_IS_REFERENCED_2") {
           // La salle est encore utilisée dans affectation_cours ou cours.id_salle_reference
           return response.status(400).json({

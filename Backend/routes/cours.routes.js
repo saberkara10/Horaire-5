@@ -41,6 +41,8 @@ import {
 } from "../src/validations/cours.validations.js";
 import { televerserFichierImportExcel } from "../src/validations/import-excel.validation.js";
 import { userAdminOrResponsable, userAuth } from "../middlewares/auth.js";
+import { requireResourceLock } from "../middlewares/concurrency.js";
+import { journaliserActivite } from "../src/services/activity-log.service.js";
 
 /**
  * Initialise et enregistre les routes des cours sur l'application Express.
@@ -49,6 +51,7 @@ import { userAdminOrResponsable, userAuth } from "../middlewares/auth.js";
  */
 export default function coursRoutes(app) {
   const accesCours = [userAuth, userAdminOrResponsable];
+  const verrouCours = requireResourceLock("cours", (request) => request.params.id);
 
   /**
    * GET /api/cours
@@ -112,8 +115,29 @@ export default function coursRoutes(app) {
     async (request, response) => {
       try {
         const resultat = await importerCoursDepuisFichier(request.file);
+        await journaliserActivite({
+          request,
+          actionType: "IMPORT",
+          module: "Cours",
+          targetType: "Fichier Excel",
+          description: "Importation Excel des cours.",
+          newValue: {
+            fichier: request.file?.originalname,
+            resultat,
+          },
+        });
         return response.status(200).json(resultat);
       } catch (error) {
+        await journaliserActivite({
+          request,
+          actionType: "IMPORT",
+          module: "Cours",
+          targetType: "Fichier Excel",
+          description: "Echec de l'importation Excel des cours.",
+          status: "ERROR",
+          errorMessage: error.message,
+          newValue: { fichier: request.file?.originalname },
+        });
         if (error instanceof ImportExcelError) {
           return response.status(error.status || 400).json({
             message: error.message,
@@ -173,8 +197,27 @@ export default function coursRoutes(app) {
     async (request, response) => {
       try {
         const nouveauCours = await ajouterCours(request.body);
+        await journaliserActivite({
+          request,
+          actionType: "CREATE",
+          module: "Cours",
+          targetType: "Cours",
+          targetId: nouveauCours?.id_cours,
+          description: `Creation du cours ${nouveauCours?.code || request.body?.code || ""}.`.trim(),
+          newValue: nouveauCours,
+        });
         response.status(201).json(nouveauCours);
       } catch (error) {
+        await journaliserActivite({
+          request,
+          actionType: "CREATE",
+          module: "Cours",
+          targetType: "Cours",
+          description: "Echec de creation d'un cours.",
+          status: "ERROR",
+          errorMessage: error.message,
+          newValue: request.body,
+        });
         response.status(500).json({ message: "Erreur serveur." });
       }
     }
@@ -199,15 +242,40 @@ export default function coursRoutes(app) {
     validerIdCours,
     verifierCoursExiste,
     validerUpdateCours,
+    verrouCours,
     async (request, response) => {
       try {
+        const ancienCours = request.cours;
         const coursModifie = await modifierCours(
           Number(request.params.id),
           request.body
         );
 
+        await journaliserActivite({
+          request,
+          actionType: "UPDATE",
+          module: "Cours",
+          targetType: "Cours",
+          targetId: request.params.id,
+          description: `Modification du cours ${coursModifie?.code || ancienCours?.code || request.params.id}.`,
+          oldValue: ancienCours,
+          newValue: coursModifie,
+        });
+
         response.status(200).json(coursModifie);
       } catch (error) {
+        await journaliserActivite({
+          request,
+          actionType: "UPDATE",
+          module: "Cours",
+          targetType: "Cours",
+          targetId: request.params.id,
+          description: "Echec de modification d'un cours.",
+          status: "ERROR",
+          errorMessage: error.message,
+          oldValue: request.cours,
+          newValue: request.body,
+        });
         response.status(500).json({ message: "Erreur serveur." });
       }
     }
@@ -232,11 +300,33 @@ export default function coursRoutes(app) {
     validerIdCours,
     verifierCoursExiste,
     validerDeleteCours,
+    verrouCours,
     async (request, response) => {
       try {
+        const ancienCours = request.cours;
         await supprimerCours(Number(request.params.id));
+        await journaliserActivite({
+          request,
+          actionType: "DELETE",
+          module: "Cours",
+          targetType: "Cours",
+          targetId: request.params.id,
+          description: `Suppression du cours ${ancienCours?.code || request.params.id}.`,
+          oldValue: ancienCours,
+        });
         response.status(200).json({ message: "Cours supprime." });
       } catch (error) {
+        await journaliserActivite({
+          request,
+          actionType: "DELETE",
+          module: "Cours",
+          targetType: "Cours",
+          targetId: request.params.id,
+          description: "Echec de suppression d'un cours.",
+          status: "ERROR",
+          errorMessage: error.message,
+          oldValue: request.cours,
+        });
         response.status(500).json({ message: "Erreur serveur." });
       }
     }
