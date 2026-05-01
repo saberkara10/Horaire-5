@@ -484,4 +484,20 @@ describe("SchedulerEngine.generer", () => {
     expect(releaseMock).toHaveBeenCalled();
     expect(commitMock).not.toHaveBeenCalled();
   });
+
+  test("retient un score rapport reel quand scoring_v1 est trop optimiste", () => {
+    const score = SchedulerEngine._calculerScoreRapportGlobal(
+      {
+        modes: {
+          equilibre: {
+            scoreGlobal: 100,
+          },
+        },
+      },
+      "equilibre",
+      74
+    );
+
+    expect(score).toBe(74);
+  });
 });

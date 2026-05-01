@@ -596,7 +596,7 @@ export class SchedulerEngine {
         SchedulerEngine._safeNum(scoreInitial, 0)
       );
       rapport.iterations_sa = 0;
-      rapport.score_qualite = SchedulerEngine._lireScoreScoringV1(
+      rapport.score_qualite = SchedulerEngine._calculerScoreRapportGlobal(
         optimisationLocale.scoringAfter,
         modeOptimisation,
         qualite.score
@@ -641,6 +641,12 @@ export class SchedulerEngine {
           raisonIgnoree: optimisationLocale.skipReason || null,
           erreur: optimisationLocale.error || null,
         },
+        score_qualite_scoring_v1: SchedulerEngine._lireScoreScoringV1(
+          optimisationLocale.scoringAfter,
+          modeOptimisation,
+          qualite.score
+        ),
+        score_qualite_operationnel: SchedulerEngine._safeNum(qualite.score, 0),
       };
       rapport.details.scoring_v1_avant_optimisation_locale =
         optimisationLocale.scoringBefore;
@@ -3436,6 +3442,25 @@ export class SchedulerEngine {
     return Number.isFinite(score) ? Number(score.toFixed(2)) : fallback;
   }
 
+  static _calculerScoreRapportGlobal(
+    scoringBundle,
+    optimizationMode = "legacy",
+    scoreOperationnel = 0
+  ) {
+    const scoreScoring = SchedulerEngine._lireScoreScoringV1(
+      scoringBundle,
+      optimizationMode,
+      scoreOperationnel
+    );
+    const scoreQualiteOperationnelle = Number(scoreOperationnel);
+
+    if (!Number.isFinite(scoreQualiteOperationnelle)) {
+      return scoreScoring;
+    }
+
+    return Number(Math.min(scoreScoring, scoreQualiteOperationnelle).toFixed(2));
+  }
+
   static _calculerScoringLectureSeule(payload = {}) {
     try {
       return ScheduleScorer.scoreAllModes(payload);
@@ -4693,7 +4718,7 @@ export class SchedulerEngine {
         modeOptimisation,
         qualite.score
       );
-      rapport.score_qualite = SchedulerEngine._lireScoreScoringV1(
+      rapport.score_qualite = SchedulerEngine._calculerScoreRapportGlobal(
         optimisationLocale.scoringAfter,
         modeOptimisation,
         qualite.score
@@ -4758,6 +4783,12 @@ export class SchedulerEngine {
           fallbackLectureSeule: Boolean(optimisationLocale.fallbackLectureSeule),
           erreur: optimisationLocale.error || null,
         },
+        score_qualite_scoring_v1: SchedulerEngine._lireScoreScoringV1(
+          optimisationLocale.scoringAfter,
+          modeOptimisation,
+          qualite.score
+        ),
+        score_qualite_operationnel: SchedulerEngine._safeNum(qualite.score, 0),
       };
       rapport.details.scoring_v1_avant_optimisation_locale =
         optimisationLocale.scoringBefore;
